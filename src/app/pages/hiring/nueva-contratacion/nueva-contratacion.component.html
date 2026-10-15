@@ -1,0 +1,396 @@
+<!-- ============================================
+     MODAL NUEVA CONTRATACIÓN
+     Patrón del modal de distribución de resueltos_ok (mppd/gdoc):
+     backdrop + blur, card con slideUp, header con icono, body con
+     checklist de canales y footer Cancelar/Aceptar.
+     ============================================ -->
+<div class="contr-modal-backdrop" (click)="cerrarModal()">
+  <div
+    class="contr-modal-card"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="contr-modal-title"
+    (click)="$event.stopPropagation()"
+  >
+
+    <!-- Header -->
+    <div class="contr-modal-header">
+      <div class="contr-modal-icon">
+        <mat-icon>post_add</mat-icon>
+      </div>
+      <div>
+        <h3 class="contr-modal-title" id="contr-modal-title">Nueva Contratación</h3>
+        <p class="contr-modal-subtitle">
+          Proceso N° <strong>{{ numero || 'autogenerado' }}</strong>
+        </p>
+      </div>
+      <button class="contr-close-btn" type="button" (click)="cerrarModal()" aria-label="Cerrar">
+        &times;
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="contr-modal-body">
+      <p class="contr-instruction">
+        Complete los datos del nuevo proceso de contratación. Los campos marcados con
+        <span class="contr-required">*</span> son obligatorios.
+      </p>
+
+      <!-- Errores -->
+      <div class="contr-error-box" *ngIf="mostrarErrores">
+        <mat-icon>error_outline</mat-icon>
+        <ul>
+          <li *ngFor="let error of errores">{{ error }}</li>
+        </ul>
+      </div>
+
+      <div class="contr-form-grid">
+
+        <!-- Tipo de contratación -->
+        <div class="contr-field">
+          <label class="contr-label" for="contr-tipo">Tipo de contratación</label>
+          <select id="contr-tipo" name="contr-tipo" class="contr-input" [(ngModel)]="tipo">
+            <option value="">Seleccione...</option>
+            <option *ngFor="let t of tipos" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+
+        <!-- Modalidad -->
+        <div class="contr-field">
+          <label class="contr-label" for="contr-modalidad">Modalidad</label>
+          <select id="contr-modalidad" name="contr-modalidad" class="contr-input" [(ngModel)]="modalidad">
+            <option value="">Seleccione...</option>
+            <option *ngFor="let m of modalidades" [value]="m">{{ m }}</option>
+          </select>
+        </div>
+
+        <!-- Cargo / Objeto -->
+        <div class="contr-field span-2">
+          <label class="contr-label" for="contr-cargo">
+            Cargo u objeto de la contratación <span class="contr-required">*</span>
+          </label>
+          <input
+            #campoCargo
+            id="contr-cargo"
+            name="contr-cargo"
+            type="text"
+            class="contr-input"
+            placeholder="Ej: Analista de Sistemas / Suministro de equipos de cómputo"
+            [(ngModel)]="cargo"
+          />
+        </div>
+
+        <!-- Solicitante -->
+        <div class="contr-field">
+          <label class="contr-label" for="contr-solicitante">
+            Solicitante <span class="contr-required">*</span>
+          </label>
+          <input
+            id="contr-solicitante"
+            name="contr-solicitante"
+            type="text"
+            class="contr-input"
+            placeholder="Nombre y apellido"
+            [(ngModel)]="solicitante"
+          />
+        </div>
+
+        <!-- Cédula / RIF -->
+        <div class="contr-field">
+          <label class="contr-label" for="contr-cedula">
+            Cédula / RIF <span class="contr-required">*</span>
+          </label>
+          <input
+            id="contr-cedula"
+            name="contr-cedula"
+            type="text"
+            class="contr-input"
+            placeholder="V-12.345.678"
+            [(ngModel)]="cedula"
+          />
+        </div>
+
+        <!-- Fecha -->
+        <div class="contr-field">
+          <label class="contr-label" for="contr-fecha">
+            Fecha <span class="contr-required">*</span>
+          </label>
+          <input
+            id="contr-fecha"
+            name="contr-fecha"
+            type="date"
+            class="contr-input"
+            [(ngModel)]="fecha"
+          />
+        </div>
+
+        <!-- Monto estimado -->
+        <div class="contr-field">
+          <label class="contr-label" for="contr-monto">Monto estimado (Bs.)</label>
+          <input
+            id="contr-monto"
+            name="contr-monto"
+            type="number"
+            min="0"
+            step="0.01"
+            class="contr-input"
+            placeholder="0,00"
+            [(ngModel)]="monto"
+          />
+        </div>
+
+        <!-- Canales de publicación -->
+        <div class="contr-field span-2">
+          <label class="contr-label">Canales de publicación previstos</label>
+          <div class="contr-checklist-grid">
+            <label
+              class="contr-check-item"
+              *ngFor="let canal of canalesPublicacion"
+              [class.is-no-publicar]="canal === 'NO PUBLICAR'"
+              [class.checked]="esCanalSeleccionado(canal)"
+            >
+              <input
+                type="checkbox"
+                [checked]="esCanalSeleccionado(canal)"
+                (change)="toggleCanal(canal)"
+              />
+              <span class="contr-check-box">
+                <mat-icon>check</mat-icon>
+              </span>
+              <span class="contr-check-label">{{ canal }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Observaciones — editor con opciones de texto (patrón toolbar de resueltos_ok) -->
+        <div class="contr-field span-2">
+          <label class="contr-label">Observaciones</label>
+
+          <div class="contr-editor">
+            <!-- Toolbar de formato -->
+            <div class="contr-toolbar" #editorToolbar role="toolbar" aria-label="Opciones de texto">
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Negrita (Ctrl+B)"
+                (mousedown)="$event.preventDefault(); formatearTexto('bold')"
+              >
+                <mat-icon>format_bold</mat-icon>
+              </button>
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Cursiva (Ctrl+I)"
+                (mousedown)="$event.preventDefault(); formatearTexto('italic')"
+              >
+                <mat-icon>format_italic</mat-icon>
+              </button>
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Subrayado (Ctrl+U)"
+                (mousedown)="$event.preventDefault(); formatearTexto('underline')"
+              >
+                <mat-icon>format_underlined</mat-icon>
+              </button>
+
+              <span class="contr-tool-divider"></span>
+
+              <!-- Alineación -->
+              <div class="contr-tool-drop" [class.open]="dropdownAbierto === 'align'" [class.abrir-arriba]="dropdownAbierto === 'align' && dropdownArriba">
+                <button
+                  type="button"
+                  class="contr-tool-btn contr-tool-btn-caret"
+                  title="Alineación"
+                  (mousedown)="$event.preventDefault(); alternarDropdown('align', $event.currentTarget)"
+                >
+                  <mat-icon>format_align_left</mat-icon>
+                </button>
+                <div class="contr-tool-menu" *ngIf="dropdownAbierto === 'align'">
+                  <button
+                    type="button"
+                    class="contr-tool-item"
+                    *ngFor="let alineacion of alineaciones"
+                    (mousedown)="$event.preventDefault(); elegirOpcionEnDropdown('align', alineacion.comando)"
+                  >
+                    <mat-icon>{{ alineacion.icono }}</mat-icon>
+                    <span>{{ alineacion.etiqueta }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Listas -->
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Lista con viñetas"
+                (mousedown)="$event.preventDefault(); formatearTexto('insertUnorderedList')"
+              >
+                <mat-icon>format_list_bulleted</mat-icon>
+              </button>
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Lista numerada"
+                (mousedown)="$event.preventDefault(); formatearTexto('insertOrderedList')"
+              >
+                <mat-icon>format_list_numbered</mat-icon>
+              </button>
+
+              <span class="contr-tool-divider"></span>
+
+              <!-- Tamaño de fuente de la selección -->
+              <div class="contr-tool-drop" [class.open]="dropdownAbierto === 'fontSize'" [class.abrir-arriba]="dropdownAbierto === 'fontSize' && dropdownArriba">
+                <button
+                  type="button"
+                  class="contr-tool-btn contr-tool-btn-caret"
+                  title="Tamaño de fuente de la selección"
+                  (mousedown)="$event.preventDefault(); alternarDropdown('fontSize', $event.currentTarget)"
+                >
+                  <mat-icon>format_size</mat-icon>
+                </button>
+                <div class="contr-tool-menu" *ngIf="dropdownAbierto === 'fontSize'">
+                  <button
+                    type="button"
+                    class="contr-tool-item"
+                    *ngFor="let tamano of tamanosFuente"
+                    (mousedown)="$event.preventDefault(); elegirOpcionEnDropdown('fontSize', tamano)"
+                  >
+                    <span [class.contr-tool-item-default]="tamano === '11pt'">
+                      {{ tamano }}{{ tamano === '11pt' ? ' (Defecto)' : '' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Interlineado de la selección -->
+              <div class="contr-tool-drop" [class.open]="dropdownAbierto === 'lineHeight'" [class.abrir-arriba]="dropdownAbierto === 'lineHeight' && dropdownArriba">
+                <button
+                  type="button"
+                  class="contr-tool-btn contr-tool-btn-caret"
+                  title="Interlineado de la selección"
+                  (mousedown)="$event.preventDefault(); alternarDropdown('lineHeight', $event.currentTarget)"
+                >
+                  <mat-icon>format_line_spacing</mat-icon>
+                </button>
+                <div class="contr-tool-menu" *ngIf="dropdownAbierto === 'lineHeight'">
+                  <button
+                    type="button"
+                    class="contr-tool-item"
+                    *ngFor="let interlineado of interlineados"
+                    (mousedown)="$event.preventDefault(); elegirOpcionEnDropdown('lineHeight', interlineado)"
+                  >
+                    <span [class.contr-tool-item-default]="interlineado === '1.0'">
+                      {{ interlineado }}{{ interlineado === '1.0' ? ' (Sencillo)' : interlineado === '2.0' ? ' (Doble)' : '' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Ancho de línea / espaciado entre letras -->
+              <div class="contr-tool-drop contr-tool-drop-end" [class.open]="dropdownAbierto === 'letterSpacing'" [class.abrir-arriba]="dropdownAbierto === 'letterSpacing' && dropdownArriba">
+                <button
+                  type="button"
+                  class="contr-tool-btn contr-tool-btn-caret"
+                  title="Ancho de línea de la selección"
+                  (mousedown)="$event.preventDefault(); alternarDropdown('letterSpacing', $event.currentTarget)"
+                >
+                  <mat-icon>swap_horiz</mat-icon>
+                </button>
+                <div class="contr-tool-menu" *ngIf="dropdownAbierto === 'letterSpacing'">
+                  <button
+                    type="button"
+                    class="contr-tool-item"
+                    *ngFor="let ancho of anchosLinea"
+                    (mousedown)="$event.preventDefault(); elegirOpcionEnDropdown('letterSpacing', ancho.valor)"
+                  >
+                    <span [class.contr-tool-item-default]="ancho.valor === 'normal'">{{ ancho.etiqueta }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <span class="contr-tool-divider"></span>
+
+              <!-- Ancho de la línea (fila) -->
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Ampliar ancho de la línea"
+                (mousedown)="$event.preventDefault(); ampliarLinea()"
+              >
+                <mat-icon>fullscreen</mat-icon>
+              </button>
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Estrechar ancho de la línea"
+                (mousedown)="$event.preventDefault(); estrecharLinea()"
+              >
+                <mat-icon>fullscreen_exit</mat-icon>
+              </button>
+
+              <!-- Sangrías -->
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Aumentar sangría izquierda"
+                (mousedown)="$event.preventDefault(); aumentarSangria()"
+              >
+                <mat-icon>format_indent_increase</mat-icon>
+              </button>
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Reducir sangría izquierda"
+                (mousedown)="$event.preventDefault(); reducirSangria()"
+              >
+                <mat-icon>format_indent_decrease</mat-icon>
+              </button>
+
+              <span class="contr-tool-divider"></span>
+
+              <button
+                type="button"
+                class="contr-tool-btn"
+                title="Limpiar formato de la selección"
+                (mousedown)="$event.preventDefault(); formatearTexto('removeFormat')"
+              >
+                <mat-icon>format_clear</mat-icon>
+              </button>
+            </div>
+
+            <!-- Área de escritura -->
+            <div
+              #editorTexto
+              id="contr-editor"
+              class="contr-editor-area"
+              contenteditable="true"
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Observaciones"
+              data-placeholder="Escriba aquí la observación. Use la barra superior para dar formato (negrita, alineación, listas, tamaño, interlineado, sangrías)."
+              [attr.data-vacio]="observacion ? null : true"
+              (input)="onEditorInput()"
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen de canales -->
+      <div class="contr-summary" *ngIf="totalCanales > 0">
+        <mat-icon>alt_route</mat-icon>
+        <span>Canales: <strong>{{ totalCanales }}</strong> seleccionados</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="contr-modal-footer">
+      <button class="contr-btn-cancel" type="button" (click)="cerrarModal()">
+        <mat-icon>close</mat-icon> Cancelar
+      </button>
+      <button class="contr-btn-accept" type="button" (click)="onCrear()">
+        <mat-icon>check</mat-icon> Crear Contratación
+      </button>
+    </div>
+  </div>
+</div>

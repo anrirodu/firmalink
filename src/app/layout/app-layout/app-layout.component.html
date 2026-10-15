@@ -1,0 +1,148 @@
+<!-- ============================================
+     LAYOUT COMPARTIDO — después de iniciar sesión
+     Sidebar + Topbar + Footer fijos, contenido en <router-outlet>
+     ============================================ -->
+<div class="app-layout">
+
+  <!-- ═══════ BACKDROP (móvil) ═══════ -->
+  @if (isMobile() && sidenavOpen()) {
+    <div class="sidebar-backdrop" (click)="closeSidenav()"></div>
+  }
+
+  <!-- ═══════ SIDEBAR ═══════ -->
+  <aside
+    class="sidebar"
+    [class.open]="sidenavOpen()"
+    [class.mobile]="isMobile()"
+  >
+    <div class="sidebar-header">
+      <img src="assets/images/logo.png" alt="FirmaLink" class="sidebar-logo-img" />
+      <span class="sidebar-title">FirmaLink</span>
+      @if (isMobile()) {
+        <button mat-icon-button class="sidebar-close" (click)="closeSidenav()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Menú dinámico desde la API -->
+      @for (item of menuService.menuItems(); track item.id) {
+        @if (item.type === 'item' && item.url) {
+          <a class="nav-item" [class.active]="isActive(item.url!)" (click)="navigateTo(item.url!)">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <span>{{ item.title }}</span>
+          </a>
+        }
+
+        @if (item.type === 'collapsible' && item.children?.length) {
+          <div class="nav-collapsible">
+            <a class="nav-item" (click)="toggleSubmenu(item)">
+              <mat-icon>{{ item.icon }}</mat-icon>
+              <span>{{ item.title }}</span>
+              <mat-icon class="expand-icon" [class.expanded]="isExpanded(item)">
+                expand_more
+              </mat-icon>
+            </a>
+
+            @if (isExpanded(item)) {
+              <div class="submenu">
+                @for (child of item.children!; track child.id) {
+                  @if (child.url) {
+                    <a class="submenu-item" [class.active]="isActive(child.url)" (click)="navigateTo(child.url)">
+                      <mat-icon>{{ child.icon }}</mat-icon>
+                      <span>{{ child.title }}</span>
+                    </a>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+    </nav>
+  </aside>
+
+  <!-- ═══════ CONTENIDO PRINCIPAL ═══════ -->
+  <div class="main-content">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <button mat-icon-button (click)="toggleSidenav()">
+        <mat-icon>menu</mat-icon>
+      </button>
+
+      <div class="topbar-spacer"></div>
+
+      <button mat-icon-button class="topbar-icon">
+        <mat-icon>notifications</mat-icon>
+      </button>
+
+      <button mat-icon-button class="topbar-icon">
+        <mat-icon>mail</mat-icon>
+      </button>
+
+      <!-- Toggle de tema claro/oscuro -->
+      <button
+        mat-icon-button
+        class="topbar-icon"
+        [matTooltip]="themeService.isDark() ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
+        (click)="themeService.toggle()"
+      >
+        <mat-icon>{{ themeService.isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
+
+      <!-- User Menu -->
+      <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        @if (authService.user(); as user) {
+          <div class="user-info">
+            <span class="user-name">{{ user.nombre }}</span>
+            <span class="user-role">{{ user.rol }}</span>
+          </div>
+        }
+        <mat-icon class="dropdown-arrow">arrow_drop_down</mat-icon>
+      </button>
+
+      <mat-menu #userMenu="matMenu" class="user-menu">
+        <button mat-menu-item (click)="goDashboard()">
+          <mat-icon>person</mat-icon>
+          <span>Mi Perfil</span>
+        </button>
+        <button mat-menu-item (click)="goChangePassword()">
+          <mat-icon>lock</mat-icon>
+          <span>Cambiar Contraseña</span>
+        </button>
+        <button mat-menu-item>
+          <mat-icon>settings</mat-icon>
+          <span>Configuración</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="logout()">
+          <mat-icon>logout</mat-icon>
+          <span>Cerrar Sesión</span>
+        </button>
+      </mat-menu>
+    </header>
+
+    <!-- Contenido de la página activa (router-outlet) -->
+    <div class="page-content fade-in">
+      <router-outlet></router-outlet>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-left">
+        <mat-icon style="font-size:16px;width:16px;height:16px;color:#00c9a7">link</mat-icon>
+        <span>FirmaLink &copy; {{ currentYear }} — BUNKER TECHNOLOGIES SOLUTIONS C.A</span>
+      </div>
+      <div class="footer-right">
+        <a href="javascript:void(0)">Soporte</a>
+        <a href="javascript:void(0)">Términos</a>
+        <a href="javascript:void(0)">Política de Privacidad</a>
+      </div>
+    </footer>
+  </div>
+</div>

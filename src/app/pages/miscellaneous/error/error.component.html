@@ -1,0 +1,43 @@
+<div class="misc-wrapper">
+  <!-- Background animado -->
+  <div class="background-shapes">
+    <div class="shape shape1"></div>
+    <div class="shape shape2"></div>
+    <div class="shape shape3"></div>
+  </div>
+
+  <div class="misc-inner d-flex flex-column align-items-center justify-content-center p-4">
+    <div class="w-100 text-center">
+      <!-- Candado animado -->
+      <div class="animated-lock-container mb-4">
+        <svg style="width: 150px; height: auto;"
+          class="animated-lock"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 100 125"
+        >
+          <g class="lock-body">
+            <path fill="#5e5873"
+              d="M82.1,48.4H78V35.3C78,20.8,65.2,8,50.7,8S23.4,20.8,23.4,35.3v13.1h-4.1c-3.3,0-6,2.7-6,6v34.5c0,3.3,2.7,6,6,6h62.8c3.3,0,6-2.7,6-6V54.4C88.1,51.1,85.4,48.4,82.1,48.4z M31.4,35.3c0-10.1,8.2-18.3,18.3-18.3s18.3,8.2,18.3,18.3v13.1H31.4V35.3z"
+            />
+          </g>
+          <g class="shackle">
+            <path fill="#5e5873"
+              d="M62.1,21.3c0-6.8-5.5-12.3-12.3-12.3S37.4,14.5,37.4,21.3v14h8V21.3c0-2.4,1.9-4.3,4.3-4.3s4.3,1.9,4.3,4.3v14h8V21.3z"
+            />
+          </g>
+        </svg>
+      </div>
+
+      <h1 class="mb-2 font-weight-bolder title-firmalink">Acceso Restringido</h1>
+      <p class="mb-4 text-muted">
+        No tienes permiso para ver esta página. <br />
+        Serás redirigido automáticamente en
+        <span class="countdown-timer">{{ countdown() }}</span> segundos.
+      </p>
+
+      <button class="btn btn-firmalink-gradient btn-lg" (click)="goBack()">
+        <i class="fas fa-arrow-left me-2"></i> Regresar
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,447 @@
+/* ============================================
+   CAMBIAR CONTRASEÑA — Contenido de la página
+   (el shell sidebar/topbar/footer vive en AppLayout)
+   ============================================ */
+
+:host {
+  display: block;
+}
+
+/* ---------- Section header ---------- */
+.section-header {
+  margin-bottom: 1.5rem;
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0c2d48;
+    margin: 0 0 0.25rem;
+  }
+
+  p {
+    color: #757575;
+    font-size: 0.92rem;
+  }
+}
+
+/* ═══════ CONTENIDO (formulario) ═══════ */
+.form-card {
+  border-radius: 16px !important;
+  border: 1px solid rgba(224, 224, 224, 0.5);
+  margin-bottom: 1.5rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.alert.info-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #e0f7f1;
+  border: 1px solid #b2ece1;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 1rem;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #0c2d48;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  small {
+    color: #12406b;
+    line-height: 1.35;
+  }
+}
+
+/* Fortaleza */
+.strength-wrapper {
+  margin: 0.15rem 0 0.9rem;
+}
+
+.strength-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.strength-label {
+  font-weight: 600;
+}
+
+.label-danger { color: #d32f2f; }
+.label-warning { color: #f9a825; }
+.label-success { color: #2e7d32; }
+.label-info { color: #0277bd; }
+
+.strength-percent {
+  color: #757575;
+}
+
+.progress-track {
+  height: 6px;
+  background: #eeeeee;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.bg-danger { background: #d32f2f; }
+.bg-warning { background: #f9a825; }
+.bg-success { background: #2e7d32; }
+.bg-info { background: #0277bd; }
+
+.mismatch-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #d32f2f;
+  margin: -0.3rem 0 0.5rem;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eeeeee;
+}
+
+.inline-spinner {
+  display: inline-block;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+/* Alinear icono + texto dentro del botón (siempre en fila horizontal) */
+.form-actions button[mat-flat-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 0.4rem;
+  line-height: normal;
+
+  .mdc-button__label,
+  .mat-button-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    gap: 0.4rem;
+  }
+
+  mat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  span {
+    line-height: normal;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+  }
+}
+
+/* ═══════════ TOTP ═══════════ */
+.totp-card {
+  border-radius: 16px !important;
+  border: 1px solid rgba(224, 224, 224, 0.5);
+}
+
+.totp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.totp-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  > mat-icon {
+    font-size: 30px;
+    width: 30px;
+    height: 30px;
+    color: #0c2d48;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #212121;
+  }
+
+  small {
+    color: #9e9e9e;
+    font-size: 0.78rem;
+  }
+}
+
+.totp-divider {
+  margin: 1.25rem 0;
+}
+
+.totp-body {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.alert.light-info-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 1.25rem;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #0277bd;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  small {
+    color: #01579b;
+    line-height: 1.35;
+  }
+}
+
+.totp-qr-row {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.qr-area {
+  width: 168px;
+  height: 168px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.qr-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qr-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: #9e9e9e;
+
+  mat-icon {
+    font-size: 42px;
+    width: 42px;
+    height: 42px;
+  }
+
+  small {
+    font-size: 0.78rem;
+  }
+}
+
+.qr-info {
+  flex: 1;
+  min-width: 220px;
+
+  .muted {
+    font-size: 0.82rem;
+    color: #757575;
+    margin: 0 0 0.5rem;
+    line-height: 1.4;
+  }
+}
+
+.secret-box {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.1rem 0.1rem 0.1rem 0.75rem;
+  background: #fafafa;
+
+  input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.85rem;
+    color: #424242;
+    font-family: monospace;
+    letter-spacing: 1px;
+    padding: 0.55rem 0;
+    min-width: 0;
+  }
+}
+
+.copied-msg {
+  display: block;
+  margin-top: 0.45rem;
+  color: #2e7d32;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .totp-qr-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .qr-info {
+    width: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   TEMA OSCURO
+   Las tarjetas de contenido (formulario y TOTP) conservan el
+   fondo oscuro coherente con la app, con textos claros legibles.
+   ═══════════════════════════════════════════ */
+:host-context([data-theme="dark"]) {
+  .section-header {
+    h1 {
+      color: #00c9a7;
+    }
+
+    p {
+      color: #9e9e9e;
+    }
+  }
+
+  /* Tarjetas de contenido: fondo oscuro coherente (no blanco) */
+  .form-card,
+  .totp-card {
+    background: #1e1e1e !important;
+    color: #e0e0e0 !important;
+    border-color: #333 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  /* Títulos y subtítulos dentro de las tarjetas: claros y legibles */
+  .totp-title {
+    h3 {
+      color: #ffffff;
+    }
+
+    small {
+      color: #b0b0b0;
+    }
+
+    > mat-icon {
+      color: #00c9a7;
+    }
+  }
+
+  .alert.info-alert {
+    background: rgba(30, 95, 158, 0.15);
+    border-color: rgba(30, 95, 158, 0.4);
+
+    mat-icon {
+      color: #8fe8d8;
+    }
+
+    small {
+      color: #b3bac5;
+    }
+  }
+
+  .alert.light-info-alert {
+    background: rgba(0, 121, 189, 0.15);
+    border-color: rgba(0, 121, 189, 0.4);
+
+    mat-icon {
+      color: #4fc3f7;
+    }
+
+    small {
+      color: #a9cbe0;
+    }
+  }
+
+  .strength-percent {
+    color: #9e9e9e;
+  }
+
+  .progress-track {
+    background: #333;
+  }
+
+  .secret-box {
+    background: #242424;
+    border-color: #333;
+
+    input {
+      color: #e0e0e0;
+    }
+  }
+
+  .qr-area {
+    background: #1e1e1e;
+    border-color: #333;
+  }
+
+  .qr-info .muted {
+    color: #9e9e9e;
+  }
+
+  /* Botón Guardar: destacado (cian FirmaLink) en tema oscuro */
+  .form-actions button[mat-flat-button] {
+    background: linear-gradient(135deg, #00c9a7 0%, #00c9a7 100%) !important;
+    color: #fff !important;
+  }
+}

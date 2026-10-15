@@ -1,0 +1,495 @@
+<!-- ============================================
+     NEW AGREEMENT — Nuevo Acuerdo
+     Panel izquierdo: campos editables del contrato.
+     Panel derecho: editor WYSIWYG sobre hoja oficio (Letter 8.5" x 11"),
+     Tahoma 13 por defecto, márgenes de contrato, literales, tabulaciones,
+     alineaciones, negrita/subrayado y demás formato.
+     ============================================ -->
+
+<!-- Header -->
+<div class="page-header">
+  <div class="header-content">
+    <h1>Nuevo Acuerdo</h1>
+    <p>
+      Redacción del instrumento contractual — hoja oficio, márgenes de contrato y
+      campos editables sincronizados con el documento
+    </p>
+  </div>
+  <div class="header-actions">
+    <button mat-stroked-button type="button" (click)="irAlListado()" matTooltip="Ver todos los acuerdos registrados">
+      <mat-icon>folder_open</mat-icon> Acuerdos
+    </button>
+    <button mat-stroked-button type="button" (click)="restablecer()"
+      [disabled]="cerrado"
+      [matTooltip]="cerrado ? motivoBloqueoActual : 'Volver al acuerdo predeterminado'">
+      <mat-icon>restart_alt</mat-icon> Restablecer
+    </button>
+    <button mat-stroked-button type="button" (click)="imprimir()" matTooltip="Imprimir / Exportar a PDF">
+      <mat-icon>print</mat-icon> Imprimir
+    </button>
+    <button mat-stroked-button type="button" (click)="enviarPorCorreo()"
+      [disabled]="!campos['codigo']"
+      matTooltip="Enviar el acuerdo por correo electrónico">
+      <mat-icon>mail</mat-icon> Enviar
+    </button>
+    <button mat-raised-button color="primary" type="button" (click)="guardar()"
+      [disabled]="cerrado && !editado"
+      [matTooltip]="cerrado && !editado ? motivoBloqueoActual : 'Guardar borrador del acuerdo'">
+      <mat-icon>save</mat-icon> Guardar Acuerdo
+    </button>
+  </div>
+</div>
+
+<!-- Aviso de documento cerrado -->
+<div class="na-aviso-cerrado" *ngIf="contenidoBloqueado" role="status">
+  <mat-icon>lock</mat-icon>
+  <div>
+    <strong>
+      {{ estado === 'firmado' ? 'Acuerdo firmado — documento cerrado' : 'Acuerdo anulado — documento cerrado' }}
+    </strong>
+    <span>
+      {{ motivoBloqueoActual }} Puede consultarlo, imprimirlo y enviarlo por correo,
+      pero no modificar su contenido.
+    </span>
+  </div>
+  <button mat-stroked-button type="button" (click)="imprimir()">
+    <mat-icon>print</mat-icon> Imprimir
+  </button>
+</div>
+
+<div class="na-layout">
+
+  <!-- ═══════ PANEL IZQUIERDO: CAMPOS EDITABLES ═══════ -->
+  <aside class="na-panel">
+    <div class="na-panel-head">
+      <mat-icon>edit_note</mat-icon>
+      <div>
+        <h3>Campos editables</h3>
+        <p>Lo que escriba aquí se refleja en el documento</p>
+      </div>
+    </div>
+
+    <!-- Estado: fuera del bloqueo, para poder anular un acuerdo firmado -->
+    <div class="na-group na-group-estado">
+      <label class="na-label" for="na-estado">Estado del acuerdo</label>
+      <select
+        id="na-estado"
+        class="na-input"
+        [(ngModel)]="estado"
+        (ngModelChange)="onEstadoChange()"
+      >
+        <option
+          *ngFor="let e of estados"
+          [value]="e.valor"
+          [disabled]="e.valor !== estado && !transicionesPermitidas(estadoPrevio).includes(e.valor)"
+        >
+          {{ e.etiqueta }}{{ e.valor === estadoPrevio ? ' (actual)' : '' }}
+        </option>
+      </select>
+      <p class="na-ayuda" *ngIf="cerrado">
+        Documento cerrado: solo puede
+        {{ transicionesPermitidas(estadoPrevio).length ? 'anularse' : 'consultarse' }}.
+      </p>
+    </div>
+
+    <!-- Contenido del acuerdo: se bloquea cuando el documento está cerrado -->
+    <fieldset class="na-panel-campos" [disabled]="contenidoBloqueado">
+
+    <!-- Documento y control -->
+    <div class="na-group">
+      <h4 class="na-group-title">Documento y control</h4>
+
+      <div class="na-row">
+        <div class="na-col na-col-prefijo">
+          <label class="na-label" for="na-prefijo">Prefijo</label>
+          <input
+            id="na-prefijo"
+            class="na-input na-input-prefijo"
+            type="text"
+            maxlength="6"
+            [(ngModel)]="prefijo"
+            (ngModelChange)="onPrefijoChange()"
+          />
+        </div>
+        <div class="na-col">
+          <label class="na-label" for="na-codigo">Código del acuerdo</label>
+          <input
+            id="na-codigo"
+            class="na-input"
+            type="text"
+            placeholder="CJS001-2026"
+            [(ngModel)]="campos['codigo']"
+            (ngModelChange)="sincronizarCampo('codigo')"
+          />
+        </div>
+        <button
+          type="button"
+          class="na-icon-btn"
+          matTooltip="Generar el siguiente consecutivo"
+          (click)="generarCodigoAutomatico()"
+        >
+          <mat-icon>autorenew</mat-icon>
+        </button>
+      </div>
+
+      <div class="na-huella" *ngIf="hashDocumento">
+        <mat-icon>fingerprint</mat-icon>
+        <div>
+          <span class="na-huella-titulo">Huella SHA-256</span>
+          <code [matTooltip]="hashDocumento">{{ hashCorto }}…</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Identificación -->
+    <div class="na-group">
+      <h4 class="na-group-title">Identificación</h4>
+
+      <label class="na-label" for="na-titulo">Título del acuerdo</label>
+      <textarea
+        id="na-titulo"
+        class="na-input na-textarea"
+        rows="3"
+        placeholder="ACUERDO DE FORMALIZACIÓN..."
+        [(ngModel)]="campos['titulo']"
+        (ngModelChange)="sincronizarCampo('titulo')"
+      ></textarea>
+    </div>
+
+    <!-- Proyecto -->
+    <div class="na-group">
+      <h4 class="na-group-title">Proyecto</h4>
+
+      <label class="na-label" for="na-proyecto">Denominación del proyecto</label>
+      <textarea
+        id="na-proyecto"
+        class="na-input na-textarea"
+        rows="2"
+        [(ngModel)]="campos['proyecto']"
+        (ngModelChange)="sincronizarCampo('proyecto')"
+      ></textarea>
+
+      <label class="na-label" for="na-area">Área / componente tecnológico</label>
+      <input
+        id="na-area"
+        class="na-input"
+        type="text"
+        [(ngModel)]="campos['area']"
+        (ngModelChange)="sincronizarCampo('area')"
+      />
+    </div>
+
+    <!-- Partes -->
+    <div class="na-group">
+      <h4 class="na-group-title">Partes</h4>
+
+      <label class="na-label" for="na-gerente">Líder / Gerente de Proyecto</label>
+      <input
+        id="na-gerente"
+        class="na-input"
+        type="text"
+        [(ngModel)]="campos['gerente']"
+        (ngModelChange)="sincronizarCampo('gerente')"
+      />
+
+      <label class="na-label" for="na-cedula">Cédula de identidad</label>
+      <input
+        id="na-cedula"
+        class="na-input"
+        type="text"
+        placeholder="V-00.000.000"
+        [(ngModel)]="campos['cedula']"
+        (ngModelChange)="sincronizarCampo('cedula')"
+      />
+
+      <label class="na-label" for="na-cedula-firma">Cédula (bloque de firmas)</label>
+      <input
+        id="na-cedula-firma"
+        class="na-input"
+        type="text"
+        placeholder="CIV-00.000.000"
+        [(ngModel)]="campos['cedulaFirma']"
+        (ngModelChange)="sincronizarCampo('cedulaFirma')"
+      />
+
+      <label class="na-label" for="na-representante">Representante SANDRA SERVER</label>
+      <input
+        id="na-representante"
+        class="na-input"
+        type="text"
+        [(ngModel)]="campos['representante']"
+        (ngModelChange)="sincronizarCampo('representante')"
+      />
+    </div>
+
+    <!-- Vigencia y firma -->
+    <div class="na-group">
+      <h4 class="na-group-title">Vigencia y firma</h4>
+
+      <label class="na-label" for="na-vigencia">Vigencia del acuerdo</label>
+      <textarea
+        id="na-vigencia"
+        class="na-input na-textarea"
+        rows="2"
+        [(ngModel)]="campos['vigencia']"
+        (ngModelChange)="sincronizarCampo('vigencia')"
+      ></textarea>
+
+      <label class="na-label" for="na-ciudad">Ciudad de firma</label>
+      <input
+        id="na-ciudad"
+        class="na-input"
+        type="text"
+        [(ngModel)]="campos['ciudad']"
+        (ngModelChange)="sincronizarCampo('ciudad')"
+      />
+
+      <label class="na-label" for="na-fecha">Fecha de firma</label>
+      <input
+        id="na-fecha"
+        class="na-input"
+        type="text"
+        placeholder="01 de octubre de 2026"
+        [(ngModel)]="campos['fechaFirma']"
+        (ngModelChange)="sincronizarCampo('fechaFirma')"
+      />
+    </div>
+
+    <!-- Contraprestación -->
+    <div class="na-group">
+      <h4 class="na-group-title">Contraprestación</h4>
+
+      <label class="na-label" for="na-honorario">Honorario mensual (en letras y cifras)</label>
+      <textarea
+        id="na-honorario"
+        class="na-input na-textarea"
+        rows="2"
+        [(ngModel)]="campos['honorario']"
+        (ngModelChange)="sincronizarCampo('honorario')"
+      ></textarea>
+
+      <label class="na-label" for="na-quincena">Monto por quincena</label>
+      <textarea
+        id="na-quincena"
+        class="na-input na-textarea"
+        rows="2"
+        [(ngModel)]="campos['quincena']"
+        (ngModelChange)="sincronizarCampo('quincena')"
+      ></textarea>
+    </div>
+
+    </fieldset>
+  </aside>
+
+  <!-- ═══════ PANEL DERECHO: EDITOR / HOJA OFICIO ═══════ -->
+  <section class="na-doc">
+
+    <!-- Toolbar -->
+    <div
+      class="na-toolbar"
+      #editorToolbar
+      role="toolbar"
+      aria-label="Opciones de formato del documento"
+      [class.na-bloqueado]="contenidoBloqueado"
+      [attr.aria-disabled]="contenidoBloqueado"
+    >
+
+      <!-- Formato básico -->
+      <button type="button" class="na-tool-btn" title="Negrita (Ctrl+B)"
+        (mousedown)="$event.preventDefault(); formatearTexto('bold')">
+        <mat-icon>format_bold</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Cursiva (Ctrl+I)"
+        (mousedown)="$event.preventDefault(); formatearTexto('italic')">
+        <mat-icon>format_italic</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Subrayado (Ctrl+U)"
+        (mousedown)="$event.preventDefault(); formatearTexto('underline')">
+        <mat-icon>format_underlined</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Tachado"
+        (mousedown)="$event.preventDefault(); formatearTexto('strikeThrough')">
+        <mat-icon>format_strikethrough</mat-icon>
+      </button>
+
+      <span class="na-tool-divider"></span>
+
+      <!-- Tipo de letra -->
+      <div class="na-tool-drop" [class.open]="dropdownAbierto === 'fuente'" [class.abrir-arriba]="dropdownAbierto === 'fuente' && dropdownArriba">
+        <button type="button" class="na-tool-btn na-tool-btn-caret" title="Tipo de letra"
+          (mousedown)="$event.preventDefault(); alternarDropdown('fuente', $event.currentTarget)">
+          <mat-icon>font_download</mat-icon>
+        </button>
+        <div class="na-tool-menu" *ngIf="dropdownAbierto === 'fuente'">
+          <button type="button" class="na-tool-item" *ngFor="let fuente of fuentes"
+            (mousedown)="$event.preventDefault(); aplicarFuente(fuente)">
+            <span [class.na-tool-item-default]="fuente === 'Tahoma'" [style.font-family]="fuente">
+              {{ fuente }}{{ fuente === 'Tahoma' ? ' (Predeterminada)' : '' }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tamaño de fuente -->
+      <div class="na-tool-drop" [class.open]="dropdownAbierto === 'tamano'" [class.abrir-arriba]="dropdownAbierto === 'tamano' && dropdownArriba">
+        <button type="button" class="na-tool-btn na-tool-btn-caret" title="Tamaño de fuente de la selección"
+          (mousedown)="$event.preventDefault(); alternarDropdown('tamano', $event.currentTarget)">
+          <mat-icon>format_size</mat-icon>
+        </button>
+        <div class="na-tool-menu" *ngIf="dropdownAbierto === 'tamano'">
+          <button type="button" class="na-tool-item" *ngFor="let tamano of tamanosFuente"
+            (mousedown)="$event.preventDefault(); aplicarTamanoFuente(tamano)">
+            <span [class.na-tool-item-default]="tamano === '13pt'">
+              {{ tamano }}{{ tamano === '13pt' ? ' (Predeterminado)' : '' }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Interlineado -->
+      <div class="na-tool-drop" [class.open]="dropdownAbierto === 'interlineado'" [class.abrir-arriba]="dropdownAbierto === 'interlineado' && dropdownArriba">
+        <button type="button" class="na-tool-btn na-tool-btn-caret" title="Interlineado del párrafo"
+          (mousedown)="$event.preventDefault(); alternarDropdown('interlineado', $event.currentTarget)">
+          <mat-icon>format_line_spacing</mat-icon>
+        </button>
+        <div class="na-tool-menu" *ngIf="dropdownAbierto === 'interlineado'">
+          <button type="button" class="na-tool-item" *ngFor="let interlineado of interlineados"
+            (mousedown)="$event.preventDefault(); aplicarInterlineado(interlineado)">
+            <span [class.na-tool-item-default]="interlineado === '1.15'">
+              {{ interlineado }}{{ interlineado === '1.15' ? ' (Predeterminado)' : interlineado === '2.0' ? ' (Doble)' : '' }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <span class="na-tool-divider"></span>
+
+      <!-- Alineaciones -->
+      <button type="button" class="na-tool-btn" *ngFor="let alineacion of alineaciones"
+        [title]="alineacion.etiqueta"
+        (mousedown)="$event.preventDefault(); formatearTexto(alineacion.comando)">
+        <mat-icon>{{ alineacion.icono }}</mat-icon>
+      </button>
+
+      <span class="na-tool-divider"></span>
+
+      <!-- Tabulaciones y sangrías -->
+      <button type="button" class="na-tool-btn" title="Insertar tabulación"
+        (mousedown)="$event.preventDefault(); insertarTabulacion()">
+        <mat-icon>keyboard_tab</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Aumentar sangría"
+        (mousedown)="$event.preventDefault(); aumentarSangria()">
+        <mat-icon>format_indent_increase</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Reducir sangría"
+        (mousedown)="$event.preventDefault(); reducirSangria()">
+        <mat-icon>format_indent_decrease</mat-icon>
+      </button>
+
+      <span class="na-tool-divider"></span>
+
+      <!-- Listas / literales -->
+      <button type="button" class="na-tool-btn" title="Literal a) b) c)"
+        (mousedown)="$event.preventDefault(); insertarLiteral()">
+        <mat-icon>format_list_numbered</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Lista numerada 1) 2) 3)"
+        (mousedown)="$event.preventDefault(); insertarNumerada()">
+        <mat-icon>tag</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Lista con viñetas"
+        (mousedown)="$event.preventDefault(); insertarVineta()">
+        <mat-icon>format_list_bulleted</mat-icon>
+      </button>
+
+      <span class="na-tool-divider"></span>
+
+      <!-- Márgenes de la hoja -->
+      <div class="na-tool-drop" [class.open]="dropdownAbierto === 'margenes'" [class.abrir-arriba]="dropdownAbierto === 'margenes' && dropdownArriba">
+        <button type="button" class="na-tool-btn na-tool-btn-caret na-tool-btn-wide" title="Márgenes de la hoja oficio"
+          (mousedown)="$event.preventDefault(); alternarDropdown('margenes', $event.currentTarget)">
+          <mat-icon>crop_landscape</mat-icon>
+          <span class="na-tool-btn-txt">{{ etiquetaMargenActiva }}</span>
+        </button>
+
+        <div class="na-tool-menu na-tool-menu-margenes" *ngIf="dropdownAbierto === 'margenes'">
+          <button type="button" class="na-tool-item" *ngFor="let preset of presetsMargen"
+            (mousedown)="$event.preventDefault(); aplicarPresetMargen(preset)">
+            <span [class.na-tool-item-default]="preset.id === presetActivo">{{ preset.etiqueta }}</span>
+          </button>
+
+          <div class="na-margenes-custom" (mousedown)="$event.stopPropagation()">
+            <span class="na-margenes-titulo">Personalizado (cm)</span>
+            <div class="na-margenes-grid">
+              <label>
+                Sup.
+                <input type="number" min="0" step="0.1" [(ngModel)]="margen.sup" (ngModelChange)="aplicarMargenPersonalizado()" />
+              </label>
+              <label>
+                Inf.
+                <input type="number" min="0" step="0.1" [(ngModel)]="margen.inf" (ngModelChange)="aplicarMargenPersonalizado()" />
+              </label>
+              <label>
+                Izq.
+                <input type="number" min="0" step="0.1" [(ngModel)]="margen.izq" (ngModelChange)="aplicarMargenPersonalizado()" />
+              </label>
+              <label>
+                Der.
+                <input type="number" min="0" step="0.1" [(ngModel)]="margen.der" (ngModelChange)="aplicarMargenPersonalizado()" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span class="na-tool-divider"></span>
+
+      <!-- Deshacer / Rehacer / Limpiar formato -->
+      <button type="button" class="na-tool-btn" title="Deshacer (Ctrl+Z)"
+        (mousedown)="$event.preventDefault(); formatearTexto('undo')">
+        <mat-icon>undo</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Rehacer (Ctrl+Y)"
+        (mousedown)="$event.preventDefault(); formatearTexto('redo')">
+        <mat-icon>redo</mat-icon>
+      </button>
+      <button type="button" class="na-tool-btn" title="Limpiar formato de la selección"
+        (mousedown)="$event.preventDefault(); formatearTexto('removeFormat')">
+        <mat-icon>format_clear</mat-icon>
+      </button>
+
+      <span class="na-tool-spacer"></span>
+
+      <span
+        class="na-tool-hint na-hint-{{ autoGuardado }}"
+        [matTooltip]="hashDocumento ? 'Huella SHA-256: ' + hashDocumento : etiquetaAutoGuardado"
+      >
+        <mat-icon>{{ iconoAutoGuardado }}</mat-icon> {{ etiquetaAutoGuardado }}
+      </span>
+    </div>
+
+    <!-- Hoja oficio + editor -->
+    <div class="na-sheet-wrap" [class.na-solo-lectura]="contenidoBloqueado">
+      <div class="na-sheet-label">
+        Hoja oficio (Letter 8.5" × 11") — Tahoma 13
+        @if (contenidoBloqueado) {
+          <span class="na-sheet-candado"><mat-icon>lock</mat-icon> Documento cerrado (solo lectura)</span>
+        }
+      </div>
+
+      <div class="na-sheet" #hoja>
+        <div
+          #editorTexto
+          class="na-editor"
+          [attr.contenteditable]="contenidoBloqueado ? 'false' : 'true'"
+          role="textbox"
+          aria-multiline="true"
+          aria-label="Documento del acuerdo"
+          spellcheck="false"
+          (input)="onEditorInput()"
+        ></div>
+      </div>
+    </div>
+  </section>
+</div>

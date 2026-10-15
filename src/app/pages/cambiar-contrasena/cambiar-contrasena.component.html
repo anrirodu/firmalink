@@ -1,0 +1,184 @@
+<!-- ============================================
+     CAMBIAR CONTRASEÑA — Contenido de la página
+     (el shell sidebar/topbar/footer vive en AppLayout)
+     ============================================ -->
+
+<!-- Header de sección -->
+<div class="section-header">
+  <h1>Cambiar Contraseña</h1>
+  <p>Actualice la clave de acceso y gestione la autenticación de dos factores de su cuenta.</p>
+</div>
+
+<!-- Formulario -->
+<mat-card class="form-card">
+  <mat-card-content>
+    <div class="alert info-alert">
+      <mat-icon>info</mat-icon>
+      <small>La contraseña debe tener entre 8-16 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales (@$!%*?&).</small>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Contraseña Actual</mat-label>
+      <input
+        matInput
+        [type]="showClave() ? 'text' : 'password'"
+        placeholder="Ingrese su clave actual"
+        [formControl]="changeClaveCtrl"
+        autocomplete="current-password"
+      />
+      <button mat-icon-button matSuffix type="button" (click)="showClave.set(!showClave())">
+        <mat-icon>{{ showClave() ? 'visibility_off' : 'visibility' }}</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Nueva Contraseña</mat-label>
+      <input
+        matInput
+        [type]="showNueva() ? 'text' : 'password'"
+        placeholder="Ingrese su nueva clave"
+        [formControl]="changeNuevaCtrl"
+        autocomplete="new-password"
+        [class.invalid]="passwordsMatch"
+      />
+      <button mat-icon-button matSuffix type="button" (click)="showNueva.set(!showNueva())">
+        <mat-icon>{{ showNueva() ? 'visibility_off' : 'visibility' }}</mat-icon>
+      </button>
+    </mat-form-field>
+
+    @if (changeNuevaLength > 0) {
+      <div class="strength-wrapper">
+        <div class="strength-header">
+          <small class="strength-label" [class]="'label-' + passwordStrengthColor()">
+            Nivel de seguridad: {{ passwordStrengthLabel() }}
+          </small>
+          <small class="strength-percent">{{ passwordStrengthWidth() }}%</small>
+        </div>
+        <div class="progress-track">
+          <div
+            class="progress-bar"
+            [class]="'bg-' + passwordStrengthColor()"
+            [style.width.%]="passwordStrengthWidth()"
+          ></div>
+        </div>
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Repetir Contraseña</mat-label>
+      <input
+        matInput
+        [type]="showRepite() ? 'text' : 'password'"
+        placeholder="Confirme su nueva clave"
+        [formControl]="changeRepiteCtrl"
+        autocomplete="new-password"
+        [class.invalid]="passwordsMatch"
+      />
+      <button mat-icon-button matSuffix type="button" (click)="showRepite.set(!showRepite())">
+        <mat-icon>{{ showRepite() ? 'visibility_off' : 'visibility' }}</mat-icon>
+      </button>
+    </mat-form-field>
+
+    @if (passwordsMatch) {
+      <div class="mismatch-alert">
+        <mat-icon>warning</mat-icon>
+        <small>Las contraseñas no coinciden</small>
+      </div>
+    }
+
+    <div class="form-actions">
+      <button
+        mat-flat-button
+        color="primary"
+        (click)="save()"
+        [disabled]="!canSave || saving()"
+      >
+        @if (saving()) {
+          <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+          <span>Guardando...</span>
+        } @else {
+          <ng-container>
+            <mat-icon>save</mat-icon>
+            <span>Guardar</span>
+          </ng-container>
+        }
+      </button>
+    </div>
+  </mat-card-content>
+</mat-card>
+
+<!-- ═══════════ SECCIÓN TOTP ═══════════ -->
+<mat-card class="totp-card">
+  <mat-card-content>
+    <div class="totp-header">
+      <div class="totp-title">
+        <mat-icon>smartphone</mat-icon>
+        <div>
+          <h3>Autenticación de Dos Factores (TOTP)</h3>
+          <small>Añade una capa extra de seguridad a tu cuenta.</small>
+        </div>
+      </div>
+      <mat-slide-toggle
+        [checked]="isTotpActive()"
+        (change)="toggleTotp($event)"
+        color="primary"
+      ></mat-slide-toggle>
+    </div>
+
+    @if (showTotpSection()) {
+      <mat-divider class="totp-divider"></mat-divider>
+
+      <div class="totp-body">
+        <div class="alert light-info-alert">
+          <mat-icon>help</mat-icon>
+          <small>
+            Para mayor seguridad, active la autenticación de dos factores. Escanee el código QR con una
+            aplicación como Google Authenticator, Authy o similar.
+          </small>
+        </div>
+
+        <div class="totp-qr-row">
+          <div class="qr-area">
+            @if (generatingQr()) {
+              <div class="qr-placeholder">
+                <mat-spinner diameter="28"></mat-spinner>
+                <small>Generando código...</small>
+              </div>
+            } @else if (totpQrCodeUrl()) {
+              <img [src]="totpQrCodeUrl()" alt="Código QR TOTP" class="qr-image" />
+            } @else {
+              <div class="qr-placeholder">
+                <mat-icon>qr_code</mat-icon>
+                <small>Sin código QR</small>
+              </div>
+            }
+          </div>
+
+          <div class="qr-info">
+            <p class="muted">Si no puede escanear el código, ingrese manualmente la siguiente clave en su aplicación de autenticación:</p>
+            <div class="secret-box">
+              <input
+                type="text"
+                readonly
+                [value]="totpSecret()"
+                placeholder="Clave secreta..."
+              />
+              <button
+                mat-icon-button
+                color="primary"
+                (click)="copyTotpSecret()"
+                [disabled]="!totpSecret()"
+                matTooltip="Copiar clave"
+              >
+                <mat-icon>{{ isTotpSecretCopied() ? 'check' : 'content_copy' }}</mat-icon>
+              </button>
+            </div>
+            @if (isTotpSecretCopied()) {
+              <small class="copied-msg">¡Clave copiada!</small>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

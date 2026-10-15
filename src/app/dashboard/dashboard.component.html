@@ -1,0 +1,90 @@
+<!-- ═══════════════════════════════════════════
+     WELCOME
+     ═══════════════════════════════════════════ -->
+<section class="welcome-section">
+  <h1>Bienvenido a FirmaLink</h1>
+  <p>
+    Firmas electrónicas, acuerdos, trámites y contrataciones en línea con
+    certificación digital.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     ACCIONES RÁPIDAS
+     ═══════════════════════════════════════════ -->
+<section class="actions-section">
+  <h2 class="section-title">¿Qué desea realizar?</h2>
+  <div class="actions-grid">
+    <button
+      type="button"
+      class="action-card"
+      *ngFor="let accion of acciones"
+      [style.background]="accion.bg"
+      (click)="onAccion(accion)"
+    >
+      <mat-icon class="action-icon">{{ accion.icono }}</mat-icon>
+      <span class="action-title">{{ accion.titulo }}</span>
+      <span class="action-desc">{{ accion.descripcion }}</span>
+      <mat-icon class="action-arrow">arrow_forward</mat-icon>
+    </button>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SERVICIOS EN LÍNEA
+     ═══════════════════════════════════════════ -->
+<!-- <section class="servicios-section">
+  <mat-card class="servicios-card">
+    <div class="servicios-header">
+      <div class="header-icon">
+        <mat-icon>verified_user</mat-icon>
+      </div>
+      <div class="header-text">
+        <h2>Servicios en Línea</h2>
+        <h3>
+          Firmas, acuerdos, trámites y contrataciones con certificación digital
+        </h3>
+      </div>
+    </div>
+    <mat-card-content>
+      <div class="servicios-grid">
+        <div class="servicio-item" *ngFor="let servicio of servicios; let i = index">
+          <div class="servicio-numero">{{ i + 1 }}</div>
+          <div class="servicio-texto">
+            <p class="servicio-titulo">{{ servicio.titulo }}</p>
+            <p class="servicio-detalle" *ngIf="servicio.detalle">
+              {{ servicio.detalle }}
+            </p>
+            <ul class="servicio-sublista" *ngIf="servicio.subitems?.length">
+              <li *ngFor="let item of servicio.subitems">{{ item }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</section> -->
+
+<!-- ═══════════════════════════════════════════
+     INFORMACIÓN IMPORTANTE
+     ═══════════════════════════════════════════ -->
+<!-- <section class="notas-section">
+  <mat-card class="notas-card">
+    <div class="notas-header">
+      <div class="header-icon warning">
+        <mat-icon>info</mat-icon>
+      </div>
+      <div class="header-text">
+        <h2>Información Importante</h2>
+      </div>
+    </div>
+    <mat-card-content>
+      <div class="notas-list">
+        <div class="nota-item" *ngFor="let nota of notas">
+          <span class="nota-badge">{{ nota.numero }}</span>
+          <p class="nota-texto">{{ nota.texto }}</p>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</section> -->

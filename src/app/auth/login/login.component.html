@@ -1,0 +1,331 @@
+<!-- ============================================
+     LOGIN — Split Layout
+     Left: Branding / Info    Right: Login Form + TOTP
+     ============================================ -->
+<div class="login-container">
+
+  <!-- ═══════════ LADO IZQUIERDO — INFO ═══════════ -->
+  <aside class="login-branding">
+    <div class="branding-overlay"></div>
+
+    <div class="branding-content">
+      <!-- Isotipo animado (clic para repetir la animación) -->
+      <div class="brand-logo">
+        <app-isotipo-animado
+          class="brand-isotipo"
+          [ancho]="420"
+          colorEslabonA="#ffffff"
+          colorEslabonB="#4ee1c8"
+          [replayOnClick]="true"
+          etiqueta="FirmaLink — La forma inteligente de acordar y firmar"
+        />
+      </div>
+
+      <!-- Título principal -->
+      <h1 class="brand-title">
+        FirmaLink
+      </h1>
+
+      <p class="brand-subtitle">
+        La forma inteligente de acordar y firmar.
+      </p>
+
+      <mat-divider class="brand-divider"></mat-divider>
+
+      <!-- Features -->
+      <div class="features-list">
+        <div class="feature-item">
+          <mat-icon>hub</mat-icon>
+          <div>
+            <strong>Conexión Inteligente</strong>
+            <span>Enlaza personas, acuerdos y firmas en una sola plataforma</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <mat-icon>bolt</mat-icon>
+          <div>
+            <strong>Firma Ágil</strong>
+            <span>Acuerdos firmados en tiempo real, sin fricción ni papeleo</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <mat-icon>verified_user</mat-icon>
+          <div>
+            <strong>Confianza y Seguridad</strong>
+            <span>Autenticación robusta y protección de datos de extremo a extremo</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <mat-icon>task_alt</mat-icon>
+          <div>
+            <strong>Trazabilidad Total</strong>
+            <span>Seguimiento, métricas y reportes de cada acuerdo y firma</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer branding -->
+    <div class="branding-footer">
+      <span>&copy; {{ currentYear }} — BUNKER TECHNOLOGIES SOLUTIONS C.A</span>
+    </div>
+  </aside>
+
+  <!-- ═══════════ LADO DERECHO — FORMULARIO ═══════════ -->
+  <main class="login-form-section">
+    <div class="form-wrapper">
+
+      <!-- Header mobile (visible solo en móvil) -->
+      <div class="mobile-header">
+        <app-isotipo-animado
+          class="mobile-isotipo"
+          [ancho]="240"
+          [replayOnClick]="true"
+          etiqueta="FirmaLink — La forma inteligente de acordar y firmar"
+        />
+        <span>FirmaLink</span>
+      </div>
+
+      <!-- Card del formulario -->
+      <div class="login-card slide-up">
+        <!-- ========== SECCIÓN LOGIN ========== -->
+        @if (!showTotp()) {
+          <div class="card-header text-center">
+            <h2>INICIAR SESIÓN</h2>
+            <p>Ingrese sus credenciales para acceder al sistema</p>
+          </div>
+
+          <form class="login-form" (ngSubmit)="onLogin()">
+            <!-- Email -->
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Nombre de usuario</mat-label>
+              <input
+                matInput
+                type="text"
+                placeholder="Nombre de usuario"
+                [value]="email()"
+                (input)="email.set($any($event.target).value)"
+                (keydown)="onKeydown($event)"
+                autocomplete="username"
+              />
+              <mat-icon matPrefix>person</mat-icon>
+            </mat-form-field>
+
+            <!-- Password -->
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Contraseña</mat-label>
+              <input
+                matInput
+                [type]="hidePassword() ? 'password' : 'text'"
+                placeholder="••••••••"
+                [value]="password()"
+                (input)="password.set($any($event.target).value)"
+                (keydown)="onKeydown($event)"
+                autocomplete="current-password"
+              />
+              <mat-icon matPrefix>lock</mat-icon>
+              <button
+                mat-icon-button
+                matSuffix
+                type="button"
+                (click)="hidePassword.set(!hidePassword())"
+                aria-label="Mostrar contraseña"
+              >
+                <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <!-- Forgot password -->
+            <div class="form-options">
+              <label class="remember-me">
+                <input type="checkbox" />
+                <span>Recordarme</span>
+              </label>
+              <a href="javascript:void(0)" class="forgot-link">¿Olvidó su contraseña?</a>
+            </div>
+
+            <!-- Submit Button -->
+            <button
+              mat-flat-button
+              color="primary"
+              class="login-btn full-width"
+              type="submit"
+              [disabled]="isLoading() || !email() || !password()"
+            >
+              @if (isLoading()) {
+                <ng-container>
+                  <span class="spinner"></span>
+                  <span>Autenticando...</span>
+                </ng-container>
+              } @else {
+                <ng-container>
+                  <mat-icon>login</mat-icon>
+                  <span>Ingresar al Sistema</span>
+                </ng-container>
+              }
+            </button>
+          </form>
+        }
+
+        <!-- ========== SECCIÓN TOTP ========== -->
+        @if (showTotp()) {
+          <div class="totp-section" [class.verified]="success()">
+            @if (success()) {
+              <!-- ══════════ EFECTO DE VERIFICACIÓN EXITOSA ══════════ -->
+              <div class="success-block" role="status" aria-live="polite">
+                <div class="success-ring">
+                  <!-- Confeti -->
+                  <span class="confetti c1"></span>
+                  <span class="confetti c2"></span>
+                  <span class="confetti c3"></span>
+                  <span class="confetti c4"></span>
+                  <span class="confetti c5"></span>
+                  <span class="confetti c6"></span>
+
+                  <svg class="success-svg" viewBox="0 0 52 52" aria-hidden="true">
+                    <circle class="success-circle" cx="26" cy="26" r="24" fill="none" />
+                    <path class="success-tick" d="M15 27 l8 8 l15 -17" fill="none" />
+                  </svg>
+                </div>
+
+                <p class="success-title">Verificación exitosa</p>
+                <p class="success-sub">Bienvenido a FirmaLink</p>
+
+                <div class="success-loading">
+                  <mat-spinner diameter="22"></mat-spinner>
+                  <span>Ingresando al sistema…</span>
+                </div>
+              </div>
+            } @else {
+            <div class="card-header text-center">
+              <mat-icon class="totp-icon">shield</mat-icon>
+              <h2>Verificación de Dos Pasos</h2>
+              <p>Abre tu aplicación de autenticación (ej. Google Authenticator) e ingresa el código de 6 dígitos.</p>
+            </div>
+
+            <!-- OTP Input -->
+            <div class="otp-container" [class.shake]="isOtpInvalid()">
+              <div class="otp-wrapper">
+                <input #otp0 type="tel" class="otp-box" maxlength="1"
+                  (input)="onInput($event, 0)"
+                  (keydown)="onKeydownOtp($event, 0)"
+                  (paste)="onPaste($event)">
+                <input type="tel" class="otp-box" maxlength="1"
+                  (input)="onInput($event, 1)"
+                  (keydown)="onKeydownOtp($event, 1)">
+                <input type="tel" class="otp-box" maxlength="1"
+                  (input)="onInput($event, 2)"
+                  (keydown)="onKeydownOtp($event, 2)">
+
+                <span class="otp-divider"></span>
+
+                <input type="tel" class="otp-box" maxlength="1"
+                  (input)="onInput($event, 3)"
+                  (keydown)="onKeydownOtp($event, 3)">
+                <input type="tel" class="otp-box" maxlength="1"
+                  (input)="onInput($event, 4)"
+                  (keydown)="onKeydownOtp($event, 4)">
+                <input type="tel" class="otp-box" maxlength="1"
+                  (input)="onInput($event, 5)"
+                  (keydown)="onKeydownOtp($event, 5)">
+              </div>
+
+              @if (isOtpInvalid()) {
+                <p class="error-text">Código incorrecto. Inténtalo de nuevo.</p>
+              }
+            </div>
+
+            <!-- Loading -->
+            @if (loading()) {
+              <div class="text-center mt-3">
+                <mat-spinner diameter="40"></mat-spinner>
+                <small class="text-muted">Validando código...</small>
+              </div>
+            }
+
+            <!-- Descargar Google Authenticator -->
+            <div class="totp-stores">
+              <p class="stores-hint">¿No tiene una aplicación de autenticación? Descárguela:</p>
+              <div class="stores-row">
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Descargar Google Authenticator en Google Play"
+                >
+                  <img
+                    src="assets/images/play-store.svg"
+                    alt="Google Play"
+                    class="store-badge store-badge-play"
+                  />
+                </a>
+                <a
+                  href="https://apps.apple.com/app/google-authenticator/id388497605"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Descargar Google Authenticator en App Store"
+                >
+                  <img
+                    src="assets/images/app-store.svg"
+                    alt="App Store"
+                    class="store-badge store-badge-apple"
+                  />
+                </a>
+              </div>
+              <p class="stores-note">
+                <mat-icon>verified_user</mat-icon>
+                Compatible con <strong>Google Authenticator</strong>
+              </p>
+            </div>
+
+            <!-- Volver al login -->
+            <div class="mt-3 text-center">
+              <a href="javascript:void(0);" (click)="goBackToLogin()" class="back-link">
+                <mat-icon>arrow_back</mat-icon>
+                <span>Volver al inicio de sesión</span>
+              </a>
+            </div>
+            }
+          </div>
+        }
+
+        <mat-divider class="form-divider"></mat-divider>
+
+        <!-- Footer con hora a la izquierda y versión a la derecha -->
+        @if (!showTotp()) {
+          <div class="login-footer-info">
+            <div class="hora-actual">
+              <mat-icon>schedule</mat-icon>
+              <small> {{ currentTime() | date: 'hh:mm:ss a' }}</small>
+            </div>
+            @if (buildDate) {
+              <div class="version-info">
+                <mat-icon>info</mat-icon>
+                <small> {{ buildDate }}</small>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Footer info -->
+         <br>
+        <div class="card-footer">
+          <mat-icon>help_outline</mat-icon>
+          <span>¿Necesita ayuda? Contacte al administrador</span>
+        </div>
+      </div>
+
+      <!-- Demo hint -->
+      <!-- @if (!showTotp()) {
+        <div class="demo-hint fade-in">
+          <mat-icon>info_outline</mat-icon>
+          <div>
+            <strong>Demo:</strong> use
+            <code>admin&#64;habilitacion.gob.ve</code> /
+            <code>admin123</code>
+          </div>
+        </div>
+      } -->
+    </div>
+  </main>
+</div>

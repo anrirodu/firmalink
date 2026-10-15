@@ -1,0 +1,216 @@
+<!-- ============================================
+     HIRING — Contrataciones: tabla de procesos de contratación
+     Modal de distribución basado en resueltos_ok (mppd/gdoc)
+     ============================================ -->
+
+<!-- Header -->
+<div class="page-header">
+  <div class="header-content">
+    <h1>Contrataciones</h1>
+    <p>Gestión de procesos de contratación (Hiring) — consulta, seguimiento y distribución</p>
+  </div>
+</div>
+
+<!-- Tabla de datos -->
+<mat-card class="table-card">
+  <!-- Barra de búsqueda -->
+  <mat-card-header class="table-header">
+    <div class="header-left">
+      <button mat-raised-button class="btn-create" color="primary" (click)="crearContratacion()">
+        <mat-icon>add_circle</mat-icon>
+        Nueva Contratación
+      </button>
+    </div>
+    <div class="header-right">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Buscar contratación</mat-label>
+        <input
+          #searchInput
+          matInput
+          (keyup)="aplicarFiltro(searchInput.value)"
+          placeholder="Número, cargo, solicitante..."
+        />
+        <mat-icon matPrefix>search</mat-icon>
+        <button *ngIf="dataSource.filter" matSuffix mat-icon-button aria-label="Limpiar" (click)="limpiarFiltro(searchInput)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+    </div>
+  </mat-card-header>
+
+  <!-- Tabla -->
+  <mat-card-content>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="dataSource" matSort class="data-table">
+
+        <!-- N° Contratación -->
+        <ng-container matColumnDef="numero">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>N° Contratación</th>
+          <td mat-cell *matCellDef="let row" class="cell-number">{{ row.numero }}</td>
+        </ng-container>
+
+        <!-- Cargo -->
+        <ng-container matColumnDef="cargo">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Cargo</th>
+          <td mat-cell *matCellDef="let row" class="cell-name">{{ row.cargo }}</td>
+        </ng-container>
+
+        <!-- Solicitante -->
+        <ng-container matColumnDef="solicitante">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Solicitante</th>
+          <td mat-cell *matCellDef="let row">{{ row.solicitante }}</td>
+        </ng-container>
+
+        <!-- Fecha -->
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
+          <td mat-cell *matCellDef="let row">{{ row.fecha }}</td>
+        </ng-container>
+
+        <!-- Estado -->
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="badge" [ngClass]="getEstadoClass(row.estado)">{{ row.estado }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Acciones -->
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let row">
+            <button
+              mat-icon-button
+              class="btn-dist"
+              matTooltip="Distribuir contratación"
+              aria-label="Distribuir contratación"
+              (click)="openDistributionModal(row)"
+            >
+              <mat-icon>alt_route</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              class="btn-menu"
+              [matMenuTriggerFor]="accionesMenu"
+              [matMenuTriggerData]="{ contratacion: row }"
+              aria-label="Opciones de contratación"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Menú contextual de acciones -->
+        <mat-menu #accionesMenu="matMenu" xPosition="after" yPosition="below">
+          <ng-template matMenuContent let-contratacion="contratacion">
+            <button mat-menu-item (click)="verDetalles(contratacion)">
+              <mat-icon>visibility</mat-icon>
+              <span>Detalles</span>
+            </button>
+            <button mat-menu-item (click)="openDistributionModal(contratacion)">
+              <mat-icon>alt_route</mat-icon>
+              <span>Distribuir</span>
+            </button>
+          </ng-template>
+        </mat-menu>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"></tr>
+
+        <!-- Fila vacía cuando no hay datos -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-state" [attr.colspan]="displayedColumns.length">
+            <div class="empty-content">
+              <mat-icon>search_off</mat-icon>
+              <p>No se encontraron contrataciones</p>
+              <span>Intenta con otros términos de búsqueda</span>
+            </div>
+          </td>
+        </tr>
+
+      </table>
+    </div>
+
+    <!-- Paginador -->
+    <mat-paginator
+      [pageSizeOptions]="[5, 10, 25, 50]"
+      [pageSize]="10"
+      showFirstLastButtons
+      aria-label="Seleccionar página de contrataciones"
+    >
+    </mat-paginator>
+  </mat-card-content>
+</mat-card>
+
+<!-- ==================== MODAL NUEVA CONTRATACIÓN ==================== -->
+<app-nueva-contratacion
+  *ngIf="isCreateModalOpen"
+  [numero]="nextNumero"
+  (cerrar)="cerrarModalCreacion()"
+  (crear)="onCrearContratacion($event)"
+></app-nueva-contratacion>
+
+<!-- ==================== MODAL DE DISTRIBUCIÓN (patrón resueltos_ok) ==================== -->
+<div class="dist-modal-backdrop" *ngIf="isDistributionModalOpen" (click)="closeDistributionModal()">
+  <div class="dist-modal-card" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="dist-modal-header">
+      <div class="dist-modal-icon">
+        <mat-icon>alt_route</mat-icon>
+      </div>
+      <div>
+        <h3 class="dist-modal-title">Instrucciones de Distribución</h3>
+        <p class="dist-modal-subtitle">Contratación N° <strong>{{ selectedContratacion?.numero }}</strong></p>
+      </div>
+      <button class="dist-close-btn" (click)="closeDistributionModal()" aria-label="Cerrar">&times;</button>
+    </div>
+
+    <!-- Body -->
+    <div class="dist-modal-body">
+      <p class="dist-instruction">Seleccione los canales de publicación para esta contratación:</p>
+
+      <div class="dist-checklist-grid">
+        <label class="dist-check-item"
+               *ngFor="let option of distributionOptions"
+               [class.is-no-publicar]="option === 'NO PUBLICAR'"
+               [class.checked]="isOptionChecked(option)">
+          <input type="checkbox"
+                 [checked]="isOptionChecked(option)"
+                 (change)="toggleDistributionOption(option)">
+          <span class="dist-check-box">
+            <mat-icon>check</mat-icon>
+          </span>
+          <span class="dist-check-label">{{ option }}</span>
+        </label>
+      </div>
+
+      <!-- Observaciones -->
+      <div class="dist-observacion-section">
+        <label class="dist-observacion-label">Observación</label>
+        <textarea
+          class="dist-observacion-input"
+          rows="3"
+          placeholder="Ingrese una observación opcional para la distribución..."
+          [(ngModel)]="distributionObservacion">
+        </textarea>
+      </div>
+
+      <!-- Resumen de Selección -->
+      <div class="dist-summary" *ngIf="selectedDistributions.size > 0">
+        <mat-icon>alt_route</mat-icon>
+        <span>Canales: <strong>{{ selectedDistributions.size }}</strong> seleccionados</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="dist-modal-footer">
+      <button class="dist-btn-cancel" (click)="closeDistributionModal()">
+        <mat-icon>close</mat-icon> Cancelar
+      </button>
+      <button class="dist-btn-accept" (click)="saveDistribution()">
+        <mat-icon>check</mat-icon> Aceptar
+      </button>
+    </div>
+  </div>
+</div>

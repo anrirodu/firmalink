@@ -1,0 +1,826 @@
+/* ============================================
+   NEW AGREEMENT — Nuevo Acuerdo
+   Panel izquierdo (campos editables) + panel derecho
+   (editor sobre hoja oficio con márgenes de contrato).
+   ============================================ */
+
+/* ---------- Header ---------- */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+
+  .header-content {
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #0c2d48;
+      margin: 0 0 0.35rem 0;
+    }
+
+    p {
+      color: #757575;
+      font-size: 0.9rem;
+      margin: 0;
+      max-width: 62ch;
+    }
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    button {
+      min-height: 42px;
+
+      mat-icon {
+        margin-right: 0.35rem;
+      }
+    }
+  }
+}
+
+[data-theme='dark'] .page-header .header-content h1 {
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .page-header .header-content p {
+  color: #9e9e9e;
+}
+
+/* ---------- Aviso de documento cerrado (firmado / anulado) ---------- */
+.na-aviso-cerrado {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #d7b56d;
+  border-left: 4px solid #b8860b;
+  border-radius: var(--radius-md, 10px);
+  background: #fdf6e3;
+  color: #6b4e00;
+
+  > mat-icon {
+    flex: 0 0 auto;
+    color: #b8860b;
+  }
+
+  div {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    strong {
+      display: block;
+      font-size: 0.9rem;
+    }
+
+    span {
+      display: block;
+      font-size: 0.78rem;
+      color: #7a6427;
+      margin-top: 0.15rem;
+    }
+  }
+}
+
+[data-theme='dark'] .na-aviso-cerrado {
+  background: #3a2f12;
+  border-color: #6b5420;
+  color: #e8cf95;
+
+  div span {
+    color: #c8b076;
+  }
+}
+
+/* ---------- Layout de dos columnas ---------- */
+.na-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════
+   PANEL IZQUIERDO — CAMPOS EDITABLES
+   ═══════════════════════════════════════════ */
+.na-panel {
+  flex: 0 0 340px;
+  width: 340px;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+  padding: 1rem;
+
+  .na-panel-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding-bottom: 0.85rem;
+    margin-bottom: 0.85rem;
+    border-bottom: 1px solid var(--border, #e0e0e0);
+
+    mat-icon {
+      color: var(--primary, #0c2d48);
+      font-size: 26px;
+      width: 26px;
+      height: 26px;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-primary, #212121);
+    }
+
+    p {
+      margin: 0.15rem 0 0 0;
+      font-size: 0.75rem;
+      color: var(--text-secondary, #757575);
+    }
+  }
+
+  .na-group {
+    margin-bottom: 1.1rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  /* El bloque de contenido se deshabilita en bloque cuando el acuerdo es
+     un documento cerrado; el selector de estado queda fuera para poder
+     anular un acuerdo firmado. */
+  .na-panel-campos {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+
+    &:disabled {
+      opacity: 0.65;
+    }
+  }
+
+  .na-group-estado {
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed var(--border, #e0e0e0);
+  }
+
+  .na-ayuda {
+    margin: 0.3rem 0 0 0;
+    font-size: 0.72rem;
+    color: var(--text-secondary, #757575);
+  }
+
+  .na-group-title {
+    margin: 0 0 0.6rem 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent, #00c9a7);
+  }
+
+  .na-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary, #757575);
+    margin-bottom: 0.25rem;
+  }
+
+  .na-input {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0.7rem;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--text-primary, #212121);
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e0e0e0);
+    border-radius: var(--radius-sm, 8px);
+    transition: var(--transition, all 0.3s ease);
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary-light, #2a6fb0);
+      box-shadow: 0 0 0 3px rgba(42, 111, 176, 0.14);
+    }
+
+    &::placeholder {
+      color: #b0b0b0;
+    }
+  }
+
+  .na-textarea {
+    line-height: 1.35;
+    min-height: 44px;
+  }
+
+  /* Fila con varios controles (prefijo + código + acción) */
+  .na-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.4rem;
+  }
+
+  .na-col {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .na-col-prefijo {
+    flex: 0 0 74px;
+  }
+
+  .na-input-prefijo {
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+
+  .na-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 0.7rem;
+    border: 1px solid var(--border, #e0e0e0);
+    border-radius: var(--radius-sm, 8px);
+    background: var(--surface, #fff);
+    color: var(--primary, #0c2d48);
+    cursor: pointer;
+    transition: var(--transition, all 0.3s ease);
+
+    &:hover {
+      background: var(--primary, #0c2d48);
+      color: #fff;
+      border-color: var(--primary, #0c2d48);
+    }
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  /* Huella SHA-256 del documento */
+  .na-huella {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    padding: 0.45rem 0.55rem;
+    background: rgba(0, 201, 167, 0.08);
+    border: 1px dashed rgba(0, 201, 167, 0.45);
+    border-radius: var(--radius-sm, 8px);
+
+    > mat-icon {
+      color: var(--accent, #00c9a7);
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    > div {
+      min-width: 0;
+    }
+
+    code {
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.02em;
+      color: var(--text-primary, #212121);
+      word-break: break-all;
+    }
+  }
+
+  .na-huella-titulo {
+    display: block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #757575);
+  }
+}
+
+[data-theme='dark'] .na-panel {
+  background: var(--surface);
+  border-color: var(--border);
+
+  .na-input {
+    background: #242424;
+    color: #e0e0e0;
+    border-color: #333;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PANEL DERECHO — HOJA OFICIO + EDITOR
+   ═══════════════════════════════════════════ */
+.na-doc {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---------- Toolbar ---------- */
+.na-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.85rem;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+
+  /* Documento cerrado: la barra de formato no responde */
+  &.na-bloqueado {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.4);
+  }
+}
+
+.na-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary, #212121);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+
+  mat-icon {
+    font-size: 19px;
+    width: 19px;
+    height: 19px;
+    color: inherit;
+  }
+
+  &:hover {
+    background: rgba(12, 45, 72, 0.07);
+    border-color: rgba(12, 45, 72, 0.12);
+  }
+
+  &:active {
+    background: rgba(12, 45, 72, 0.14);
+  }
+
+  &.na-tool-btn-caret::after {
+    content: '';
+  }
+
+  &.na-tool-btn-wide {
+    padding: 0 0.55rem;
+    max-width: 230px;
+  }
+
+  .na-tool-btn-txt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.na-tool-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 0.25rem;
+  background: var(--border, #e0e0e0);
+}
+
+.na-tool-spacer {
+  flex: 1 1 auto;
+}
+
+.na-tool-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #b26a00;
+  background: #fff3e0;
+  border-radius: 999px;
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    color: inherit;
+  }
+}
+
+/* Estados del indicador de autoguardado */
+.na-tool-hint.na-hint-limpio {
+  color: var(--text-secondary, #757575);
+  background: rgba(117, 117, 117, 0.12);
+}
+
+.na-tool-hint.na-hint-pendiente {
+  color: #b26a00;
+  background: #fff3e0;
+}
+
+.na-tool-hint.na-hint-guardando {
+  color: #0c2d48;
+  background: rgba(42, 111, 176, 0.14);
+
+  mat-icon {
+    animation: naGirar 1s linear infinite;
+  }
+}
+
+.na-tool-hint.na-hint-guardado {
+  color: #1b7a5a;
+  background: rgba(0, 201, 167, 0.16);
+}
+
+.na-tool-hint.na-hint-error {
+  color: #b3261e;
+  background: rgba(179, 38, 30, 0.12);
+}
+
+@keyframes naGirar {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Dropdowns de la toolbar ---------- */
+.na-tool-drop {
+  position: relative;
+
+  &.abrir-arriba .na-tool-menu {
+    top: auto;
+    bottom: calc(100% + 6px);
+  }
+}
+
+.na-tool-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 210px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.3rem;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg, 0 8px 30px rgba(0, 0, 0, 0.12));
+  animation: naMenuIn 0.14s ease-out;
+}
+
+.na-tool-menu-margenes {
+  min-width: 260px;
+}
+
+@keyframes naMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.na-tool-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text-primary, #212121);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(12, 45, 72, 0.07);
+  }
+
+  .na-tool-item-default {
+    font-weight: 700;
+    color: var(--primary-light, #2a6fb0);
+  }
+}
+
+.na-margenes-custom {
+  margin-top: 0.35rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--border, #e0e0e0);
+
+  .na-margenes-titulo {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #757575);
+    margin-bottom: 0.4rem;
+  }
+
+  .na-margenes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      font-size: 0.68rem;
+      color: var(--text-secondary, #757575);
+    }
+
+    input {
+      width: 100%;
+      padding: 0.3rem 0.4rem;
+      font-family: inherit;
+      font-size: 0.78rem;
+      color: var(--text-primary, #212121);
+      background: var(--surface, #fff);
+      border: 1px solid var(--border, #e0e0e0);
+      border-radius: 6px;
+
+      &:focus {
+        outline: none;
+        border-color: var(--primary-light, #2a6fb0);
+      }
+    }
+  }
+}
+
+/* ---------- Contenedor de la hoja ---------- */
+.na-sheet-wrap {
+  padding: 0 0.25rem 2rem 0.25rem;
+
+  /* Documento cerrado: la hoja se muestra como lectura */
+  &.na-solo-lectura {
+    .na-editor {
+      cursor: default;
+    }
+
+    .na-sheet {
+      box-shadow: 0 10px 34px rgba(0, 0, 0, 0.16), inset 0 0 0 2px rgba(184, 134, 11, 0.35);
+    }
+  }
+}
+
+.na-sheet-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary, #757575);
+  margin-bottom: 0.5rem;
+  text-align: center;
+
+  .na-sheet-candado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: #fdf6e3;
+    border: 1px solid #d7b56d;
+    color: #8a6d00;
+    font-weight: 700;
+
+    mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+/* ---------- Hoja oficio (Letter 8.5" x 11") ---------- */
+.na-sheet {
+  /* Márgenes de contrato por defecto (personalizables desde la toolbar) */
+  --mg-sup: 2.5cm;
+  --mg-inf: 2.5cm;
+  --mg-izq: 3cm;
+  --mg-der: 2.5cm;
+
+  width: 21.59cm; /* 8.5 in */
+  min-height: 27.94cm; /* 11 in */
+  margin: 0 auto;
+  padding: var(--mg-sup) var(--mg-der) var(--mg-inf) var(--mg-izq);
+  background: #ffffff;
+  color: #000000;
+  border-radius: 2px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.16);
+  transition: padding 0.2s ease;
+}
+
+/* ---------- Editor (contenido del contrato) ---------- */
+.na-editor {
+  min-height: calc(27.94cm - var(--mg-sup) - var(--mg-inf));
+  font-family: Tahoma, Verdana, Geneva, sans-serif;
+  font-size: 13pt; /* Tahoma 13 predeterminado */
+  line-height: 1.15;
+  color: #000000;
+  outline: none;
+  text-align: justify;
+  word-wrap: break-word;
+}
+
+/* Los nodos del documento se insertan vía innerHTML, por lo que se
+   estilan con ::ng-deep (no reciben el atributo de encapsulación). */
+:host ::ng-deep .na-editor {
+  p,
+  > div {
+    margin: 0 0 0.45em 0;
+    text-align: justify;
+  }
+
+  strong,
+  b {
+    font-weight: 700;
+  }
+
+  /* Código del acuerdo (esquina superior) */
+  .doc-codigo {
+    text-align: left;
+    margin-bottom: 1.1em;
+    font-size: 13pt;
+    letter-spacing: 0.5px;
+  }
+
+  /* Título del acuerdo */
+  .doc-titulo {
+    text-align: center;
+    margin-bottom: 1.4em;
+    text-transform: none;
+  }
+
+  /* Encabezado de cláusula */
+  .doc-clausula {
+    margin-top: 1.1em;
+    margin-bottom: 0.55em;
+    text-align: left;
+  }
+
+  /* Literales a) b) c) */
+  .doc-literal {
+    list-style-type: lower-alpha;
+    padding-left: 1.6em;
+    margin: 0.4em 0 0.9em 0;
+
+    > li {
+      margin-bottom: 0.4em;
+      text-align: justify;
+    }
+  }
+
+  /* Lista con viñetas */
+  .doc-vineta {
+    list-style-type: disc;
+    padding-left: 1.4em;
+    margin: 0.4em 0 0.9em 0;
+
+    > li {
+      margin-bottom: 0.35em;
+      text-align: justify;
+    }
+  }
+
+  /* Bloques de firma */
+  .doc-firmas {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.6em;
+
+    td {
+      vertical-align: top;
+      padding: 0.15em 0.4em;
+      text-align: center;
+    }
+  }
+
+  .doc-firma-linea {
+    font-size: 13pt;
+    letter-spacing: -0.5px;
+  }
+
+  .doc-firma-nombre {
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .doc-firma-cedula {
+    font-size: 12pt;
+  }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1280px) {
+  .na-sheet {
+    transform: scale(0.92);
+    transform-origin: top center;
+    margin-bottom: -2rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .na-layout {
+    flex-direction: column;
+  }
+
+  .na-panel {
+    flex: 1 1 auto;
+    width: 100%;
+    max-height: none;
+  }
+
+  .na-doc {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .na-sheet-wrap {
+    overflow-x: auto;
+    padding-bottom: 1.5rem;
+  }
+
+  .na-sheet {
+    transform: none;
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-header .header-content h1 {
+    font-size: 1.3rem;
+  }
+
+  .page-header .header-actions {
+    width: 100%;
+
+    button {
+      flex: 1 1 auto;
+    }
+  }
+
+  .na-toolbar {
+    gap: 0.15rem;
+    padding: 0.4rem;
+  }
+
+  .na-tool-btn {
+    min-width: 30px;
+    height: 30px;
+  }
+
+  .na-tool-btn.na-tool-btn-wide {
+    max-width: 150px;
+  }
+}
