@@ -12,7 +12,20 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../services/auth.service';
 import { TokenPayload } from '../interfaces/auth.interfaces';
 import { IsotipoAnimadoComponent } from '../../shared/components/isotipo-animado/isotipo-animado.component';
+import { AccesoBienvenidaComponent } from '../../shared/components/acceso-bienvenida/acceso-bienvenida.component';
 import { environment } from '../../../environments/environment';
+
+/**
+ * Duración mínima de la bienvenida animada antes de entrar al panel.
+ * Debe coincidir con la animación de la barra de progreso del SCSS
+ * (`.acceso-barra span`), para que el avance y la salida vayan sincronizados.
+ */
+const DURACION_BIENVENIDA = 1800;
+
+/** Desvanecido del panel que sale antes de montar el siguiente. */
+const DURACION_SALIDA = 220;
+/** Ajuste animado del alto de la tarjeta al cambiar de panel. */
+const DURACION_ALTO = 320;
 
 @Component({
   selector: 'app-login',
@@ -28,12 +41,14 @@ import { environment } from '../../../environments/environment';
     MatDividerModule,
     MatProgressSpinnerModule,
     IsotipoAnimadoComponent,
+    AccesoBienvenidaComponent,
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
 export class LoginComponent implements AfterViewInit, OnDestroy {
   @ViewChild('otp0') otp0Ref!: ElementRef<HTMLInputElement>;
+  @ViewChild('tarjeta') tarjetaRef!: ElementRef<HTMLElement>;
 
   email = signal('');
   password = signal('');
@@ -52,6 +67,16 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
   loading = signal(false);
   // Efecto de verificación exitosa (mostrado antes de ingresar)
   success = signal(false);
+  // Panel en salida: desvanece el contenido actual antes de mostrar el otro
+  transicionando = signal(false);
+
+  // Bienvenida a pantalla completa. Se reserva al acceso directo (usuario sin
+  // TOTP): con TOTP el efecto de verificación ya cumple esa función y encadenar
+  // las dos animaciones retrasaría el ingreso sin aportar nada.
+  accesoDirecto = signal(false);
+  nombreBienvenida = signal('');
+
+  private navegando = false;
 
   currentYear = new Date().getFullYear();
   version = '1.0.0';
@@ -101,10 +126,10 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
           this.tempAuthToken.set(itk.token);
           this.authService.setTempAuthToken(itk.token); // Guardar en el servicio para validarTotp
           this.success.set(false);
-          this.showTotp.set(true);
-          setTimeout(() => {
-            this.otp0Ref?.nativeElement?.focus();
-          }, 100);
+          this.cambiarPanel(
+            () => this.showTotp.set(true),
+            () => this.otp0Ref?.nativeElement?.focus(),
+          );
         } else {
           // Sin TOTP → verificar multi-sesión antes de iniciar sesión
           this.authService.verificarSesion(itk.token).subscribe({
@@ -112,7 +137,7 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
               if (xdata.msj === 'Ok') {
                 // Sin sesión activa previa → iniciar sesión
                 this.authService.iniciarSesion(itk.token).then(() => {
-                  this.router.navigate(['/dashboard']);
+                  this.ingresarConBienvenida(itk.token);
                 }).catch((e) => {
                   this.manejarErrorAcceso(e);
                 });
@@ -127,7 +152,7 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
             error: () => {
               // Si falla el chequeo, no bloquear el login (best effort)
               this.authService.iniciarSesion(itk.token).then(() => {
-                this.router.navigate(['/dashboard']);
+                this.ingresarConBienvenida(itk.token);
               }).catch((e) => {
                 this.manejarErrorAcceso(e);
               });
@@ -279,15 +304,93 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
   }
 
   goBackToLogin(): void {
-    this.showTotp.set(false);
+    // Limpiar inputs del DOM antes del cambio de panel
+    const inputs = document.querySelectorAll('.otp-box');
+    inputs.forEach((i) => ((i as HTMLInputElement).value = ''));
+
     this.success.set(false);
     this.tempAuthToken.set('');
     this.isOtpInvalid.set(false);
     this.otp.set(['', '', '', '', '', '']);
 
-    // Limpiar inputs del DOM
-    const inputs = document.querySelectorAll('.otp-box');
-    inputs.forEach((i) => ((i as HTMLInputElement).value = ''));
+    this.cambiarPanel(() => this.showTotp.set(false));
+  }
+
+  /**
+   * Cambia el panel visible (formulario ⇄ verificación en dos pasos) con una
+   * transición: el panel actual se desvanece, la tarjeta ajusta su alto y el
+   * nuevo panel entra deslizándose. Con "reducir movimiento" el cambio es
+   * instantáneo.
+   */
+  private cambiarPanel(aplicar: () => void, alEntrar?: () => void): void {
+    if (this.prefiereMenosMovimiento()) {
+      aplicar();
+      alEntrar?.();
+      return;
+    }
+
+    this.transicionando.set(true);
+
+    setTimeout(() => {
+      this.ajustarAlto(() => {
+        aplicar();
+        this.transicionando.set(false);
+      });
+      if (alEntrar) setTimeout(alEntrar, 120);
+    }, DURACION_SALIDA);
+  }
+
+  /**
+   * Anima el alto de la tarjeta entre el panel que sale y el que entra para
+   * que el cambio no dé un salto brusco.
+   *
+   * Congela el alto actual, deja que Angular monte el panel nuevo, mide su alto
+   * natural y transiciona entre ambos; al terminar libera los estilos en línea.
+   */
+  private ajustarAlto(aplicar: () => void): void {
+    const tarjeta = this.tarjetaRef?.nativeElement;
+    if (!tarjeta) {
+      aplicar();
+      return;
+    }
+
+    const altoAntes = tarjeta.offsetHeight;
+    tarjeta.style.transition = 'none';
+    tarjeta.style.height = `${altoAntes}px`;
+    // Evita que el panel nuevo se derrame mientras el alto todavía no creció.
+    tarjeta.style.overflow = 'hidden';
+
+    aplicar();
+
+    // Siguiente frame: el panel nuevo ya está renderizado.
+    requestAnimationFrame(() => {
+      tarjeta.style.height = '';
+      const altoDespues = tarjeta.offsetHeight;
+
+      if (altoAntes === altoDespues) {
+        tarjeta.style.transition = '';
+        tarjeta.style.overflow = '';
+        return;
+      }
+
+      // Vuelve al alto anterior sin pintar nada y transiciona al nuevo.
+      tarjeta.style.height = `${altoAntes}px`;
+      void tarjeta.offsetHeight;
+      tarjeta.style.transition = `height ${DURACION_ALTO}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+
+      requestAnimationFrame(() => {
+        tarjeta.style.height = `${altoDespues}px`;
+      });
+
+      const liberar = () => {
+        tarjeta.style.height = '';
+        tarjeta.style.transition = '';
+        tarjeta.style.overflow = '';
+        tarjeta.removeEventListener('transitionend', liberar);
+      };
+      tarjeta.addEventListener('transitionend', liberar);
+      setTimeout(liberar, DURACION_ALTO + 150);
+    });
   }
 
   /**
@@ -315,6 +418,42 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
         this.success.set(false);
         this.manejarErrorAcceso(e);
       });
+  }
+
+  /**
+   * Acceso directo (usuario sin TOTP): muestra la bienvenida animada a pantalla
+   * completa y, al terminar, entra al panel.
+   *
+   * La sesión ya quedó establecida cuando se llama, así que la animación nunca
+   * anuncia un éxito que pueda revertirse.
+   */
+  private ingresarConBienvenida(token: string): void {
+    this.nombreBienvenida.set(
+      this.authService.getUserDecrypt(token)?.Usuario?.nombre || '',
+    );
+    this.accesoDirecto.set(true);
+
+    // Con "reducir movimiento" el overlay no aporta valor: se entra de una vez.
+    if (this.prefiereMenosMovimiento()) {
+      this.irAlPanel();
+      return;
+    }
+
+    setTimeout(() => this.irAlPanel(), DURACION_BIENVENIDA);
+  }
+
+  /**
+   * Entra al panel. Es idempotente y público porque la bienvenida también se
+   * puede saltar con un clic, sin esperar a que termine la animación.
+   */
+  irAlPanel(): void {
+    if (this.navegando) return;
+    this.navegando = true;
+    this.router.navigate(['/dashboard']);
+  }
+
+  private prefiereMenosMovimiento(): boolean {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   }
 
   /**

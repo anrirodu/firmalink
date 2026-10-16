@@ -1,0 +1,28 @@
+<!-- Overlay a pantalla completa: degradado de marca + isotipo animado. -->
+<div
+  class="acceso-overlay"
+  role="status"
+  aria-live="polite"
+  title="Entrar ahora"
+  (click)="saltar.emit()"
+>
+  <div class="acceso-halo" aria-hidden="true"></div>
+
+  <app-isotipo-animado
+    class="acceso-isotipo"
+    [ancho]="360"
+    colorEslabonA="#ffffff"
+    colorEslabonB="#4ee1c8"
+    etiqueta="FirmaLink"
+  />
+
+  <div class="acceso-texto">
+    <p class="acceso-titulo">Acceso concedido</p>
+    @if (nombre()) {
+      <p class="acceso-nombre">{{ nombre() }}</p>
+    }
+    <p class="acceso-sub">Ingresando al sistema…</p>
+  </div>
+
+  <div class="acceso-barra" aria-hidden="true"><span></span></div>
+</div>

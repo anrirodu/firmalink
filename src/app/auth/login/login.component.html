@@ -75,11 +75,13 @@
   <main class="login-form-section">
     <div class="form-wrapper">
 
-      <!-- Header mobile (visible solo en móvil) -->
+      <!-- Header mobile (visible en tablet y móvil, ≤1024px) -->
       <div class="mobile-header">
         <app-isotipo-animado
           class="mobile-isotipo"
           [ancho]="240"
+          colorEslabonA="#ffffff"
+          colorEslabonB="#4ee1c8"
           [replayOnClick]="true"
           etiqueta="FirmaLink — La forma inteligente de acordar y firmar"
         />
@@ -87,89 +89,96 @@
       </div>
 
       <!-- Card del formulario -->
-      <div class="login-card slide-up">
+      <div class="login-card slide-up" #tarjeta>
         <!-- ========== SECCIÓN LOGIN ========== -->
         @if (!showTotp()) {
-          <div class="card-header text-center">
-            <h2>INICIAR SESIÓN</h2>
-            <p>Ingrese sus credenciales para acceder al sistema</p>
-          </div>
-
-          <form class="login-form" (ngSubmit)="onLogin()">
-            <!-- Email -->
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Nombre de usuario</mat-label>
-              <input
-                matInput
-                type="text"
-                placeholder="Nombre de usuario"
-                [value]="email()"
-                (input)="email.set($any($event.target).value)"
-                (keydown)="onKeydown($event)"
-                autocomplete="username"
-              />
-              <mat-icon matPrefix>person</mat-icon>
-            </mat-form-field>
-
-            <!-- Password -->
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Contraseña</mat-label>
-              <input
-                matInput
-                [type]="hidePassword() ? 'password' : 'text'"
-                placeholder="••••••••"
-                [value]="password()"
-                (input)="password.set($any($event.target).value)"
-                (keydown)="onKeydown($event)"
-                autocomplete="current-password"
-              />
-              <mat-icon matPrefix>lock</mat-icon>
-              <button
-                mat-icon-button
-                matSuffix
-                type="button"
-                (click)="hidePassword.set(!hidePassword())"
-                aria-label="Mostrar contraseña"
-              >
-                <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-              </button>
-            </mat-form-field>
-
-            <!-- Forgot password -->
-            <div class="form-options">
-              <label class="remember-me">
-                <input type="checkbox" />
-                <span>Recordarme</span>
-              </label>
-              <a href="javascript:void(0)" class="forgot-link">¿Olvidó su contraseña?</a>
+          <div class="seccion-panel" [class.saliendo]="transicionando()">
+            <div class="card-header text-center">
+              <h2>INICIAR SESIÓN</h2>
+              <p>Ingrese sus credenciales para acceder al sistema</p>
             </div>
 
-            <!-- Submit Button -->
-            <button
-              mat-flat-button
-              color="primary"
-              class="login-btn full-width"
-              type="submit"
-              [disabled]="isLoading() || !email() || !password()"
-            >
-              @if (isLoading()) {
-                <ng-container>
-                  <span class="spinner"></span>
-                  <span>Autenticando...</span>
-                </ng-container>
-              } @else {
-                <ng-container>
-                  <mat-icon>login</mat-icon>
-                  <span>Ingresar al Sistema</span>
-                </ng-container>
-              }
-            </button>
-          </form>
+            <form class="login-form" (ngSubmit)="onLogin()">
+              <!-- Email -->
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Nombre de usuario</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  placeholder="Nombre de usuario"
+                  [value]="email()"
+                  (input)="email.set($any($event.target).value)"
+                  (keydown)="onKeydown($event)"
+                  autocomplete="username"
+                />
+                <mat-icon matPrefix>person</mat-icon>
+              </mat-form-field>
+
+              <!-- Password -->
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Contraseña</mat-label>
+                <input
+                  matInput
+                  [type]="hidePassword() ? 'password' : 'text'"
+                  placeholder="••••••••"
+                  [value]="password()"
+                  (input)="password.set($any($event.target).value)"
+                  (keydown)="onKeydown($event)"
+                  autocomplete="current-password"
+                />
+                <mat-icon matPrefix>lock</mat-icon>
+                <button
+                  mat-icon-button
+                  matSuffix
+                  type="button"
+                  (click)="hidePassword.set(!hidePassword())"
+                  aria-label="Mostrar contraseña"
+                >
+                  <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+              </mat-form-field>
+
+              <!-- Forgot password -->
+              <div class="form-options">
+                <label class="remember-me">
+                  <input type="checkbox" />
+                  <span>Recordarme</span>
+                </label>
+                <a href="javascript:void(0)" class="forgot-link">¿Olvidó su contraseña?</a>
+              </div>
+
+              <!-- Submit Button -->
+              <button
+                mat-flat-button
+                color="primary"
+                class="login-btn full-width"
+                type="submit"
+                [disabled]="isLoading() || !email() || !password()"
+              >
+                @if (isLoading()) {
+                  <ng-container>
+                    <span class="spinner"></span>
+                    <span>Autenticando...</span>
+                  </ng-container>
+                } @else {
+                  <ng-container>
+                    <mat-icon>login</mat-icon>
+                    <span>Ingresar al Sistema</span>
+                  </ng-container>
+                }
+              </button>
+            </form>
+          </div>
         }
 
         <!-- ========== SECCIÓN TOTP ========== -->
         @if (showTotp()) {
-          <div class="totp-section" [class.verified]="success()">
+          <div
+            class="totp-section seccion-panel entra"
+            [class.saliendo]="transicionando()"
+            [class.verified]="success()"
+          >
+
             @if (success()) {
               <!-- ══════════ EFECTO DE VERIFICACIÓN EXITOSA ══════════ -->
               <div class="success-block" role="status" aria-live="polite">
@@ -329,3 +338,13 @@
     </div>
   </main>
 </div>
+
+<!-- ═══════════ BIENVENIDA — ACCESO DIRECTO (SIN TOTP) ═══════════
+     Se muestra tras validar las credenciales cuando el usuario no tiene TOTP
+     activo. Se puede saltar con un clic. -->
+@if (accesoDirecto()) {
+  <app-acceso-bienvenida
+    [nombre]="nombreBienvenida()"
+    (saltar)="irAlPanel()"
+  />
+}

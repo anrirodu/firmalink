@@ -225,6 +225,51 @@
   text-align: center;
 }
 
+/* ═══════════════════════════════════════════
+   TRANSICIÓN ENTRE PANELES (LOGIN ⇄ TOTP)
+   El panel que sale se desvanece y sube; el que entra aparece deslizándose
+   desde abajo. El alto de la tarjeta lo anima el componente.
+   ═══════════════════════════════════════════ */
+.seccion-panel {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+/* Panel saliente */
+.seccion-panel.saliendo {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.985);
+  pointer-events: none;
+}
+
+/* Panel entrante */
+.seccion-panel.entra {
+  animation: panelEntra 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes panelEntra {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seccion-panel,
+  .seccion-panel.saliendo {
+    transition: none;
+  }
+
+  .seccion-panel.entra {
+    animation: none;
+  }
+}
+
 /* Form */
 .login-form {
   display: flex;
@@ -433,48 +478,85 @@
 }
 
 /* ═══════════════════════════════════════════
-   RESPONSIVE — TABLET (≤1024px)
+   RESPONSIVE — TABLET Y MÓVIL (≤1024px)
+   El split desaparece: una sola columna que ocupa todo el viewport, con el
+   degradado de marca como fondo para que el isotipo (blanco/cian) luzca sobre
+   el fondo para el que fue diseñado, y la tarjeta flotando encima.
    ═══════════════════════════════════════════ */
 @media (max-width: 1024px) {
+  .login-container {
+    flex-direction: column;
+    background: linear-gradient(135deg, #0d1b3e 0%, #0c2d48 40%, #12406b 70%, #1a5490 100%);
+  }
+
+  /* El panel lateral desaparece; su esencia vive en el encabezado de marca */
   .login-branding {
-    flex: 0 0 40%;
-    padding: 2rem;
+    display: none;
   }
 
-  .brand-isotipo {
-    max-width: 300px;
+  .login-form-section {
+    flex: 1;
+    /* El contenedor es un flex en fila: align-items mueve el bloque en vertical.
+       flex-start lo pega arriba para que el isotipo presida la pantalla, en vez
+       de quedar centrado; justify-content conserva el centrado horizontal. */
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    padding-top: max(clamp(2rem, 5vh, 5rem), env(safe-area-inset-top));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    background: transparent;
   }
 
-  .brand-title {
-    font-size: 2.4rem;
+  .form-wrapper {
+    /* Más ancha que en escritorio: la tarjeta llena la tablet */
+    max-width: 560px;
   }
 
-  .brand-subtitle {
-    font-size: 0.9rem;
+  /* Encabezado de marca sobre el degradado */
+  .mobile-header {
+    display: flex;
+    margin-bottom: 2rem;
+    color: #fff;
+
+    span {
+      font-size: 1.7rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, #ffffff 0%, #4ee1c8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
   }
 
-  .logo-circle {
-    width: 80px;
-    height: 80px;
-    border-radius: 22px;
+  .mobile-isotipo {
+    width: min(64vw, 320px);
+    max-width: 320px;
+    filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.35))
+      drop-shadow(0 6px 22px rgba(0, 201, 167, 0.45));
   }
 
-  .logo-icon {
-    font-size: 40px;
-    width: 40px;
-    height: 40px;
+  .login-card {
+    padding: 2.25rem;
+    box-shadow: 0 18px 50px rgba(4, 15, 35, 0.45);
   }
 
-  .features-list {
-    gap: 1rem;
+  /* Un poco más de aire dentro de la tarjeta: gana cuerpo sin llenarse de huecos */
+  .card-header {
+    margin-bottom: 2.25rem;
   }
 
-  .feature-item strong {
-    font-size: 0.85rem;
+  .login-form {
+    gap: 0.5rem;
   }
 
-  .feature-item span {
-    font-size: 0.75rem;
+  .form-options {
+    margin-bottom: 1.75rem;
+  }
+
+  .login-btn {
+    height: 52px !important;
+    font-size: 1rem !important;
   }
 }
 
@@ -482,46 +564,28 @@
    RESPONSIVE — MÓVIL (≤768px)
    ═══════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .login-container {
-    flex-direction: column;
-  }
-
-  .login-branding {
-    display: none;
-  }
-
-  .mobile-header {
-    display: flex;
-  }
-
   .login-form-section {
-    padding: 1.25rem;
-    padding-top: max(1.25rem, env(safe-area-inset-top));
-    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-    background: #f8f9fc;
-    align-items: center;
+    padding: 1.5rem 1.25rem;
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   }
 
   .form-wrapper {
     max-width: 100%;
   }
 
-  .mobile-header {
-    color: #0c2d48;
-  }
-
   .login-card {
-    border-radius: 16px;
-    padding: 1.75rem;
-    box-shadow: 0 4px 20px rgba(12, 45, 72, 0.1);
+    border-radius: 18px;
+    padding: 2rem;
+    box-shadow: 0 14px 40px rgba(4, 15, 35, 0.42);
   }
 
   .card-header h2 {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
   }
 
   .card-header p {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 
   .form-options {
@@ -531,7 +595,8 @@
   }
 
   .login-btn {
-    height: 46px !important;
+    height: 50px !important;
+    font-size: 1rem !important;
   }
 
   .demo-hint {
@@ -559,34 +624,38 @@
    ═══════════════════════════════════════════ */
 @media (max-width: 480px) {
   .login-form-section {
-    padding: 1rem;
-    padding-top: max(1rem, env(safe-area-inset-top));
-    background: #f8f9fc;
+    padding: 1.25rem 1rem;
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
   }
 
   .mobile-header {
     margin-bottom: 1.25rem;
-    font-size: 1.2rem;
 
     .mobile-isotipo {
-      max-width: 190px;
+      width: min(58vw, 220px);
+      max-width: 220px;
+    }
+
+    span {
+      font-size: 1.45rem;
     }
   }
 
   .login-card {
-    padding: 1.5rem;
-    border-radius: 14px;
+    padding: 1.75rem;
+    border-radius: 16px;
   }
 
   .card-header {
     margin-bottom: 1.5rem;
 
     h2 {
-      font-size: 1.25rem;
+      font-size: 1.35rem;
     }
 
     p {
-      font-size: 0.8rem;
+      font-size: 0.85rem;
     }
   }
 
@@ -611,18 +680,32 @@
    ═══════════════════════════════════════════ */
 @media (max-width: 360px) {
   .login-form-section {
-    padding: 0.75rem;
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-    background: #f8f9fc;
+    padding: 1.25rem 0.75rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+
+  /* En pantallas tan bajas el encabezado se aprieta para que todo quepa */
+  .mobile-header {
+    margin-bottom: 1rem;
+
+    .mobile-isotipo {
+      width: min(52vw, 186px);
+      max-width: 186px;
+    }
   }
 
   .login-card {
-    padding: 1.25rem;
-    border-radius: 12px;
+    padding: 1.35rem;
+    border-radius: 14px;
   }
 
-  .card-header h2 {
-    font-size: 1.15rem;
+  .card-header {
+    margin-bottom: 1.25rem;
+
+    h2 {
+      font-size: 1.2rem;
+    }
   }
 
   .login-btn {
@@ -949,74 +1032,23 @@
 }
 
 /* ═══════════════════════════════════════════
-   LANDSCAPE EN MÓVIL
+   LANDSCAPE DE POCA ALTURA
+   Se mantiene la pantalla completa (degradado de marca); solo se retira el
+   encabezado para que la tarjeta quepa entera sin desplazarse.
    ═══════════════════════════════════════════ */
-@media (max-width: 768px) and (orientation: landscape) {
-  .login-container {
-    flex-direction: row;
-  }
-
-  .login-branding {
-    display: flex;
-    flex: 0 0 38%;
-    padding: 1.5rem;
-  }
-
-  .brand-isotipo {
-    max-width: 170px;
-  }
-
-  .brand-title {
-    font-size: 1.8rem;
-  }
-
-  .brand-subtitle {
-    font-size: 0.78rem;
-    display: none;
-  }
-
-  .brand-divider {
-    display: none;
-  }
-
-  .features-list {
-    gap: 0.6rem;
-  }
-
-  .feature-item strong {
-    font-size: 0.75rem;
-  }
-
-  .feature-item span {
-    display: none;
-  }
-
-  .feature-item mat-icon {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-  }
-
-  .branding-footer {
-    font-size: 0.65rem;
-  }
-
-  .login-form-section {
-    padding: 1rem;
-    align-items: center;
-    background: #f8f9fc;
-  }
-
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 560px) {
   .mobile-header {
     display: none;
   }
 
-  .login-card {
-    padding: 1.25rem;
+  .login-form-section {
+    padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
-  .form-wrapper {
-    max-width: 340px;
+  .login-card {
+    padding: 1.25rem;
   }
 }
 
@@ -1112,8 +1144,11 @@
    TEMA OSCURO — LOGIN
    ═══════════════════════════════════════════ */
 :host-context([data-theme="dark"]) {
-  .login-form-section {
-    background: #121212;
+  /* Solo en escritorio: en tablet/móvil (≤1024px) manda el degradado de marca */
+  @media (min-width: 1025px) {
+    .login-form-section {
+      background: #121212;
+    }
   }
 
   .login-card {
