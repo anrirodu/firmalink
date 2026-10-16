@@ -26,7 +26,9 @@ import {
 import { AcuerdoService } from '../new-agreement/acuerdo.service';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
 import { CorreoError, CorreoService } from '../../../shared/services/correo.service';
+import { PdfService } from '../../../shared/services/pdf.service';
 import { construirCorreoAcuerdo } from '../acuerdo-correo';
+import { cargarLogoCorreo, generarPdfAcuerdo } from '../acuerdo-pdf';
 import { pedirDestinatariosCorreo } from '../enviar-correo.dialog';
 
 /**
@@ -146,6 +148,7 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
     private correo: CorreoService,
     private router: Router,
     private notificar: NotificacionService,
+    private pdf: PdfService,
   ) {}
 
   ngOnInit(): void {
@@ -443,7 +446,19 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
     try {
       // El listado es liviano: se relee el documento completo para adjuntarlo
       const doc = (await this.acuerdos.obtener(a.codigo)) ?? a;
-      const cuerpo = construirCorreoAcuerdo(doc, destinatarios.mensaje);
+      // El PDF se arma antes que el cuerpo: el mensaje incrusta sus páginas
+      const pdf = await this.prepararPdfAcuerdo(doc);
+      const logo = await cargarLogoCorreo();
+      const cuerpo = construirCorreoAcuerdo(
+        doc,
+        destinatarios.mensaje,
+        pdf?.paginas ?? [],
+        logo?.nombre,
+        pdf?.totalPaginas,
+      );
+      const adjunto = pdf?.adjunto;
+      // Las páginas y el logo viajan como imágenes incrustadas (Content-ID)
+      const adjuntosInline = [...(pdf?.paginas ?? []), ...(logo ? [logo] : [])];
 
       const resultado = await this.correo.enviar({
         para: destinatarios.para,
@@ -451,6 +466,8 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
         asunto: cuerpo.asunto,
         html: cuerpo.html,
         texto: cuerpo.texto,
+        adjunto,
+        adjuntosInline,
         idempotencia: `${a.codigo}:${doc.hashDocumento ?? ''}:${Date.now()}`,
       });
 
@@ -459,14 +476,32 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
         title: 'Correo enviado',
         html:
           `El acuerdo <strong>${a.codigo}</strong> se envió a:<br>` +
-          `<small>${resultado.para.join(', ')}</small><br><br>` +
-          `<small style="color:#9e9e9e">Identificador del proveedor: ${resultado.id || 'sin identificar'}</small>`,
+          `<small>${resultado.para.join(', ')}</small><br>` +
+          (adjunto ? `<small>Adjunto: ${adjunto.nombre}</small><br>` : '') +
+          `<br><small style="color:#9e9e9e">Identificador del proveedor: ${resultado.id || 'sin identificar'}</small>`,
         confirmButtonColor: '#0c2d48',
       });
     } catch (e) {
       await this.reportarFalloCorreo(e, a.codigo);
     } finally {
       this.cargando = false;
+    }
+  }
+
+  /**
+   * Convierte el acuerdo en un PDF Carta. Si la conversión falla no se
+   * bloquea el envío: se avisa y el correo sale sin adjunto ni imágenes.
+   */
+  private async prepararPdfAcuerdo(doc: Acuerdo) {
+    try {
+      return await generarPdfAcuerdo(this.pdf, doc);
+    } catch (e) {
+      console.error('[ListAgreement] No se pudo generar el PDF del acuerdo:', e);
+      this.notificar.aviso(
+        'El correo saldrá sin el PDF adjunto',
+        `No se pudo generar el archivo PDF de ${doc.codigo} (${NotificacionService.detalle(e)}).`,
+      );
+      return undefined;
     }
   }
 

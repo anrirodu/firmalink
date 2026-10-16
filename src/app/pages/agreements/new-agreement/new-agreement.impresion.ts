@@ -1,9 +1,6 @@
-export interface MargenCm {
-  sup: number;
-  inf: number;
-  izq: number;
-  der: number;
-}
+import { CSS_CONTENIDO_IMPRESION, type MargenCm } from '../../../shared/impresion/acuerdo-estilos';
+
+export type { MargenCm };
 
 export function construirDocumentoImpresion(opts: {
   contenidoHtml: string;
@@ -48,13 +45,7 @@ export function construirDocumentoImpresion(opts: {
     print-color-adjust: exact;
   }
 
-  body {
-    font-family: Tahoma, Verdana, Geneva, sans-serif;
-    font-size: 13pt;
-    line-height: 1.15;
-    color: #000000;
-    text-align: justify;
-  }
+${CSS_CONTENIDO_IMPRESION}
 
   table.marco { width: 100%; border-collapse: collapse; }
   table.marco > thead > tr > td { height: ${margen.sup}cm; padding: 0; }
@@ -67,36 +58,6 @@ export function construirDocumentoImpresion(opts: {
     padding-left: ${margen.izq}cm;
     padding-right: ${margen.der}cm;
     vertical-align: top;
-  }
-
-  p, div {
-    margin: 0 0 0.45em 0;
-    text-align: justify;
-  }
-
-  strong, b { font-weight: 700; }
-
-  ul, ol { margin: 0.4em 0 0.9em 0; }
-  li { margin-bottom: 0.35em; text-align: justify; }
-
-  .doc-codigo { text-align: left; margin-bottom: 1.1em; letter-spacing: 0.5px; }
-  .doc-titulo { text-align: center; margin-bottom: 1.4em; }
-  .doc-clausula { margin-top: 1.1em; margin-bottom: 0.55em; text-align: left; }
-  .doc-literal { list-style-type: lower-alpha; padding-left: 1.6em; }
-  .doc-vineta { list-style-type: disc; padding-left: 1.4em; }
-
-  .doc-firmas { width: 100%; border-collapse: collapse; margin-top: 0.6em; }
-  .doc-firmas td {
-    vertical-align: top;
-    padding: 0.15em 0.4em;
-    text-align: center;
-  }
-  .doc-firma-nombre { font-weight: 700; letter-spacing: 0.3px; }
-  .doc-firma-cedula { font-size: 12pt; }
-
-  .doc-clausula, .doc-firmas {
-    break-inside: avoid;
-    page-break-inside: avoid;
   }
 
   .na-pie {

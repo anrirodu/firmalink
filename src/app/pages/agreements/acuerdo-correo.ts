@@ -1,10 +1,14 @@
+import type { AdjuntoCorreo } from '../../shared/services/api.service';
+import { sanitizarContentId } from '../../shared/correo/content-id';
+import { esc, plantillaCorreo } from '../../shared/correo/plantilla-correo';
 import type { Acuerdo } from './new-agreement/acuerdo.model';
 
 /**
  * Cuerpo del correo con el que se remite un acuerdo.
  *
- * El HTML va con estilos en línea porque los clientes de correo no respetan
- * hojas de estilo externas ni los márgenes de contrato de la hoja oficio.
+ * El HTML se arma sobre la plantilla institucional (`plantillaCorreo`) y usa
+ * estilos en línea porque los clientes de correo no respetan hojas de estilo
+ * externas ni los márgenes de contrato de la hoja oficio.
  */
 export interface CorreoAcuerdo {
   asunto: string;
@@ -12,106 +16,143 @@ export interface CorreoAcuerdo {
   texto: string;
 }
 
-/** Escapa el texto que se interpola en el HTML del correo */
-function esc(valor: unknown): string {
-  if (valor === null || valor === undefined) return '';
-  return String(valor)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 /** Fila de la tabla de datos del correo */
 function fila(etiqueta: string, valor: unknown): string {
   const v = esc(valor);
   if (!v) return '';
   return `
-    <tr>
-      <td style="padding:4px 12px 4px 0;color:#757575;font:600 12px Arial,sans-serif;white-space:nowrap;vertical-align:top">${esc(etiqueta)}</td>
-      <td style="padding:4px 0;color:#212121;font:400 13px Arial,sans-serif">${v}</td>
-    </tr>`;
+              <tr>
+                <td style="padding:5px 14px 5px 0;color:#6B7280;font:600 12px Arial,sans-serif;white-space:nowrap;vertical-align:top">${esc(etiqueta)}</td>
+                <td style="padding:5px 0;color:#111827;font:400 13px Arial,sans-serif">${v}</td>
+              </tr>`;
 }
 
 /**
- * Arma el correo del acuerdo: presentación con los datos de control, el
- * documento redactado y el pie con la huella SHA-256.
+ * Arma el correo del acuerdo: presentación con los datos de control, las
+ * páginas del documento y el pie con la huella SHA-256.
  *
- * @param acuerdo acuerdo a remitir (documento ya redactado)
+ * El documento NO se pega como HTML en el cuerpo: viaja como archivo adjunto y,
+ * además, como una imagen incrustada por página. Las imágenes se referencian
+ * con `cid:`, no con un `data:` URI, porque Gmail y Outlook descartan los
+ * `data:` URI y el documento se vería como un hueco en blanco.
+ *
+ * @param acuerdo acuerdo a remitir
  * @param mensaje nota opcional que escribe quien envía
+ * @param paginas páginas del PDF ya listas como adjuntos incrustables
+ * @param logoNombre nombre del logo incrustado, si se envía
+ * @param totalPaginas páginas totales del PDF, cuando la vista previa va recortada
  */
-export function construirCorreoAcuerdo(acuerdo: Acuerdo, mensaje?: string): CorreoAcuerdo {
+export function construirCorreoAcuerdo(
+  acuerdo: Acuerdo,
+  mensaje?: string,
+  paginas: AdjuntoCorreo[] = [],
+  logoNombre?: string,
+  totalPaginas?: number,
+): CorreoAcuerdo {
   const codigo = acuerdo.codigo || '(sin código)';
   const titulo = acuerdo.titulo?.trim() || acuerdo.proyecto?.trim() || 'Acuerdo';
   const asunto = `Acuerdo ${codigo} — ${titulo}`;
 
-  const documento = acuerdo.documentoHtml?.trim() ?? '';
   const huella = acuerdo.hashDocumento ?? '';
   const nota = mensaje?.trim();
+  const pdf = `${codigo}.pdf`;
 
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;padding:0;background:#f4f6f8">
-  <div style="max-width:760px;margin:0 auto;padding:24px">
+  // El PDF siempre lleva el documento completo; la vista previa del cuerpo no,
+  // cuando el acuerdo es tan largo que sus páginas no caben en el cupo de
+  // adjuntos del correo. El aviso lo dice para que nadie dé por leído lo que no
+  // se reprodujo.
+  const paginasTotales = totalPaginas ?? paginas.length;
+  const recortadas = paginasTotales > paginas.length;
+  const avisoDocumento = recortadas
+    ? `, en hoja Carta (${paginasTotales} páginas). Arriba se reproduce el comienzo, ${paginas.length} de ${paginasTotales} páginas.`
+    : paginas.length
+      ? `, en hoja Carta (${paginasTotales} ${paginasTotales === 1 ? 'página' : 'páginas'}).`
+      : '.';
+  // Versión para el texto plano: ahí no se describe dónde está la vista previa
+  const avisoTexto = paginas.length
+    ? `, en hoja Carta (${paginasTotales} ${paginasTotales === 1 ? 'página' : 'páginas'})`
+    : '';
 
-    <!-- Presentación -->
-    <div style="background:#0c2d48;color:#ffffff;padding:20px 24px;border-radius:12px 12px 0 0">
-      <div style="font:400 12px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;opacity:.85">FirmaLink — Acuerdo</div>
-      <div style="font:700 20px Arial,sans-serif;margin-top:6px">${esc(codigo)}</div>
-      <div style="font:400 14px Arial,sans-serif;margin-top:4px;opacity:.95">${esc(titulo)}</div>
-    </div>
+  const cuerpoHtml = `
+              <!-- Datos de control -->
+              <table cellpadding="0" cellspacing="0" role="presentation"
+                     style="border-collapse:collapse;width:100%;margin:0 0 4px 0">
+                <tr>
+                  <td style="padding:0 0 10px 0;border-bottom:1px solid #F3F4F6">
+                    <span style="font:400 12px Arial,sans-serif;color:#6B7280;letter-spacing:.06em;text-transform:uppercase">Acuerdo</span>
+                    <div style="font:700 18px Arial,sans-serif;color:#111827;margin-top:2px">${esc(codigo)}</div>
+                  </td>
+                </tr>
+              </table>
 
-    <!-- Datos de control -->
-    <div style="background:#ffffff;padding:18px 24px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0">
-      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%">
-        ${fila('Estado', acuerdo.estado)}
-        ${fila('Proyecto', acuerdo.proyecto)}
-        ${fila('Área', acuerdo.area)}
-        ${fila('Gerente', acuerdo.gerente)}
-        ${fila('Representante', acuerdo.representante)}
-        ${fila('Cédula', acuerdo.cedula)}
-        ${fila('Vigencia', acuerdo.vigencia)}
-        ${fila('Ciudad', acuerdo.ciudad)}
-        ${fila('Fecha de firma', acuerdo.fechaFirma)}
-        ${fila('Honorario', acuerdo.honorario ? `${acuerdo.honorario} (${acuerdo.quincena || 'sin periodicidad'})` : '')}
-      </table>
-    </div>
+              <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;width:100%;margin:14px 0 0 0">
+                ${fila('Estado', acuerdo.estado)}
+                ${fila('Título', titulo)}
+                ${fila('Proyecto', acuerdo.proyecto)}
+                ${fila('Área', acuerdo.area)}
+                ${fila('Gerente', acuerdo.gerente)}
+                ${fila('Representante', acuerdo.representante)}
+                ${fila('Cédula', acuerdo.cedula)}
+                ${fila('Vigencia', acuerdo.vigencia)}
+                ${fila('Ciudad', acuerdo.ciudad)}
+                ${fila('Fecha de firma', acuerdo.fechaFirma)}
+                ${fila('Honorario', acuerdo.honorario ? `${acuerdo.honorario} (${acuerdo.quincena || 'sin periodicidad'})` : '')}
+              </table>
 
-    ${
-      nota
-        ? `<div style="background:#ffffff;padding:0 24px 18px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0">
-             <div style="border-left:3px solid #00b8a9;background:#f4fbfa;padding:10px 14px;font:400 13px Arial,sans-serif;color:#37474f;white-space:pre-wrap">${esc(nota)}</div>
-           </div>`
-        : ''
-    }
+              ${
+                nota
+                  ? `<div style="margin:20px 0 0 0;border-left:3px solid #059669;background-color:#F0FDF7;padding:12px 16px;font:400 13px Arial,sans-serif;color:#37474F;white-space:pre-wrap">${esc(nota)}</div>`
+                  : ''
+              }
 
-    <!-- Documento del acuerdo -->
-    <div style="background:#ffffff;padding:24px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0">
-      <div style="font:700 12px Arial,sans-serif;color:#757575;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #eeeeee;padding-bottom:8px;margin-bottom:16px">
-        Documento del acuerdo
-      </div>
-      <div style="font:400 13px 'Tahoma',Arial,sans-serif;color:#212121;line-height:1.55">
-        ${documento || '<em style="color:#9e9e9e">El documento no tiene contenido redactado.</em>'}
-      </div>
-    </div>
+              <!-- Documento: una imagen incrustada por página -->
+              <div style="margin:28px 0 0 0;padding:22px 0 0 0;border-top:1px solid #F3F4F6">
+                <div style="font:700 12px Arial,sans-serif;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">
+                  Documento del acuerdo${paginas.length > 1 ? ` — ${paginas.length} páginas` : ''}
+                </div>
+                ${paginas
+                  .map(
+                    (pagina, i) => `
+                <img class="doc-page" src="cid:${sanitizarContentId(pagina.nombre)}" width="516"
+                     alt="Página ${i + 1} del acuerdo ${esc(codigo)}"
+                     style="display:block;width:100%;max-width:100%;height:auto;border:1px solid #E5E7EB;border-radius:6px;margin:0 0 ${i < paginas.length - 1 ? '16px' : '0'}">`,
+                  )
+                  .join('')}
+                <!-- Siempre visible: si el cliente descarta las imágenes, este
+                     aviso es lo único que le dice al destinatario dónde está
+                     el documento. -->
+                <div style="margin-top:16px;padding-top:14px;border-top:1px dashed #E5E7EB;font:400 13px Arial,sans-serif;color:#4B5563">
+                  El documento completo viaja adjunto a este correo:
+                  <strong style="color:#065F46">${esc(pdf)}</strong>${avisoDocumento}
+                </div>
+              </div>
 
-    <!-- Pie con la huella -->
-    <div style="background:#ffffff;padding:16px 24px 22px;border:1px solid #e0e0e0;border-top:0;border-radius:0 0 12px 12px">
-      <div style="font:600 11px Arial,sans-serif;color:#757575;letter-spacing:.06em;text-transform:uppercase">Huella del documento (SHA-256)</div>
-      <div style="font:400 11px 'Courier New',monospace;color:#546e7a;word-break:break-all;margin-top:4px">
-        ${huella ? esc(huella) : '<em>sin calcular</em>'}
-      </div>
-      <div style="font:400 11px Arial,sans-serif;color:#9e9e9e;margin-top:10px">
-        Enviado desde FirmaLink — ${esc(new Date().toLocaleString('es-VE'))}
-      </div>
-    </div>
+              <!-- Huella -->
+              <div style="margin:24px 0 0 0;background-color:#ECFDF5;border:1px solid #A7F3D0;border-left:4px solid #059669;border-radius:8px;padding:14px 16px">
+                <div style="font:700 11px Arial,sans-serif;color:#047857;letter-spacing:.06em;text-transform:uppercase">
+                  Huella del documento (SHA-256)
+                </div>
+                <div style="font:400 12px 'Courier New',Courier,monospace;color:#047857;word-break:break-all;margin-top:6px">
+                  ${huella ? esc(huella) : '<em style="color:#9CA3AF">sin calcular</em>'}
+                </div>
+              </div>`;
 
-  </div>
-</body>
-</html>`;
+  const html = plantillaCorreo({
+    titulo: `Acuerdo ${codigo}`,
+    encabezado: 'FIRMALINK',
+    preheader: `${codigo} — ${titulo}. Documento adjunto en PDF${
+      paginas.length ? ` y ${paginasTotales} ${paginasTotales === 1 ? 'página' : 'páginas'} en el cuerpo.` : '.'
+    }`,
+    cuerpoHtml,
+    logoCid: logoNombre ? `cid:${sanitizarContentId(logoNombre)}` : undefined,
+    logoAlt: 'FirmaLink',
+  });
 
+  // El texto plano repite los datos de la tabla, omitiendo los que no existen
+  // (el HTML ya los salta en `fila`): una etiqueta sin valor no informa de nada
   const datos: string[] = [
-    `Estado: ${acuerdo.estado ?? ''}`,
+    acuerdo.estado ? `Estado: ${acuerdo.estado}` : '',
+    `Título: ${titulo}`,
     acuerdo.proyecto ? `Proyecto: ${acuerdo.proyecto}` : '',
     acuerdo.area ? `Área: ${acuerdo.area}` : '',
     acuerdo.gerente ? `Gerente: ${acuerdo.gerente}` : '',
@@ -123,24 +164,22 @@ export function construirCorreoAcuerdo(acuerdo: Acuerdo, mensaje?: string): Corr
     acuerdo.honorario ? `Honorario: ${acuerdo.honorario}` : '',
   ].filter(Boolean);
 
-  const lineas: string[] = [`ACUERDO ${codigo}`, titulo, '', ...datos];
-
-  if (nota) {
-    lineas.push('', 'Nota:', nota);
-  }
-
-  lineas.push(
+  const texto = [
+    'FIRMALINK',
+    `${codigo} — ${titulo}`,
     '',
-    '--- DOCUMENTO ---',
-    (acuerdo.documentoTexto || '').trim() || '(el documento no tiene contenido redactado)',
+    ...datos,
+    // La nota va en su propio bloque para que no se confunda con los datos
+    ...(nota ? ['', `Nota: ${nota}`] : []),
+    '',
+    `El documento completo se envía como archivo adjunto: ${pdf}${avisoTexto}`,
+    // Solo cuando la vista previa va recortada: en texto plano no hay "arriba"
+    ...(recortadas
+      ? [`Las primeras ${paginas.length} de ${paginasTotales} páginas se reproducen en el cuerpo del mensaje.`]
+      : []),
     '',
     `Huella SHA-256: ${huella || 'sin calcular'}`,
-    `Enviado desde FirmaLink — ${new Date().toLocaleString('es-VE')}`,
-  );
+  ].join('\n');
 
-  return {
-    asunto,
-    html,
-    texto: lineas.join('\n'),
-  };
+  return { asunto, html, texto };
 }

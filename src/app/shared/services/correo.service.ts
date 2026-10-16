@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
-import type { IPeticionCorreo } from './api.service';
+import type { AdjuntoCorreo, IPeticionCorreo } from './api.service';
 
 /**
  * Respuesta del servicio de correo del servidor.
@@ -22,6 +22,10 @@ export interface SolicitudCorreo {
   asunto: string;
   html: string;
   texto?: string;
+  /** Archivo adjunto generado en el navegador (p. ej. el PDF del acuerdo) */
+  adjunto?: AdjuntoCorreo;
+  /** Imágenes incrustadas en el cuerpo, referenciadas con `cid:<nombre>` */
+  adjuntosInline?: AdjuntoCorreo[];
   /** Clave de idempotencia opcional (evita envíos duplicados al reintentar) */
   idempotencia?: string;
 }
@@ -60,6 +64,8 @@ export class CorreoService {
       asunto: solicitud.asunto,
       html: solicitud.html,
       texto: solicitud.texto,
+      adjunto: solicitud.adjunto,
+      adjuntosInline: solicitud.adjuntosInline?.length ? solicitud.adjuntosInline : undefined,
       idempotencia: solicitud.idempotencia,
     };
 

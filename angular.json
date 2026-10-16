@@ -33,7 +33,13 @@
               { "glob": "**/*", "input": "public" }
             ],
             "allowedCommonJsDependencies": [
-                "sweetalert2"
+                "sweetalert2",
+                "html2canvas",
+                "jspdf",
+                "canvg",
+                "core-js",
+                "raf",
+                "rgbcolor"
              ],
             "styles": [
               "node_modules/bootstrap/dist/css/bootstrap.min.css",
