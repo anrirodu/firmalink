@@ -13,6 +13,11 @@
 }
 
 /* ═══════ SIDEBAR ═══════ */
+/* z-index por encima de 100: la cabecera sticky del datatable
+   (.mat-mdc-table-sticky, de Material) usa z-index:100 y, al estar después
+   en el DOM, ganaba el empate y se colgaba por encima del menú deslizante.
+   Se queda por debajo de los overlays de Material (mat-menu, tooltips,
+   diálogos), que van en 1000+. */
 .sidebar {
   width: 260px;
   background: linear-gradient(180deg, #0d1b3e 0%, #0c2d48 100%);
@@ -23,12 +28,14 @@
               transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   flex-shrink: 0;
-  z-index: 100;
+  z-index: 200;
 }
 
-/* Desktop colapsado: solo iconos, 68px */
-.sidebar:not(.mobile):not(.open) {
-  width: 68px;
+/* Desktop colapsado: el menú se oculta por completo (no deja una banda de
+   iconos). Se vuelve a mostrar con el botón hamburguesa de la barra superior.
+   overflow:hidden en .sidebar recorta el contenido mientras la anchura va a 0. */
+.sidebar:not(.compact):not(.open) {
+  width: 0;
 
   .sidebar-title,
   .nav-item span {
@@ -48,13 +55,14 @@
   }
 }
 
-/* Mobile: sidebar es overlay */
-.sidebar.mobile {
+/* Móvil y tablet: el sidebar es un panel deslizante (nace cerrado) */
+.sidebar.compact {
   position: fixed;
   top: 0;
   left: 0;
   height: 100%;
   width: 280px;
+  max-width: 82vw;
   transform: translateX(-100%);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
 
@@ -64,11 +72,13 @@
 }
 
 /* ═══════ BACKDROP ═══════ */
+/* Por encima de la cabecera sticky del datatable (z-index:100), que si no
+   no quedaría atenuada al abrir el menú; por debajo del sidebar (200). */
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 90;
+  z-index: 190;
   animation: fadeInBackdrop 0.25s ease-out;
 }
 

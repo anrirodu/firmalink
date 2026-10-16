@@ -8,10 +8,6 @@
 <div class="page-header">
   <div class="header-content">
     <h1>Acuerdos</h1>
-    <p>
-      Acuerdos registrados en FirmaLink — consulte, filtre por estado, cambie el
-      estado y continúe la edición del instrumento contractual
-    </p>
   </div>
   <div class="header-actions">
     <button
@@ -33,6 +29,33 @@
       <mat-icon>add_circle</mat-icon> Nuevo Acuerdo
     </button>
   </div>
+</div>
+
+<!-- ============================================
+     SPEED DIAL (móvil y tablet) — a partir de 1024px .header-actions se
+     oculta y las acciones viven dentro de este botón flotante.
+     Misma lógica de deshabilitado y de tooltips que la barra superior.
+     ============================================ -->
+<div class="la-speeddial" [class.abierto]="accionesAbiertas()">
+  <div class="la-speeddial-acciones" role="menu" aria-label="Acciones de acuerdos">
+    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); cargar()"
+      [disabled]="cargando"
+      matTooltip="Volver a consultar el listado en el servidor"
+      aria-label="Actualizar">
+      <mat-icon>refresh</mat-icon>
+    </button>
+    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); nuevoAcuerdo()"
+      matTooltip="Redactar un acuerdo nuevo"
+      aria-label="Nuevo Acuerdo">
+      <mat-icon>add_circle</mat-icon>
+    </button>
+  </div>
+
+  <button mat-fab color="primary" type="button" (click)="toggleAcciones()"
+    [attr.aria-expanded]="accionesAbiertas()" aria-haspopup="menu"
+    matTooltip="Acciones de acuerdos" aria-label="Acciones de acuerdos">
+    <mat-icon>{{ accionesAbiertas() ? 'close' : 'more_vert' }}</mat-icon>
+  </button>
 </div>
 
 <!-- Indicadores por estado -->
@@ -114,14 +137,6 @@
           </td>
         </ng-container>
 
-        <!-- Representante -->
-        <ng-container matColumnDef="representante">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Representante</th>
-          <td mat-cell *matCellDef="let row">
-            <span class="la-titulo">{{ row.representante || '—' }}</span>
-          </td>
-        </ng-container>
-
         <!-- Estado -->
         <ng-container matColumnDef="estado">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
@@ -192,9 +207,30 @@
                 <span>Continuar edición</span>
               </button>
 
-              <button mat-menu-item type="button" (click)="enviarCorreo(row)">
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="!puedeEnviarCorreo(row)"
+                (click)="enviarCorreo(row)"
+                [matTooltip]="notaEnviarCorreo(row)"
+              >
                 <mat-icon>mail</mat-icon>
                 <span>Enviar por correo</span>
+              </button>
+
+              <mat-divider></mat-divider>
+
+              <!-- Borrado lógico: el backend no admite borrados físicos -->
+              <button
+                mat-menu-item
+                type="button"
+                class="la-accion-eliminar"
+                [disabled]="!sePuedeEliminar(row)"
+                (click)="eliminar(row)"
+                [matTooltip]="notaEliminar(row)"
+              >
+                <mat-icon>delete</mat-icon>
+                <span>Eliminar</span>
               </button>
 
               <mat-divider></mat-divider>

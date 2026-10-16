@@ -38,13 +38,26 @@ interesado por correo electrónico.
   ejercicios siguientes sin romper la numeración del año en curso.
 - **Editor de documento** con contenido enriquecido, márgenes configurables (presets e introducción
   manual), plantillas de texto y vista de hoja tamaño carta.
+- **Hoja a ancho completo**: la vista se auto-escala con un `ResizeObserver` para llenar todo el
+  ancho disponible en cualquier pantalla, sin dejar huecos ni provocar scroll horizontal. El
+  instrumento se redacta directamente sobre la hoja.
+- **Barra de identificación** con el prefijo, el código del acuerdo y la huella SHA-256, fuera de la
+  hoja, más los botones **Limpiar hoja** (documento en blanco, conserva el código) y **Por defecto**
+  (recarga el modelo del instrumento).
 - **Bloqueo del documento tras la firma**: un acuerdo firmado o anulado queda cerrado; su contenido y
   su huella no pueden volver a modificarse (control aplicado en UI y en el servicio).
 - **Transiciones de estado validadas** en la interfaz y en la capa de datos.
 - **Huella de integridad SHA-256** del documento, verificada contra `shasum -a 256`.
 - **Envío por correo** del acuerdo (HTML + texto plano) con validación de destinatarios, Para/CC y
   nota personalizada, e informe de errores del proveedor.
-- **Listado con KPIs** (indicadores por estado), orden, paginación, búsqueda y filtros.
+- **Listado con KPIs** (indicadores por estado: total, borradores, en revisión, firmados y
+  anulados), orden, paginación, búsqueda y filtros.
+- **Eliminación del listado con borrado lógico**: el menú de acciones de cada fila ofrece
+  *Eliminar*; el registro se actualiza con el estado `eliminado` y deja de aparecer en el listado y
+  en los indicadores, pero se conserva en la base de datos para la trazabilidad (el endpoint
+  `ccoleccion` solo admite Insert/Upsert, no borrados físicos). Un acuerdo **firmado no se elimina
+  nunca** —su contenido y su huella son definitivos— y en su lugar puede anularse. El código de un
+  acuerdo eliminado no se reutiliza.
 - **Autenticación** por JWT con interceptor de firma **HMAC**, guardas de ruta y cierre de sesión por
   inactividad.
 - **Tema claro / oscuro** persistente.

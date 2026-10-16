@@ -4,8 +4,8 @@
      ============================================ -->
 <div class="app-layout">
 
-  <!-- ═══════ BACKDROP (móvil) ═══════ -->
-  @if (isMobile() && sidenavOpen()) {
+  <!-- ═══════ BACKDROP (móvil y tablet) ═══════ -->
+  @if (isCompact() && sidenavOpen()) {
     <div class="sidebar-backdrop" (click)="closeSidenav()"></div>
   }
 
@@ -13,12 +13,12 @@
   <aside
     class="sidebar"
     [class.open]="sidenavOpen()"
-    [class.mobile]="isMobile()"
+    [class.compact]="isCompact()"
   >
     <div class="sidebar-header">
       <img src="assets/images/logo.png" alt="FirmaLink" class="sidebar-logo-img" />
       <span class="sidebar-title">FirmaLink</span>
-      @if (isMobile()) {
+      @if (isCompact()) {
         <button mat-icon-button class="sidebar-close" (click)="closeSidenav()">
           <mat-icon>close</mat-icon>
         </button>

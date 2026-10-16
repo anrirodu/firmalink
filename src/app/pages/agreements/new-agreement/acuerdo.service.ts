@@ -5,7 +5,16 @@ import { ApiService } from '../../../shared/services/api.service';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
 import { Sha256Service } from '../../../shared/utils/sha256.service';
 import { environment } from '../../../../environments/environment';
-import { Acuerdo, AcuerdoMargen, extraerConsecutivo, generarCodigo, transicionesPermitidas } from './acuerdo.model';
+import { AuthService } from '../../../auth/services/auth.service';
+import {
+  Acuerdo,
+  AcuerdoEstado,
+  AcuerdoMargen,
+  estaEliminado,
+  extraerConsecutivo,
+  generarCodigo,
+  transicionesPermitidas,
+} from './acuerdo.model';
 
 @Injectable({ providedIn: 'root' })
 export class AcuerdoService {
@@ -16,6 +25,7 @@ export class AcuerdoService {
     private api: ApiService,
     private sha: Sha256Service,
     private notificar: NotificacionService,
+    private auth: AuthService,
   ) {}
 
   /**
@@ -25,6 +35,10 @@ export class AcuerdoService {
     const ahora = new Date().toISOString();
     const payload: Acuerdo = {
       ...acuerdo,
+      // Un código puede quedar libre tras un borrado lógico: al reutilizarlo,
+      // el upsert $set debe limpiar la bandera para que el acuerdo nuevo sí
+      // aparezca en el listado.
+      eliminado: false,
       actualizadoEn: ahora,
       creadoEn: acuerdo.creadoEn ?? ahora,
       hashAlgoritmo: 'SHA-256',
@@ -48,10 +62,21 @@ export class AcuerdoService {
   }
 
   /**
-   * Lista acuerdos: intenta función registrada; si no existe (tipo 77) usa cache local.
-   * Toda degradación se informa con SweetAlert (nunca en silencio).
+   * Lista acuerdos visibles: excluye los marcados con borrado lógico.
+   *
+   * La numeración (siguienteCodigo) pide `incluirEliminados = true`: un código
+   * que ya se usó no se reutiliza aunque su registro haya sido eliminado.
    */
-  async listar(): Promise<Acuerdo[]> {
+  async listar(incluirEliminados = false): Promise<Acuerdo[]> {
+    const lista = await this.consultarServidor();
+    return incluirEliminados ? lista : lista.filter((a) => !estaEliminado(a));
+  }
+
+  /**
+   * Consulta el listado completo del servidor (con los mismos avisos de
+   * degradación a cache local).
+   */
+  private async consultarServidor(): Promise<Acuerdo[]> {
     const fn = (environment as any).functions?.CONSULTAR_ACUERDOS;
     if (fn) {
       try {
@@ -242,11 +267,70 @@ export class AcuerdoService {
   }
 
   /**
+   * Elimina un acuerdo del listado (borrado lógico).
+   *
+   * El endpoint `ccoleccion` solo admite Insert/Upsert —no borrados físicos—,
+   * así que el registro se actualiza con el estado `eliminado` y deja de
+   * aparecer en el listado, conservándose en la base de datos para la
+   * trazabilidad. Un acuerdo FIRMADO no se elimina nunca: su contenido y su
+   * huella son un documento cerrado (en su lugar puede anularse).
+   *
+   * @param estadoActual estado del acuerdo en la lista, para la validación.
+   * @returns true si el acuerdo quedó marcado como eliminado.
+   */
+  async eliminar(codigo: string, estadoActual?: Acuerdo['estado']): Promise<boolean> {
+    if (!codigo) return false;
+
+    if (estadoActual === 'firmado') {
+      this.notificar.error(
+        'Acuerdo firmado: no se puede eliminar',
+        `El acuerdo ${codigo} está firmado: su contenido y su huella son definitivos. ` +
+          'Si ya no lo necesita, márquelo como Anulado.',
+      );
+      return false;
+    }
+
+    const ahora = new Date().toISOString();
+    const usuario = this.auth.getUserDecrypt(sessionStorage.getItem('token') ?? '')?.Usuario;
+
+    const fnx = {
+      coleccion: environment.colecciones.ACUERDO,
+      objeto: {
+        estado: 'eliminado' as AcuerdoEstado,
+        // Señal redundante para los registros borrados por versiones previas
+        eliminado: true,
+        eliminadoEn: ahora,
+        eliminadoPorCedula: usuario?.cedula ?? '',
+        eliminadoPorNombre: usuario?.nombre ?? '',
+        actualizadoEn: ahora,
+      },
+      donde: JSON.stringify({ codigo }),
+      driver: environment.driver.PRINCIPAL,
+      upsert: true,
+    };
+
+    try {
+      await firstValueFrom(this.api.ExecColeccion(fnx));
+      // La cache local del navegador también pierde el registro: así la vista
+      // offline y la numeración quedan coherentes con el servidor.
+      this.guardarCacheLocal(this.leerCacheLocal().filter((a) => a.codigo !== codigo));
+      return true;
+    } catch (e) {
+      this.notificar.error(
+        'No se pudo eliminar el acuerdo',
+        `El acuerdo ${codigo} sigue en el listado (${NotificacionService.detalle(e)}).`,
+      );
+      return false;
+    }
+  }
+
+  /**
    * Siguiente código: busca consecutivo máximo (local + borrador)
    */
   async siguienteCodigo(prefijo: string, anio?: number): Promise<string> {
     const year = anio ?? new Date().getFullYear();
-    const lista = await this.listar();
+    // Los acuerdos eliminados siguen contando: su código no se reutiliza.
+    const lista = await this.listar(true);
     const borrador = this.leerBorradorLocal();
     let max = 0;
 

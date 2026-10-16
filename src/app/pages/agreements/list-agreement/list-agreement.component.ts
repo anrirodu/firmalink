@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -75,11 +75,10 @@ interface KpiEstado {
   templateUrl: './list-agreement.component.html',
   styleUrls: ['./list-agreement.component.scss'],
 })
-export class ListAgreementComponent implements OnInit {
+export class ListAgreementComponent implements OnInit, OnDestroy {
   displayedColumns: string[] = [
     'codigo',
     'titulo',
-    'representante',
     'estado',
     'huella',
     'actualizadoEn',
@@ -91,8 +90,48 @@ export class ListAgreementComponent implements OnInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
+  /**
+   * Speed dial flotante (móvil y tablet): el botón de acción principal
+   * despliega el resto de botones del encabezado, que se ocultan allí
+   * porque no caben en la barra superior de una pantalla angosta.
+   */
+  accionesAbiertas = signal(false);
+
+  toggleAcciones(): void {
+    this.accionesAbiertas.update((abierto) => !abierto);
+  }
+
+  /**
+   * Escape cierra el speed dial. Se registra en fase de captura: hay scripts
+   * globales (Bootstrap / SweetAlert) que se comen la fase de burbuja del
+   * keydown, así que con un @HostListener('document:keydown.escape') el
+   * evento nunca llegaba al componente.
+   */
+  private readonly alPulsarEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && this.accionesAbiertas()) {
+      this.accionesAbiertas.set(false);
+    }
+  };
+
+  /** Cierra el speed dial si el clic cae fuera de él. */
+  @HostListener('document:click', ['$event'])
+  cerrarAccionesPorClicExterno(event: MouseEvent): void {
+    if (!this.accionesAbiertas()) {
+      return;
+    }
+    const destino = event.target as HTMLElement | null;
+    if (!destino?.closest('.la-speeddial')) {
+      this.accionesAbiertas.set(false);
+    }
+  }
+
   cargando = false;
 
+  /**
+   * Estados que el listado muestra: el filtro por estado y el menú "Cambiar
+   * estado". El estado `eliminado` no aparece: se llega a él con la acción
+   * "Eliminar" y los acuerdos en ese estado no se listan.
+   */
   readonly estados: EstadoOpcion[] = [
     { valor: 'borrador', etiqueta: 'Borrador', clase: 'estado-borrador', icono: 'edit_note' },
     { valor: 'en_revision', etiqueta: 'En revisión', clase: 'estado-revision', icono: 'pending_actions' },
@@ -110,7 +149,12 @@ export class ListAgreementComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    document.addEventListener('keydown', this.alPulsarEscape, true);
     void this.cargar();
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('keydown', this.alPulsarEscape, true);
   }
 
   /** Carga el listado desde el servidor (con avisos de degradación a local) */
@@ -213,6 +257,7 @@ export class ListAgreementComponent implements OnInit {
       { etiqueta: 'Borradores', valor: cuenta('borrador'), clase: 'kpi-borrador', icono: 'edit_note' },
       { etiqueta: 'En revisión', valor: cuenta('en_revision'), clase: 'kpi-revision', icono: 'pending_actions' },
       { etiqueta: 'Firmados', valor: cuenta('firmado'), clase: 'kpi-firmado', icono: 'verified' },
+      { etiqueta: 'Anulados', valor: cuenta('anulado'), clase: 'kpi-anulado', icono: 'block' },
     ];
   }
 
@@ -349,13 +394,45 @@ export class ListAgreementComponent implements OnInit {
     }
   }
 
+  // --- Envío por correo ---
+
+  /**
+   * ¿Se puede enviar el acuerdo por correo?
+   *
+   * Solo los acuerdos FIRMADOS: el envío difunde el documento con su huella
+   * SHA-256 como constancia de un compromiso cerrado. Un borrador o un acuerdo
+   * en revisión puede cambiar después, y uno anulado es un documento sin
+   * efecto, así que ninguno se envía.
+   */
+  puedeEnviarCorreo(a: Acuerdo): boolean {
+    return !!a?.codigo && a.estado === 'firmado';
+  }
+
+  /** Motivo por el que un acuerdo no admite envío por correo (tooltip) */
+  notaEnviarCorreo(a: Acuerdo): string {
+    if (this.puedeEnviarCorreo(a)) {
+      return 'Enviar el acuerdo firmado por correo electrónico';
+    }
+    if (a?.estado === 'eliminado') {
+      return 'Un acuerdo eliminado no se puede enviar por correo.';
+    }
+    return a?.estado === 'anulado'
+      ? 'Un acuerdo anulado no se puede enviar por correo: ya no tiene efecto.'
+      : 'Solo se envían por correo los acuerdos firmados.';
+  }
+
   /**
    * Envía el acuerdo por correo (servicio de correo de Sandra Server / Resend).
-   * Disponible en cualquier estado: es una acción de solo lectura.
+   * Solo para acuerdos firmados: ver `puedeEnviarCorreo()`.
    */
   async enviarCorreo(a: Acuerdo): Promise<void> {
     if (!a?.codigo) {
       this.notificar.aviso('Acuerdo sin código', 'No se puede enviar un acuerdo sin código.');
+      return;
+    }
+
+    if (!this.puedeEnviarCorreo(a)) {
+      this.notificar.aviso('Envío no permitido', this.notaEnviarCorreo(a));
       return;
     }
 
@@ -484,6 +561,64 @@ export class ListAgreementComponent implements OnInit {
           : `${a.codigo} → ${etiqueta}.`,
       );
     }
+  }
+
+  // --- Eliminación (borrado lógico) ---
+
+  /**
+   * ¿Se puede eliminar el acuerdo?
+   * Un acuerdo firmado no se elimina nunca: su contenido y su huella son
+   * definitivos. En su lugar puede anularse desde "Cambiar estado".
+   */
+  sePuedeEliminar(a: Acuerdo): boolean {
+    return !!a?.codigo && a?.estado !== 'firmado';
+  }
+
+  /** Motivo por el que un acuerdo no admite eliminarse (tooltip) */
+  notaEliminar(a: Acuerdo): string {
+    return this.sePuedeEliminar(a)
+      ? 'Eliminar este acuerdo del listado'
+      : 'Un acuerdo firmado no se puede eliminar: su contenido y su huella son definitivos. Puede anularse.';
+  }
+
+  /**
+   * Elimina el acuerdo de la lista.
+   *
+   * El backend (`ccoleccion`) no admite borrados físicos, así que el registro
+   * se actualiza con el estado `eliminado` y deja de aparecer en el listado,
+   * conservándose para la trazabilidad.
+   */
+  async eliminar(a: Acuerdo): Promise<void> {
+    if (!a?.codigo) return;
+
+    if (!this.sePuedeEliminar(a)) {
+      this.notificar.aviso('Acuerdo firmado: no se puede eliminar', this.notaEliminar(a));
+      return;
+    }
+
+    const confirmar = await Swal.fire({
+      icon: 'warning',
+      title: `¿Eliminar ${a.codigo}?`,
+      html:
+        `El acuerdo <strong>${a.titulo || a.codigo}</strong> dejará de aparecer en el listado ` +
+        'y <strong>no se contará</strong> en los indicadores.<br><br>' +
+        '<small>El registro se conserva en el sistema con el estado eliminado ' +
+        '(la huella SHA-256 no se borra).</small>',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#b3261e',
+    });
+
+    if (!confirmar.isConfirmed) return;
+
+    const ok = await this.acuerdos.eliminar(a.codigo, a.estado);
+    if (!ok) return;
+
+    this.dataSource.data = this.dataSource.data.filter((x) => x.codigo !== a.codigo);
+    this.aplicarFiltros();
+    this.calcularKpis();
+    this.notificar.exito('Acuerdo eliminado', `${a.codigo} ya no aparece en el listado.`);
   }
 
   /** Abre el editor en blanco (nuevo acuerdo) */

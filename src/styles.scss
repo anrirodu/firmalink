@@ -45,6 +45,52 @@
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.6);
   --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.7);
   color-scheme: dark;
+
+  /* Tokens de Material (M3) — Material los declara en `html` con los valores
+     del tema claro: tabla con fondo blanco, paginador con texto negro y
+     botones outlined con texto negro. Declarándolos aquí (en el <body>) se
+     heredan a toda la app y quedan por encima de `html` por cascada. */
+  /* Tabla: que no pinte un fondo blanco sobre la superficie oscura */
+  --mat-table-background-color: transparent;
+  --mat-table-header-headline-color: #bdbdbd;
+  --mat-table-row-item-label-text-color: #e0e0e0;
+  --mat-table-row-item-outline-color: #333333;
+
+  /* Paginador */
+  --mat-paginator-container-background-color: transparent;
+  --mat-paginator-container-text-color: #bdbdbd;
+  --mat-paginator-enabled-icon-color: #bdbdbd;
+  --mat-paginator-disabled-icon-color: #616161;
+
+  /* Botones con contorno (mat-stroked-button = .mat-mdc-outlined-button):
+     el label y el icono heredan el color del botón, así que basta con el
+     token; sin esto salían en negro sobre el fondo oscuro. */
+  --mat-button-outlined-label-text-color: #e0e0e0;
+  --mat-button-outlined-outline-color: rgba(255, 255, 255, 0.3);
+  --mat-button-outlined-state-layer-color: rgba(255, 255, 255, 0.08);
+  --mat-button-outlined-ripple-color: rgba(255, 255, 255, 0.24);
+  --mat-button-outlined-disabled-label-text-color: rgba(255, 255, 255, 0.38);
+  --mat-button-outlined-disabled-outline-color: rgba(255, 255, 255, 0.12);
+
+  /* El estado deshabilitado de Material también se mezcla con
+     --mat-sys-on-surface, que sigue siendo negro en el tema claro: sin estos
+     tokens los botones deshabilitados desaparecen sobre el fondo oscuro. */
+  --mat-button-protected-disabled-label-text-color: rgba(255, 255, 255, 0.38);
+  --mat-button-protected-disabled-container-color: rgba(255, 255, 255, 0.12);
+  --mat-button-filled-disabled-label-text-color: rgba(255, 255, 255, 0.38);
+  --mat-button-tonal-disabled-label-text-color: rgba(255, 255, 255, 0.38);
+  --mat-button-text-disabled-label-text-color: rgba(255, 255, 255, 0.38);
+
+  /* FAB / speed dial (mat-fab y mat-mini-fab): por defecto salen en blanco
+     sobre fondo oscuro, y los deshabilitados quedan en negro 38% (invisible).
+     El FAB principal usa color="primary", que fija el token en el propio
+     elemento y gana sobre esta regla. */
+  --mat-fab-container-color: #2b2b2b;
+  --mat-fab-foreground-color: #e0e0e0;
+  --mat-fab-ripple-color: rgba(255, 255, 255, 0.24);
+  --mat-fab-disabled-state-container-color: rgba(255, 255, 255, 0.12);
+  --mat-fab-disabled-state-foreground-color: rgba(255, 255, 255, 0.38);
+  --mat-fab-disabled-state-layer-color: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="dark"] body {
@@ -290,7 +336,7 @@ a {
   .topbar,
   .app-footer,
   .page-header,
-  .na-panel,
+  .na-identidad,
   .na-toolbar,
   .na-sheet-label {
     display: none !important;

@@ -45,6 +45,72 @@
   }
 }
 
+/* — Speed dial flotante — */
+/* Por debajo de 1024px (el mismo corte que usa el layout para el sidebar)
+   .header-actions se oculta: las acciones pasan a este botón flotante,
+   que las despliega hacia arriba. */
+.la-speeddial {
+  position: fixed;
+  right: 1.25rem;
+  /* Deja libre la franja del pie de página (.app-footer): el FAB es fixed
+     y el footer queda pegado al fondo al final del scroll. */
+  bottom: 4.5rem;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+
+.la-speeddial-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.9);
+  transform-origin: bottom right;
+  transition: opacity 0.18s ease,
+              transform 0.18s ease,
+              visibility 0s linear 0.18s;
+}
+
+.la-speeddial.abierto .la-speeddial-acciones {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.18s ease,
+              transform 0.18s ease,
+              visibility 0s linear 0s;
+}
+
+/* visibility:hidden al cerrar también las saca del tabulador */
+.la-speeddial-acciones button {
+  position: relative;
+
+  /* Etiqueta propia: en táctil el tooltip solo sale al mantener pulsado. */
+  &::after {
+    content: attr(aria-label);
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 0.5rem);
+    transform: translateY(-50%);
+    padding: 0.32rem 0.55rem;
+    border-radius: 4px;
+    background: rgba(20, 20, 20, 0.92);
+    color: #fff;
+    font-size: 0.72rem;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+}
+
+.la-speeddial > button {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
 /* — Indicadores por estado — */
 .la-kpis {
   display: grid;
@@ -93,6 +159,7 @@
   &.kpi-borrador mat-icon { color: #b26a00; }
   &.kpi-revision mat-icon { color: #1565c0; }
   &.kpi-firmado mat-icon { color: #2e7d32; }
+  &.kpi-anulado mat-icon { color: #b3261e; }
 }
 
 /* — Tarjeta contenedora de la tabla — */
@@ -271,6 +338,15 @@
   color: #2e7d32;
 }
 
+/* — Eliminar: en rojo para distinguir la acción destructiva — */
+.la-accion-eliminar {
+  color: #b3261e;
+
+  mat-icon {
+    color: inherit;
+  }
+}
+
 /* — Chips de estado — */
 .la-chip {
   display: inline-flex;
@@ -315,33 +391,38 @@
   }
 }
 
-/* — Huella — */
+/* — Huella: en verde para señalar que el documento está verificado — */
 .la-huella {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   padding: 0.2rem 0.5rem;
-  border: 1px dashed #cfd8dc;
+  border: 1px solid rgba(0, 201, 167, 0.35);
   border-radius: 8px;
-  background: #fafafa;
+  background: rgba(0, 201, 167, 0.08);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
-    border-color: #0c2d48;
-    background: #f0f4f8;
+    border-color: #00c9a7;
+    background: rgba(0, 201, 167, 0.16);
+    box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.14);
   }
 
   mat-icon {
     font-size: 1rem;
     width: 1rem;
     height: 1rem;
-    color: #0c2d48;
+    color: #00c9a7;
+    filter: drop-shadow(0 0 3px rgba(0, 201, 167, 0.45));
   }
 
   code {
     font-size: 0.75rem;
-    color: #546e7a;
+    font-weight: 600;
+    // Verde más profundo que el acento: #00c9a7 no tiene contraste suficiente
+    // para el texto monoespaciado sobre el fondo claro de la fila.
+    color: #00897b;
     letter-spacing: 0.02em;
   }
 }
@@ -375,17 +456,21 @@ mat-paginator {
 /* ═══════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════ */
+/* Mismo corte que ANCHO_COMPACTO del layout: debajo de eso la cabecera
+   cambia a speed dial flotante. */
+@media (max-width: 1024px) {
+  .page-header .header-actions {
+    display: none;
+  }
+
+  .la-speeddial {
+    display: flex;
+  }
+}
+
 @media (max-width: 992px) {
   .page-header {
     flex-direction: column;
-
-    .header-actions {
-      width: 100%;
-
-      button {
-        flex: 1;
-      }
-    }
   }
 
   .search-field,
@@ -406,6 +491,11 @@ mat-paginator {
 @media (max-width: 768px) {
   .page-header .header-content h1 {
     font-size: 1.4rem;
+  }
+
+  /* El footer se apila y crece en alto: sube el FAB para no taparlo. */
+  .la-speeddial {
+    bottom: 5.5rem;
   }
 
   .la-kpis {
@@ -463,6 +553,7 @@ mat-paginator {
     &.kpi-borrador mat-icon { color: #ffb74d; }
     &.kpi-revision mat-icon { color: #64b5f6; }
     &.kpi-firmado mat-icon { color: #81c784; }
+    &.kpi-anulado mat-icon { color: #ef9a9a; }
   }
 
   .table-card {
@@ -542,25 +633,74 @@ mat-paginator {
     }
 
     .la-sin-dato {
-      color: #757575;
+      color: #9e9e9e;
+    }
+
+    // Iconos de la columna Acciones: el gris azulado del tema claro deja de
+    // contrastar contra la fila oscura, así que se aclara.
+    .td-acciones mat-icon {
+      color: #90a4ae;
+    }
+
+    .td-acciones:hover mat-icon {
+      color: #cfd8dc;
+    }
+  }
+
+  /* Acciones del menú y chips: los colores del tema claro eran demasiado
+     oscuros (o pastel) sobre la superficie oscura. */
+  .la-accion-eliminar {
+    color: #ef9a9a;
+  }
+
+  .la-menu-actual {
+    color: #81c784;
+  }
+
+  .la-chip {
+    &.estado-borrador {
+      background: rgba(255, 183, 77, 0.16);
+      color: #ffb74d;
+    }
+
+    &.estado-revision {
+      background: rgba(100, 181, 246, 0.16);
+      color: #64b5f6;
+    }
+
+    &.estado-firmado {
+      background: rgba(129, 199, 132, 0.16);
+      color: #81c784;
+    }
+
+    &.estado-anulado {
+      background: rgba(239, 154, 154, 0.16);
+      color: #ef9a9a;
+    }
+
+    &.estado-desconocido {
+      background: rgba(255, 255, 255, 0.08);
+      color: #bdbdbd;
     }
   }
 
   .la-huella {
-    border-color: #455a64;
-    background: #263238;
+    border-color: rgba(0, 201, 167, 0.35);
+    background: rgba(0, 201, 167, 0.1);
 
     &:hover {
       border-color: #00c9a7;
-      background: #2f3e46;
+      background: rgba(0, 201, 167, 0.2);
+      box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.18);
     }
 
     mat-icon {
-      color: #00c9a7;
+      color: #2ee6c5;
     }
 
     code {
-      color: #b0bec5;
+      // En oscuro sí se puede usar el acento brillante
+      color: #2ee6c5;
     }
   }
 

@@ -34,8 +34,16 @@ import { IdleService } from '../../shared/services/idle.service';
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit {
+  /**
+   * Ancho máximo (px) en el que el sidebar pasa a comportarse como panel
+   * deslizante. Cubre tablet y móvil: en esos tamaños el menú nace cerrado,
+   * se abre con el botón de la barra superior y se cierra al elegir un ítem.
+   */
+  private readonly ANCHO_COMPACTO = 1024;
+
   sidenavOpen = signal(true);
-  isMobile = signal(false);
+  /** true en móvil y tablet (el sidebar se muestra como panel deslizante) */
+  isCompact = signal(false);
   currentYear = new Date().getFullYear();
 
   // Submenús expandidos del menu dinámico
@@ -62,10 +70,11 @@ export class AppLayoutComponent implements OnInit {
   }
 
   private checkScreen(): void {
-    const mobile = window.innerWidth <= 768;
-    this.isMobile.set(mobile);
+    // Móvil y tablet comparten comportamiento: menú cerrado por defecto
+    const compacto = window.innerWidth <= this.ANCHO_COMPACTO;
+    this.isCompact.set(compacto);
 
-    if (mobile) {
+    if (compacto) {
       this.sidenavOpen.set(false);
     }
   }
@@ -93,9 +102,16 @@ export class AppLayoutComponent implements OnInit {
   }
 
   navigateTo(url: string): void {
-    if (url) {
-      this.router.navigate([url]);
-      // El sidebar queda fijo/abierto: NO se cierra al seleccionar un item.
+    if (!url) {
+      return;
+    }
+
+    this.router.navigate([url]);
+
+    // En móvil y tablet el menú se cierra al elegir un ítem; en escritorio
+    // queda fijo (abierto o colapsado según el usuario).
+    if (this.isCompact()) {
+      this.closeSidenav();
     }
   }
 

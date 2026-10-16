@@ -5,6 +5,7 @@ import {
   HostListener,
   OnDestroy,
   ViewChild,
+  signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -57,7 +58,60 @@ interface PresetMargen {
 export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSalir {
   @ViewChild('editorTexto') editorTexto?: ElementRef<HTMLDivElement>;
   @ViewChild('hoja') hoja?: ElementRef<HTMLDivElement>;
+  @ViewChild('hojaWrap') hojaWrap?: ElementRef<HTMLDivElement>;
   @ViewChild('editorToolbar') editorToolbar?: ElementRef<HTMLDivElement>;
+
+  /**
+   * Speed dial flotante (móvil y tablet): el botón de acción principal
+   * despliega el resto de botones del encabezado, que se ocultan allí
+   * porque no caben en la barra superior de una pantalla angosta.
+   */
+  accionesAbiertas = signal(false);
+
+  toggleAcciones(): void {
+    this.accionesAbiertas.update((abierto) => !abierto);
+  }
+
+  /**
+   * Escape cierra el speed dial. Se registra en fase de captura: hay scripts
+   * globales (Bootstrap / SweetAlert) que se comen la fase de burbuja del
+   * keydown, así que con un @HostListener('document:keydown.escape') el
+   * evento nunca llegaba al componente.
+   */
+  private readonly alPulsarEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && this.accionesAbiertas()) {
+      this.accionesAbiertas.set(false);
+    }
+  };
+
+  /** Cierra el speed dial si el clic cae fuera de él. */
+  @HostListener('document:click', ['$event'])
+  cerrarAccionesPorClicExterno(event: MouseEvent): void {
+    if (!this.accionesAbiertas()) {
+      return;
+    }
+    const destino = event.target as HTMLElement | null;
+    if (!destino?.closest('.na-speeddial')) {
+      this.accionesAbiertas.set(false);
+    }
+  }
+
+  /**
+   * En móvil y tablet la barra de identificación y la toolbar de la hoja no
+   * caben siempre visibles: dos botones de la cabecera las muestran u
+   * ocultan (sin modal, simplemente aparecen/desaparecen). En escritorio
+   * ambas tarjetas quedan siempre visibles y los botones no se muestran.
+   */
+  mostrarIdentidad = signal(false);
+  mostrarOpcionesHoja = signal(false);
+
+  alternarIdentidad(): void {
+    this.mostrarIdentidad.update((visible) => !visible);
+  }
+
+  alternarOpcionesHoja(): void {
+    this.mostrarOpcionesHoja.update((visible) => !visible);
+  }
 
   // --- Campos editables del panel izquierdo ---
   campos: Record<string, string> = { ...CAMPOS_DEFAULT };
@@ -92,6 +146,21 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   /** Márgenes activos de la hoja (cm) */
   margen = { sup: 2.5, inf: 2.5, izq: 3, der: 2.5 };
   presetActivo = 'oficio';
+
+  /**
+   * Auto-escala de la hoja oficio.
+   *
+   * La hoja debe "abarcar" todo el ancho del panel del documento. Como el
+   * ancho real es fijo (Letter: 21.59 cm = 816 px a 96 dpi) y el editor es
+   * WYSIWYG con la impresión, no se puede reflowar el texto: se aplica una
+   * escala uniforme (`zoom`) para que el ancho visible coincida con el del
+   * contenedor, tanto en escritorio como en tablet y móvil.
+   */
+  private static readonly ANCHO_HOJA_PX = 816; // 21.59 cm
+  private static readonly ESCALA_HOJA_MIN = 0.35;
+  private hojaObserver?: ResizeObserver;
+  /** Identificador del ciclo de animación que aplica la auto-escala */
+  private hojaFrame = 0;
 
   // --- Estado de la toolbar ---
   dropdownAbierto: '' | 'fuente' | 'tamano' | 'interlineado' | 'margenes' = '';
@@ -144,10 +213,23 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   ) {}
 
   ngAfterViewInit(): void {
-    setTimeout(() => this.iniciarDocumento());
+    document.addEventListener('keydown', this.alPulsarEscape, true);
+    setTimeout(() => {
+      this.iniciarDocumento();
+      this.observarAnchoDeDocumento();
+    });
   }
 
   ngOnDestroy(): void {
+    document.removeEventListener('keydown', this.alPulsarEscape, true);
+    this.hojaObserver?.disconnect();
+    this.hojaObserver = undefined;
+
+    if (this.hojaFrame) {
+      cancelAnimationFrame(this.hojaFrame);
+      this.hojaFrame = 0;
+    }
+
     if (this.autoGuardadoTimer) {
       clearTimeout(this.autoGuardadoTimer);
       this.autoGuardadoTimer = null;
@@ -159,6 +241,65 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     }
 
     document.getElementById('na-print-page-style')?.remove();
+  }
+
+  // ============================================================
+  // Auto-escala de la hoja (para que abarque el ancho disponible)
+  // ============================================================
+
+  /** Vigila el ancho del panel del documento y ajusta la escala de la hoja */
+  private observarAnchoDeDocumento(): void {
+    const wrap = this.hojaWrap?.nativeElement;
+
+    if (!wrap || typeof ResizeObserver === 'undefined') {
+      this.ajustarEscalaHoja();
+      return;
+    }
+
+    // El ajuste se aplaza al siguiente cuadro: aplicar el zoom dentro de la
+    // propia notificación dispara otra notificación y el navegador emite el
+    // aviso "ResizeObserver loop completed with undelivered notifications".
+    this.hojaObserver = new ResizeObserver(() => this.programarEscalaHoja());
+    this.hojaObserver.observe(wrap);
+    this.programarEscalaHoja();
+  }
+
+  /** Aplaza la auto-escala de la hoja al siguiente cuadro de animación */
+  private programarEscalaHoja(): void {
+    if (this.hojaFrame) {
+      cancelAnimationFrame(this.hojaFrame);
+    }
+
+    this.hojaFrame = requestAnimationFrame(() => {
+      this.hojaFrame = 0;
+      this.ajustarEscalaHoja();
+    });
+  }
+
+  /**
+   * Fija `--na-escala` en la hoja para que su ancho visible coincida con el
+   * ancho disponible del contenedor (sin dejar huecos ni provocar scroll
+   * horizontal). Al no tener tope superior, la hoja abarca todo el ancho.
+   */
+  private ajustarEscalaHoja(): void {
+    const wrap = this.hojaWrap?.nativeElement;
+    const hoja = this.hoja?.nativeElement;
+
+    if (!wrap || !hoja) {
+      return;
+    }
+
+    const disponible = wrap.clientWidth;
+    if (disponible <= 0) {
+      return;
+    }
+
+    const escala = Math.max(
+      disponible / NewAgreementComponent.ANCHO_HOJA_PX,
+      NewAgreementComponent.ESCALA_HOJA_MIN,
+    );
+
+    hoja.style.setProperty('--na-escala', escala.toFixed(3));
   }
 
   /**
@@ -262,7 +403,9 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     if (this.contenidoBloqueado) {
       this.notificar.info(
         'Acuerdo abierto en solo lectura',
-        `${codigo} está ${doc.estado === 'firmado' ? 'firmado' : 'anulado'}: puede consultarlo, imprimirlo y enviarlo por correo.`,
+        doc.estado === 'firmado'
+          ? `${codigo} está firmado: puede consultarlo, imprimirlo y enviarlo por correo.`
+          : `${codigo} está anulado: puede consultarlo e imprimirlo, pero no admite envío por correo.`,
       );
     } else {
       this.notificar.info('Acuerdo abierto', `${codigo} listo para editar.`);
@@ -325,6 +468,30 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     return motivoBloqueo(this.estado);
   }
 
+  /**
+   * ¿Se puede enviar el acuerdo por correo?
+   *
+   * Solo los acuerdos FIRMADOS, y siempre que tengan código: el envío difunde
+   * el documento con su huella SHA-256 como constancia de un compromiso
+   * cerrado. Un borrador o un acuerdo en revisión puede cambiar después y uno
+   * anulado ya no tiene efecto, así que ninguno se envía.
+   */
+  get puedeEnviarPorCorreo(): boolean {
+    return !!this.campos['codigo']?.trim() && this.estado === 'firmado';
+  }
+
+  /** Motivo por el que el envío por correo está disponible o bloqueado */
+  get notaEnviarPorCorreo(): string {
+    if (this.estado === 'firmado') {
+      return this.campos['codigo']?.trim()
+        ? 'Enviar el acuerdo firmado por correo electrónico'
+        : 'Genere el código del acuerdo antes de enviarlo por correo';
+    }
+    return this.estado === 'anulado'
+      ? 'Un acuerdo anulado no se puede enviar por correo: ya no tiene efecto'
+      : 'Solo se envían por correo los acuerdos firmados';
+  }
+
   /** Estados alcanzables desde el estado registrado (lo usa el selector) */
   readonly transicionesPermitidas = transicionesPermitidas;
 
@@ -341,7 +508,7 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     return preset?.id ?? null;
   }
 
-  // Cierra el dropdown activo con Escape (o navega atrás si no hay dropdown)
+  // Cierra el modal de campos editables y el dropdown activo con Escape,
   // e intercepta Ctrl/Cmd+P para usar la impresión con márgenes de contrato.
   @HostListener('window:keydown', ['$event'])
   onWindowKeyDown(event: KeyboardEvent): void {
@@ -409,6 +576,53 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   /** Sincroniza todos los campos de una vez (tras cargar/reestablecer) */
   sincronizarTodos(): void {
     Object.keys(this.campos).forEach((campo) => this.sincronizarCampo(campo));
+  }
+
+  /**
+   * Borra toda la información que aparece en la hoja y deja el documento en
+   * blanco, listo para redactar desde cero.
+   *
+   * Es la operación contraria a `restablecer()` (botón "Por defecto"): en lugar
+   * de cargar el modelo del instrumento, deja una hoja vacía. Se conservan los
+   * datos de identificación (prefijo, código) porque van fuera del documento.
+   */
+  limpiarHoja(): void {
+    // Un acuerdo firmado o anulado no se puede vaciar
+    if (this.cerrado) {
+      void this.notificar.errorModal(
+        'El acuerdo no admite cambios',
+        `${this.motivoBloqueoActual} Limpiar la hoja borraría el contenido firmado.`,
+      );
+      return;
+    }
+
+    void Swal.fire({
+      icon: 'question',
+      title: '¿Limpiar toda la hoja?',
+      text: 'Se borrará toda la información que aparece en el documento.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, limpiar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#b3261e',
+    }).then((resultado) => {
+      if (!resultado.isConfirmed) {
+        return;
+      }
+
+      // El código es la identificación del acuerdo (va fuera de la hoja): se conserva
+      const codigo = this.campos['codigo'];
+      this.campos = { ...CAMPOS_DEFAULT, codigo };
+
+      const editor = this.editorTexto?.nativeElement;
+      if (editor) {
+        // Un contenteditable vacío no recibe el foco: se deja un párrafo en blanco
+        editor.innerHTML = '<p><br></p>';
+      }
+
+      this.hashDocumento = '';
+      this.marcarEdicion();
+      this.ajustarEscalaHoja();
+    });
   }
 
   // ============================================================
@@ -718,12 +932,39 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   // Sincronización del editor
   // ============================================================
 
-  onEditorInput(): void {
-    this.sincronizarEditor();
+  onEditorInput(ev?: Event): void {
+    this.sincronizarEditor(ev);
   }
 
-  private sincronizarEditor(): void {
-    // El HTML vive directamente en el contenteditable; solo se marca
+  /**
+   * El instrumento se redacta directamente sobre la hoja, así que el texto
+   * tecleado en un `[data-campo]` tiene que volverse a `campos`. Si no,
+   * al volver a cargar el acuerdo `sincronizarTodos()` escribiría encima los
+   * valores antiguos y se perdería lo que se acabó de teclear en el documento.
+   */
+  private sincronizarEditor(ev?: Event): void {
+    const editor = this.editorTexto?.nativeElement as HTMLElement | undefined;
+
+    if (editor) {
+      // El punto de inserción suele estar en un nodo de texto; cuando no hay
+      // selección (al pegar, arrastrar o borrar) se usa el nodo del evento.
+      const foco = (window.getSelection()?.anchorNode as Node | null) ?? (ev?.target as Node | null);
+      let marca: HTMLElement | null = null;
+
+      if (foco instanceof Element) {
+        marca = foco.closest<HTMLElement>('[data-campo]');
+      } else if (foco?.parentElement) {
+        marca = foco.parentElement.closest<HTMLElement>('[data-campo]');
+      }
+
+      const campo = marca?.dataset['campo'];
+
+      if (campo && campo in this.campos) {
+        this.campos[campo] = marca?.textContent ?? '';
+      }
+    }
+
+    // El HTML vive directamente en el contenteditable; además del dato se marca
     // la página como "editada" (y se programa el autoguardado).
     this.marcarEdicion();
   }
@@ -1148,6 +1389,11 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
         'Falta el código del acuerdo',
         'Genere el código antes de enviarlo por correo.',
       );
+      return;
+    }
+
+    if (!this.puedeEnviarPorCorreo) {
+      this.notificar.aviso('Envío no permitido', this.notaEnviarPorCorreo);
       return;
     }
 

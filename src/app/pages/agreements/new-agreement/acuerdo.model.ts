@@ -1,4 +1,15 @@
-export type AcuerdoEstado = 'borrador' | 'en_revision' | 'firmado' | 'anulado';
+/**
+ * Estados de un acuerdo.
+ *
+ * `eliminado` es el borrado lógico: el backend (`ccoleccion`) solo admite
+ * Insert/Upsert —no borrados físicos—, así que el registro se actualiza con
+ * este estado y deja de aparecer en el listado, pero se conserva en la base
+ * de datos para la trazabilidad.
+ *
+ * La interfaz no ofrece este estado en "Cambiar estado" ni en el filtro: se
+ * llega a él con la acción "Eliminar" del listado.
+ */
+export type AcuerdoEstado = 'borrador' | 'en_revision' | 'firmado' | 'anulado' | 'eliminado';
 
 export interface AcuerdoMargen {
   sup: number;
@@ -35,7 +46,27 @@ export interface Acuerdo {
   creadoPorNombre?: string;
   creadoEn?: string | Date;
   actualizadoEn?: string | Date;
+  /**
+   * Bandera de borrado lógico, complementaria a `estado: 'eliminado'`.
+   * Se escribe junto con el estado para que los registros ya borrados con
+   * versiones anteriores del cliente (que solo usaban esta bandera) sigan
+   * ocultos: `estaEliminado()` considera ambas señales.
+   */
+  eliminado?: boolean;
+  eliminadoEn?: string | Date;
+  eliminadoPorCedula?: string;
+  eliminadoPorNombre?: string;
   __v?: number;
+}
+
+/**
+ * ¿El acuerdo fue eliminado (borrado lógico)?
+ *
+ * Se revisan las dos señales posibles: el estado `eliminado` (mecanismo actual)
+ * y la bandera `eliminado` (registros borrados por versiones anteriores).
+ */
+export function estaEliminado(a: Partial<Acuerdo> | null | undefined): boolean {
+  return a?.estado === 'eliminado' || a?.eliminado === true;
 }
 
 export function generarPrefijo(): string {
@@ -106,6 +137,9 @@ export function motivoBloqueo(estado: AcuerdoEstado | undefined): string {
   }
   if (estado === 'anulado') {
     return 'El acuerdo está anulado: es un estado terminal y no admite más ediciones.';
+  }
+  if (estado === 'eliminado') {
+    return 'El acuerdo está eliminado: ya no aparece en el listado y no admite ediciones.';
   }
   return '';
 }
