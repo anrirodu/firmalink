@@ -1,0 +1,795 @@
+/* ═══════════════════════════════════════════
+   CUSTOMERS — Clientes registrados
+   Patrón visual de LIST AGREEMENT (page-header,
+   KPIs, table-card, chips, speed dial, tema oscuro).
+   ═══════════════════════════════════════════ */
+
+/* Cada categoría y cada estado llevan su propio par fondo/texto en variables,
+   así los chips y avatares —que son muchos— no repiten reglas y el CSS
+   compilado se mantiene dentro del presupuesto. */
+.cat-V { --chip-bg: #e7f1fd; --chip-fg: #1565c0; }
+.cat-E { --chip-bg: #f3e8fd; --chip-fg: #6a1b9a; }
+.cat-J { --chip-bg: #e6eaf0; --chip-fg: #0c2d48; }
+.cat-G { --chip-bg: #e8f5e9; --chip-fg: #2e7d32; }
+.cat-D { --chip-bg: #fff4e5; --chip-fg: #b26a00; }
+.cat-C { --chip-bg: #e0f2f1; --chip-fg: #00897b; }
+
+.cond-especial { --chip-bg: #e7f1fd; --chip-fg: #1565c0; }
+.cond-ordinario { --chip-bg: #eceff1; --chip-fg: #455a64; }
+.cond-formal { --chip-bg: #eceff1; --chip-fg: #607d8b; }
+.cond-exento { --chip-bg: #e8f5e9; --chip-fg: #2e7d32; }
+.cond-exonerado { --chip-bg: #f3e8fd; --chip-fg: #6a1b9a; }
+.cond-no_contribuyente { --chip-bg: #f0f0f0; --chip-fg: #757575; }
+
+.est-activo { --chip-bg: #e8f5e9; --chip-fg: #2e7d32; }
+.est-inactivo { --chip-bg: #f0f0f0; --chip-fg: #757575; }
+.est-suspendido { --chip-bg: #fdecea; --chip-fg: #b3261e; }
+
+/* — Cabecera de página — */
+.page-header {
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+
+  .header-content {
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #0c2d48;
+      margin: 0 0 0.5rem 0;
+    }
+
+    p {
+      color: #757575;
+      margin: 0;
+      font-size: 0.9rem;
+      max-width: 62ch;
+    }
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+
+    button {
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+
+      mat-icon {
+        margin-right: 0.25rem;
+      }
+    }
+  }
+}
+
+/* — Speed dial flotante (por debajo de 1024px) — */
+.cu-speeddial {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 4.5rem;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+
+.cu-speeddial-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.9);
+  transform-origin: bottom right;
+  transition: opacity 0.18s ease,
+              transform 0.18s ease,
+              visibility 0s linear 0.18s;
+
+  button {
+    position: relative;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+
+    /* Etiqueta propia: en táctil el tooltip solo sale al mantener pulsado. */
+    &::after {
+      content: attr(aria-label);
+      position: absolute;
+      top: 50%;
+      right: calc(100% + 0.5rem);
+      transform: translateY(-50%);
+      padding: 0.32rem 0.55rem;
+      border-radius: 4px;
+      background: rgba(20, 20, 20, 0.92);
+      color: #fff;
+      font-size: 0.72rem;
+      line-height: 1;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+  }
+}
+
+.cu-speeddial.abierto .cu-speeddial-acciones {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.18s ease,
+              transform 0.18s ease,
+              visibility 0s linear 0s;
+}
+
+.cu-speeddial > button {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+/* — Indicadores por categoría (también filtran) — */
+.cu-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.cu-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(224, 224, 224, 0.8);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    border-color: #b0bec5;
+    transform: translateY(-1px);
+  }
+
+  /* El KPI filtrado queda marcado con el acento */
+  &.activo {
+    border-color: #00c9a7;
+    box-shadow: 0 0 0 2px rgba(0, 201, 167, 0.18), 0 4px 14px rgba(0, 0, 0, 0.06);
+  }
+
+  mat-icon {
+    font-size: 1.65rem;
+    width: 1.65rem;
+    height: 1.65rem;
+    color: #0c2d48;
+  }
+
+  div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+
+  .cu-kpi-valor {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #0c2d48;
+  }
+
+  .cu-kpi-etiqueta {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #757575;
+  }
+
+  &.kpi-V mat-icon { color: #1565c0; }
+  &.kpi-E mat-icon { color: #6a1b9a; }
+  &.kpi-J mat-icon { color: #0c2d48; }
+  &.kpi-G mat-icon { color: #2e7d32; }
+  &.kpi-D mat-icon { color: #b26a00; }
+  &.kpi-C mat-icon { color: #00897b; }
+  &.kpi-especial mat-icon { color: #00897b; }
+}
+
+/* — Tarjeta de la tabla — */
+.table-card {
+  border-radius: 20px !important;
+  border: 1px solid rgba(224, 224, 224, 0.6);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06) !important;
+  overflow: hidden;
+
+  ::ng-deep .mat-mdc-card-content {
+    padding: 0 16px !important;
+  }
+}
+
+.table-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 16px !important;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  text-align: left;
+
+  ::ng-deep .mat-mdc-card-header-text {
+    margin: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+  }
+
+  .header-right {
+    margin-left: auto;
+  }
+
+  .cu-conteo {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #757575;
+    white-space: nowrap;
+  }
+}
+
+.search-field {
+  width: 300px;
+  margin: 0;
+
+  ::ng-deep {
+    .mat-mdc-text-field-wrapper {
+      border-radius: 12px;
+      background: #f5f5f5;
+    }
+
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+}
+
+.filtro-field {
+  width: 200px;
+  margin: 0;
+
+  ::ng-deep {
+    .mat-mdc-text-field-wrapper {
+      border-radius: 12px;
+      background: #f5f5f5;
+    }
+
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+}
+
+.filtro-estado {
+  width: 170px;
+}
+
+/* — Tabla — */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+
+  .mat-mdc-header-cell {
+    background: #f5f5f5;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #757575;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #e0e0e0;
+    white-space: nowrap;
+  }
+
+  .mat-mdc-cell {
+    font-size: 0.875rem;
+    color: #333;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+  }
+
+  .cu-fila {
+    cursor: pointer;
+
+    &:hover {
+      background: #fafafa;
+    }
+  }
+
+  /* Inactivos y suspendidos se atenúan, pero siguen legibles */
+  .cu-fila-inactiva {
+    opacity: 0.72;
+  }
+
+  .cell-number {
+    font-weight: 700;
+    color: #0c2d48;
+    white-space: nowrap;
+  }
+
+  .th-acciones,
+  .td-acciones {
+    text-align: center;
+    white-space: nowrap;
+    width: 96px;
+  }
+
+  /* El botón debe quedar centrado en la fila: el td se mantiene como celda
+     de tabla (display: flex en un <td> lo saca del flujo y lo pega arriba). */
+  .td-acciones {
+    .mat-mdc-icon-button,
+    .mat-icon-button {
+      vertical-align: middle;
+    }
+
+    mat-icon {
+      color: #546e7a;
+    }
+
+    &:hover mat-icon {
+      color: #0c2d48;
+    }
+  }
+}
+
+/* — Columna Cliente: avatar + nombre + subtítulo — */
+.cu-cliente {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.cu-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 50%;
+  background: var(--chip-bg, #eceff1);
+  color: var(--chip-fg, #455a64);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.cu-cliente-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+
+  .cu-nombre {
+    font-weight: 600;
+    color: #2c2c2c;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 26ch;
+  }
+
+  .cu-subtitulo {
+    font-size: 0.72rem;
+    color: #8a8a8a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 26ch;
+  }
+}
+
+/* — Documento: botón que copia — */
+.cu-documento {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(0, 201, 167, 0.35);
+  border-radius: 8px;
+  background: rgba(0, 201, 167, 0.08);
+  color: #00897b;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: #00c9a7;
+    background: rgba(0, 201, 167, 0.16);
+    box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.14);
+  }
+}
+
+/* — Chips (categoría, condición, estado) — */
+.cu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: var(--chip-bg, #f0f0f0);
+  color: var(--chip-fg, #616161);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.cu-retencion {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #00897b;
+  white-space: nowrap;
+}
+
+/* — Columna Contacto — */
+.cu-contacto {
+  max-width: 22ch;
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: #546e7a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  mat-icon {
+    flex: 0 0 auto;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    color: #90a4ae;
+  }
+
+  .cu-sin-dato {
+    color: #9e9e9e;
+    font-style: italic;
+  }
+}
+
+/* — Menú de acciones — */
+.cu-menu-titulo {
+  padding: 0.5rem 1rem 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9e9e9e;
+}
+
+.cu-menu-actual {
+  margin-left: auto;
+  color: #2e7d32;
+}
+
+/* — Eliminar: en rojo para distinguir la acción destructiva — */
+.cu-accion-eliminar {
+  color: #b3261e;
+
+  mat-icon {
+    color: inherit;
+  }
+}
+
+/* — Estado vacío — */
+.cu-vacio {
+  .mat-cell {
+    text-align: center;
+    padding: 3rem 1rem !important;
+    color: #757575;
+
+    p {
+      margin: 0.5rem 0 1rem;
+      font-size: 0.9rem;
+    }
+  }
+
+  .cu-vacio-icono {
+    font-size: 2.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #cfd8dc;
+  }
+}
+
+mat-paginator {
+  background: transparent;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .page-header .header-actions {
+    display: none;
+  }
+
+  .cu-speeddial {
+    display: flex;
+  }
+}
+
+@media (max-width: 992px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .search-field,
+  .filtro-field,
+  .filtro-estado {
+    width: 100%;
+  }
+
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+
+    .header-left {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header .header-content h1 {
+    font-size: 1.4rem;
+  }
+
+  /* El footer se apila y crece en alto: sube el FAB para no taparlo. */
+  .cu-speeddial {
+    bottom: 5.5rem;
+  }
+
+  .cu-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .table-wrapper {
+    margin: 0 -0.5rem;
+  }
+
+  .data-table {
+    .mat-mdc-header-cell,
+    .mat-mdc-cell {
+      padding: 0.75rem;
+      font-size: 0.8rem;
+    }
+  }
+
+  .cu-cliente-texto .cu-nombre,
+  .cu-cliente-texto .cu-subtitulo {
+    max-width: 18ch;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   TEMA OSCURO
+   ═══════════════════════════════════════════ */
+:host-context([data-theme="dark"]) {
+
+  /* Los pares pastel del tema claro pierden contraste sobre el fondo oscuro */
+  .cat-V { --chip-bg: rgba(100, 181, 246, 0.16); --chip-fg: #64b5f6; }
+  .cat-E { --chip-bg: rgba(206, 147, 216, 0.16); --chip-fg: #ce93d8; }
+  .cat-J { --chip-bg: rgba(144, 164, 174, 0.16); --chip-fg: #b0bec5; }
+  .cat-G { --chip-bg: rgba(129, 199, 132, 0.16); --chip-fg: #81c784; }
+  .cat-D { --chip-bg: rgba(255, 183, 77, 0.16); --chip-fg: #ffb74d; }
+  .cat-C { --chip-bg: rgba(77, 208, 225, 0.16); --chip-fg: #4dd0e1; }
+
+  .cond-especial { --chip-bg: rgba(100, 181, 246, 0.16); --chip-fg: #64b5f6; }
+  .cond-ordinario { --chip-bg: rgba(144, 164, 174, 0.16); --chip-fg: #b0bec5; }
+  .cond-formal { --chip-bg: rgba(144, 164, 174, 0.16); --chip-fg: #b0bec5; }
+  .cond-exento { --chip-bg: rgba(129, 199, 132, 0.16); --chip-fg: #81c784; }
+  .cond-exonerado { --chip-bg: rgba(206, 147, 216, 0.16); --chip-fg: #ce93d8; }
+  .cond-no_contribuyente { --chip-bg: rgba(255, 255, 255, 0.08); --chip-fg: #bdbdbd; }
+
+  .est-activo { --chip-bg: rgba(129, 199, 132, 0.16); --chip-fg: #81c784; }
+  .est-inactivo { --chip-bg: rgba(255, 255, 255, 0.08); --chip-fg: #bdbdbd; }
+  .est-suspendido { --chip-bg: rgba(239, 154, 154, 0.16); --chip-fg: #ef9a9a; }
+
+  .page-header {
+    .header-content h1 {
+      color: #00c9a7;
+    }
+
+    .header-content p {
+      color: #9e9e9e;
+    }
+  }
+
+  .cu-kpi {
+    background: #1e1e1e;
+    border-color: #333;
+    box-shadow: none;
+
+    mat-icon,
+    .cu-kpi-valor {
+      color: #e0e0e0;
+    }
+
+    .cu-kpi-etiqueta {
+      color: #9e9e9e;
+    }
+
+    &:hover {
+      border-color: #555;
+    }
+
+    &.activo {
+      border-color: #00c9a7;
+      box-shadow: 0 0 0 2px rgba(0, 201, 167, 0.22);
+    }
+  }
+
+  .table-card {
+    background: #1e1e1e !important;
+    border-color: #333 !important;
+
+    ::ng-deep .mat-mdc-card-header,
+    ::ng-deep .mat-mdc-card-content {
+      background: #1e1e1e;
+    }
+  }
+
+  .cu-conteo {
+    color: #9e9e9e;
+  }
+
+  .search-field,
+  .filtro-field {
+    ::ng-deep {
+      .mat-mdc-text-field-wrapper {
+        background: #2a2a2a;
+      }
+
+      .mat-mdc-form-field-icon-prefix,
+      .mat-mdc-form-field-icon-suffix,
+      .mat-mdc-floating-label {
+        color: #9e9e9e;
+      }
+
+      .mat-mdc-input-element,
+      .mat-mdc-select-value-text {
+        color: #e0e0e0;
+        caret-color: #e0e0e0;
+      }
+
+      .mdc-notched-outline__leading,
+      .mdc-notched-outline__trailing,
+      .mdc-notched-outline__notch {
+        border-color: #555 !important;
+      }
+
+      &.mat-focused .mdc-notched-outline__leading,
+      &.mat-focused .mdc-notched-outline__trailing,
+      &.mat-focused .mdc-notched-outline__notch {
+        border-color: #00c9a7 !important;
+      }
+    }
+  }
+
+  .data-table {
+    .mat-mdc-header-row,
+    .mat-mdc-header-cell {
+      background: #2a2a2a;
+      border-bottom-color: #424242;
+      color: #bdbdbd;
+    }
+
+    .mat-mdc-cell {
+      color: #e0e0e0;
+      border-bottom-color: #333;
+    }
+
+    .cu-fila:hover {
+      background: #2a2a2a;
+    }
+
+    .cell-number {
+      color: #00c9a7;
+    }
+
+    // Iconos de la columna Acciones: el gris azulado del tema claro deja de
+    // contrastar contra la fila oscura, así que se aclara.
+    .td-acciones mat-icon {
+      color: #90a4ae;
+    }
+
+    .td-acciones:hover mat-icon {
+      color: #cfd8dc;
+    }
+  }
+
+  .cu-cliente-texto {
+    .cu-nombre {
+      color: #e0e0e0;
+    }
+
+    .cu-subtitulo {
+      color: #9e9e9e;
+    }
+  }
+
+  .cu-documento {
+    border-color: rgba(0, 201, 167, 0.35);
+    background: rgba(0, 201, 167, 0.1);
+    color: #2ee6c5;
+
+    &:hover {
+      border-color: #00c9a7;
+      background: rgba(0, 201, 167, 0.2);
+      box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.18);
+    }
+  }
+
+  .cu-retencion {
+    color: #4dd0e1;
+  }
+
+  .cu-contacto {
+    span {
+      color: #b0bec5;
+    }
+
+    .cu-sin-dato {
+      color: #9e9e9e;
+    }
+  }
+
+  /* Acciones del menú: los colores del tema claro eran demasiado oscuros
+     (o pastel) sobre la superficie oscura. */
+  .cu-accion-eliminar {
+    color: #ef9a9a;
+  }
+
+  .cu-menu-actual {
+    color: #81c784;
+  }
+
+  .cu-vacio .mat-cell {
+    color: #9e9e9e;
+  }
+
+  .cu-vacio .cu-vacio-icono {
+    color: #455a64;
+  }
+
+  mat-paginator {
+    background: transparent;
+    border-top-color: #333;
+  }
+}

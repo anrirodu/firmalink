@@ -1,0 +1,579 @@
+<div class="bl-page">
+
+  <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
+  <header class="page-header">
+    <div class="header-content">
+      <h1>Facturación</h1>
+      <!-- <p>
+        Emita la factura digital con el formato de la hoja 21,7 × 28 cm. El cliente
+        llega de su ficha: su RIF, su domicilio y su trato fiscal —retención de IVA
+        e ISLR, IGTF, exención— se copian dentro del documento.
+      </p> -->
+    </div>
+
+        <div class="header-actions">
+      <span class="bl-estado" [style.--bl-estado-color]="estadoInfo().color">
+        <mat-icon>{{ estadoInfo().icono }}</mat-icon>
+        {{ estadoInfo().etiqueta }}
+      </span>
+
+      <button mat-icon-button type="button" [matMenuTriggerFor]="accionesMenu"
+              class="bl-acciones-trigger"
+              matTooltip="Acciones de la factura">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+
+      <mat-menu #accionesMenu="matMenu" class="bl-acciones-menu">
+        <button mat-menu-item type="button" (click)="nueva()">
+          <mat-icon>note_add</mat-icon> <span>Nueva</span>
+        </button>
+        <button mat-menu-item type="button" (click)="imprimir()" [disabled]="cargando()">
+          <mat-icon>print</mat-icon> <span>Imprimir</span>
+        </button>
+        @if (readonly_()) {
+          @if (factura().estado === 'emitida') {
+            <button mat-menu-item type="button" (click)="anular()">
+              <mat-icon>block</mat-icon> <span>Anular</span>
+            </button>
+          }
+        } @else {
+          <button mat-menu-item type="button" (click)="guardar(false)" [disabled]="guardando()">
+            <mat-icon>save</mat-icon> <span>Guardar</span>
+          </button>
+          <button mat-menu-item type="button" (click)="guardar(true)" [disabled]="guardando()">
+            <mat-icon>receipt_long</mat-icon> <span>Emitir</span>
+          </button>
+        }
+      </mat-menu>
+    </div>
+  </header>
+
+  @if (bloqueo()) {
+    <div class="bl-aviso bl-aviso-bloqueo">
+      <mat-icon>lock</mat-icon>
+      <div>{{ bloqueo() }}</div>
+    </div>
+  }
+
+  @if (problemas().length > 0 && !readonly_()) {
+    <div class="bl-aviso bl-aviso-datos">
+      <mat-icon>error_outline</mat-icon>
+      <div>
+        <strong>Para emitir falta:</strong>
+        <ul>
+          @for (p of problemas(); track p.campo + p.mensaje) {
+            <li>{{ p.mensaje }}</li>
+          }
+        </ul>
+      </div>
+    </div>
+  }
+
+  <div class="bl-layout">
+
+    <!-- ── Panel de datos ─────────────────────────────────────────────── -->
+    <aside class="bl-panel">
+
+            <ng-template #tplCliente let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Cliente -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>person</mat-icon> Cliente
+        </h2>
+
+        @if (!factura().cliente) {
+          <mat-form-field class="bl-buscador" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Buscar cliente</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput type="text" [formControl]="buscarCliente"
+                   placeholder="Nombre, RIF o código"
+                   [matAutocomplete]="autoClientes"
+                   [attr.disabled]="readonly_() ? '' : null">
+            <mat-autocomplete #autoClientes="matAutocomplete"
+                              [displayWith]="nombreCliente"
+                              (optionSelected)="elegirCliente($event.option.value)">
+              @for (c of clientesFiltrados(); track c.codigo) {
+                <mat-option [value]="c">
+                  <div class="bl-opcion">
+                    <span class="bl-opcion-nombre">{{ nombreCliente(c) }}</span>
+                    <span class="bl-opcion-meta">
+                      {{ c.rif || c.identificacion }} · {{ c.codigo }}
+                      @if (c.condicionFiscal !== 'ordinario') {
+                        · {{ infoCondicion(c.condicionFiscal)?.etiqueta }}
+                      }
+                    </span>
+                  </div>
+                </mat-option>
+              }
+              @if (clientesFiltrados().length === 0) {
+                <mat-option disabled>Sin clientes que coincidan</mat-option>
+              }
+            </mat-autocomplete>
+          </mat-form-field>
+        } @else {
+          <div class="bl-cliente">
+            <div class="bl-cliente-avatar">{{ factura().cliente?.nombre?.charAt(0) }}</div>
+            <div class="bl-cliente-datos">
+              <strong>{{ factura().cliente?.nombre }}</strong>
+              <span>{{ factura().cliente?.rif || factura().cliente?.identificacion }}</span>
+              <span class="bl-cliente-linea">
+                <mat-icon>place</mat-icon> {{ factura().cliente?.direccion }}
+              </span>
+              @if (factura().cliente?.telefono) {
+                <span class="bl-cliente-linea">
+                  <mat-icon>call</mat-icon> {{ factura().cliente?.telefono }}
+                </span>
+              }
+            </div>
+          </div>
+
+          <div class="bl-cliente-acciones">
+            <button mat-button type="button" (click)="refrescarCliente()"
+                    [disabled]="readonly_()"
+                    matTooltip="Volver a copiar los datos de la ficha del cliente">
+              <mat-icon>sync</mat-icon> Actualizar datos
+            </button>
+            <button mat-button type="button" (click)="quitarCliente()"
+                    [disabled]="readonly_()"
+                    matTooltip="Quitar el cliente de la factura">
+              <mat-icon>close</mat-icon> Quitar
+            </button>
+          </div>
+
+          @if (notasFiscales(factura().cliente).length > 0) {
+            <ul class="bl-notas">
+              @for (n of notasFiscales(factura().cliente); track n.titulo) {
+                <li [class]="'bl-nota bl-nota-' + n.tono">
+                  <mat-icon>{{ n.icono }}</mat-icon>
+                  <div>
+                    <strong>{{ n.titulo }}</strong>
+                    <span>{{ n.detalle }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        }
+      </section>
+      </ng-template>
+
+      <ng-template #tplDatos let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Datos de la factura -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>badge</mat-icon> Datos de la factura
+        </h2>
+
+        <div class="bl-grid">
+          <label class="bl-campo">
+            <span>N° Factura</span>
+            <input type="text" inputmode="numeric" [value]="factura().numero"
+                   (input)="set('numero', formatearNumeroFactura($any($event.target).value))"
+                   [attr.readonly]="readonly_() ? '' : null">
+          </label>
+
+          <label class="bl-campo">
+            <span>
+              N° de Control
+              <button mat-icon-button type="button" class="bl-mini"
+                      (click)="sincronizarControl()" [disabled]="readonly_()"
+                      matTooltip="Copiar el número de factura">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </span>
+            <div class="bl-campo-grupo">
+              <input class="bl-prefijo" type="text" [value]="factura().controlPrefijo"
+                     (input)="set('controlPrefijo', $any($event.target).value)"
+                     [attr.readonly]="readonly_() ? '' : null">
+              <input type="text" inputmode="numeric" [value]="factura().numeroControl"
+                     (input)="set('numeroControl', formatearNumeroFactura($any($event.target).value))"
+                     [attr.readonly]="readonly_() ? '' : null">
+            </div>
+          </label>
+
+          <label class="bl-campo">
+            <span>Formato</span>
+            <select [value]="factura().formato" (change)="set('formato', $any($event.target).value)"
+                    [attr.disabled]="readonly_() ? '' : null">
+              <option value="FORMATO LIBRE">FORMATO LIBRE</option>
+              <option value="NOTA DE ENTREGA">NOTA DE ENTREGA</option>
+            </select>
+          </label>
+
+          <label class="bl-campo">
+            <span>Fecha de emisión</span>
+            <input type="date" [value]="fechaParaInput(factura())"
+                   (change)="setFecha($any($event.target).value)"
+                   [attr.disabled]="readonly_() ? '' : null">
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Fecha impresa</span>
+            <input type="text" [value]="factura().fechaTexto"
+                   (input)="setFechaTexto($any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null"
+                   matTooltip="Como sale en la hoja: ciudad, día, mes y año">
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Mes facturado</span>
+            <input type="text" [value]="factura().mes"
+                   (input)="set('mes', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+          </label>
+        </div>
+
+        @if (controlFueraDeRango()) {
+          <p class="bl-aviso-campo">
+            <mat-icon>warning</mat-icon>
+            El control {{ factura().controlPrefijo }}{{ factura().numeroControl }} está fuera del
+            rango autorizado ({{ factura().emisor.controlDesde }} – {{ factura().emisor.controlHasta }}).
+          </p>
+        }
+      </section>
+      </ng-template>
+
+      <ng-template #tplImpuestos let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Trato fiscal -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>percent</mat-icon> Impuestos
+        </h2>
+
+        <div class="bl-grid">
+          <label class="bl-campo">
+            <span>IVA (%)</span>
+            <input type="text" inputmode="decimal" [value]="factura().alicuotaIva"
+                   (input)="setNumero('alicuotaIva', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+            @if (clienteExentoIva()) {
+              <small class="bl-hint">Cliente exento: la factura sale sin IVA.</small>
+            }
+          </label>
+
+          <label class="bl-campo">
+            <span>ISLR (%)</span>
+            <input type="text" inputmode="decimal" [value]="factura().alicuotaIslr"
+                   (input)="setNumero('alicuotaIslr', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+            <small class="bl-hint">
+              {{ factura().cliente?.agenteRetencionIslr
+                  ? 'El cliente retiene este porcentaje del subtotal.'
+                  : 'El cliente no es agente de retención de ISLR.' }}
+            </small>
+          </label>
+
+          <div class="bl-campo bl-campo-ancho">
+            <span class="bl-switch">
+              <input type="checkbox" id="bl-igtf" [checked]="factura().aplicaIgtf"
+                     (change)="alternarIgtf()"
+                     [attr.disabled]="(readonly_() || !puedeAplicarIgtf()) ? '' : null">
+              <label for="bl-igtf">Aplicar IGTF ({{ formatoPorcentaje(factura().alicuotaIgtf) }})</label>
+            </span>
+            <small class="bl-hint">
+              {{ factura().cliente?.exentoIgtf
+                  ? 'El cliente está exento de IGTF: no corresponde.'
+                  : 'Solo cuando la operación se paga en divisas.' }}
+            </small>
+          </div>
+
+          <label class="bl-campo">
+            <span>Alícuota IGTF (%)</span>
+            <input type="text" inputmode="decimal" [value]="factura().alicuotaIgtf"
+                   (input)="setNumero('alicuotaIgtf', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+          </label>
+        </div>
+      </section>
+      </ng-template>
+
+      <ng-template #tplRenglones let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Renglones -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>list_alt</mat-icon> Renglones
+          <span class="bl-contador">{{ factura().items.length }}</span>
+        </h2>
+
+        @if (factura().items.length === 0) {
+          <p class="bl-vacio">
+            La factura no tiene renglones. Agregue el primero con <strong>+ Agregar renglón</strong>.
+          </p>
+        } @else {
+          <div class="bl-items">
+            @for (it of factura().items; track $index; let i = $index) {
+              <div class="bl-item">
+                <label class="bl-item-desc">
+                  <span class="bl-item-num">{{ i + 1 }}</span>
+                  <textarea rows="2" [value]="it.descripcion"
+                            placeholder="Descripción del producto o servicio"
+                            (input)="editarItem(i, 'descripcion', $any($event.target).value)"
+                            [attr.readonly]="readonly_() ? '' : null"></textarea>
+                </label>
+                <div class="bl-item-cifras">
+                  <label class="bl-campo bl-campo-corto">
+                    <span>Cantidad</span>
+                    <input type="text" inputmode="decimal" [value]="it.cantidad"
+                           (input)="editarItem(i, 'cantidad', $any($event.target).value)"
+                           [attr.readonly]="readonly_() ? '' : null">
+                  </label>
+                  <label class="bl-campo bl-campo-corto">
+                    <span>Precio (Bs)</span>
+                    <input type="text" inputmode="decimal" [value]="it.precio"
+                           (input)="editarItem(i, 'precio', $any($event.target).value)"
+                           [attr.readonly]="readonly_() ? '' : null">
+                  </label>
+                  <div class="bl-item-total">
+                    <span>Total</span>
+                    <strong>{{ formatoBs(totalItem(i)) }}</strong>
+                  </div>
+                  <button mat-icon-button type="button" class="bl-item-quitar"
+                          (click)="quitarItem(i)" [disabled]="readonly_()"
+                          matTooltip="Quitar el renglón">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="bl-card-acciones">
+          <button mat-stroked-button type="button" (click)="agregarItem()" [disabled]="readonly_()">
+            <mat-icon>add</mat-icon> Agregar renglón
+          </button>
+          <button mat-button type="button" (click)="limpiarItems()"
+                  [disabled]="readonly_() || factura().items.length === 0">
+            <mat-icon>playlist_remove</mat-icon> Quitar todos
+          </button>
+        </div>
+      </section>
+      </ng-template>
+
+      <ng-template #tplResumen let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Resumen -->
+      <section class="bl-card bl-resumen">
+        <h2 class="bl-card-titulo">
+          <mat-icon>functions</mat-icon> Resumen
+        </h2>
+
+        <dl class="bl-totales">
+          <div><dt>SubTotal</dt><dd>{{ formatoBs(totales().subtotal) }}</dd></div>
+          <div><dt>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}</dt>
+            <dd>{{ formatoBs(totales().montoIva) }}</dd></div>
+          @if (factura().aplicaIgtf && puedeAplicarIgtf()) {
+            <div><dt>IGTF {{ formatoPorcentaje(factura().alicuotaIgtf) }}</dt>
+              <dd>{{ formatoBs(totales().montoIgtf) }}</dd></div>
+          }
+          <div class="bl-total"><dt>Total Bs</dt><dd>{{ formatoBs(totales().total) }}</dd></div>
+          @if (totales().retencionIva > 0) {
+            <div class="bl-retencion">
+              <dt>Ret. IVA {{ formatoPorcentaje(factura().cliente?.porcentajeRetencionIva ?? 0) }}</dt>
+              <dd>- {{ formatoBs(totales().retencionIva) }}</dd>
+            </div>
+          }
+          @if (totales().retencionIslr > 0) {
+            <div class="bl-retencion">
+              <dt>Ret. ISLR {{ formatoPorcentaje(factura().alicuotaIslr) }}</dt>
+              <dd>- {{ formatoBs(totales().retencionIslr) }}</dd>
+            </div>
+          }
+          @if (totales().retencionIva > 0 || totales().retencionIslr > 0) {
+            <div class="bl-total bl-neto"><dt>Neto a pagar</dt>
+              <dd>{{ formatoBs(totales().netoAPagar) }}</dd></div>
+          }
+        </dl>
+      </section>
+      </ng-template>
+
+      <ng-template #tplHoja let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Hoja -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>description</mat-icon> Hoja
+        </h2>
+
+        <div class="bl-interruptores">
+          <button mat-stroked-button type="button" (click)="alternar('mostrarCabeceraPie')"
+                  [class.activo]="factura().mostrarCabeceraPie" [disabled]="readonly_()"
+                  matTooltip="Mostrar u ocultar la cabecera (logo, empresa, formato) y el pie del emisor">
+            <mat-icon>{{ factura().mostrarCabeceraPie ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+            Cabecera y pie
+          </button>
+          <button mat-stroked-button type="button" (click)="alternar('mostrarFirmaSello')"
+                  [class.activo]="factura().mostrarFirmaSello" [disabled]="readonly_()"
+                  matTooltip="Mostrar u ocultar la firma y el sello">
+            <mat-icon>{{ factura().mostrarFirmaSello ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+            Firma y sello
+          </button>
+          <button mat-stroked-button type="button" (click)="alternar('mostrarMarcaAgua')"
+                  [class.activo]="factura().mostrarMarcaAgua" [disabled]="readonly_()"
+                  matTooltip="Mostrar u ocultar la marca de agua">
+            <mat-icon>{{ factura().mostrarMarcaAgua ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+            Marca de agua
+          </button>
+        </div>
+
+        @if (factura().codigo) {
+          <p class="bl-hint">
+            Código interno {{ factura().codigo }}
+            @if (factura().huella) {
+              · huella {{ factura().huella?.slice(0, 16) }}…
+            }
+          </p>
+        }
+      </section>
+      </ng-template>
+
+
+      @if (!esCompacta()) {
+        <ng-container *ngTemplateOutlet="tplCliente"></ng-container>
+        <ng-container *ngTemplateOutlet="tplDatos"></ng-container>
+        <ng-container *ngTemplateOutlet="tplImpuestos"></ng-container>
+        <ng-container *ngTemplateOutlet="tplRenglones"></ng-container>
+        <ng-container *ngTemplateOutlet="tplResumen"></ng-container>
+        <ng-container *ngTemplateOutlet="tplHoja"></ng-container>
+      } @else {
+        <div class="bl-secciones">
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Cliente', tplCliente)">
+            <mat-icon>person</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Cliente</strong>
+              <small>{{ factura().cliente?.nombre ?? 'Sin cliente asignado' }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Datos de la factura', tplDatos)">
+            <mat-icon>badge</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Datos de la factura</strong>
+              <small>FACTURA {{ factura().numero }} · control {{ factura().controlPrefijo }}{{ factura().numeroControl }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Impuestos', tplImpuestos)">
+            <mat-icon>percent</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Impuestos</strong>
+              <small>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}@if (factura().aplicaIgtf && puedeAplicarIgtf()) { · IGTF {{ formatoPorcentaje(factura().alicuotaIgtf) }} }</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Renglones', tplRenglones)">
+            <mat-icon>list_alt</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Renglones</strong>
+              <small>{{ factura().items.length }} {{ factura().items.length === 1 ? 'renglón' : 'renglones' }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Resumen', tplResumen)">
+            <mat-icon>functions</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Resumen</strong>
+              <small>Total {{ formatoBs(totales().total) }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Hoja', tplHoja)">
+            <mat-icon>description</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Hoja</strong>
+              <small>Cabecera y pie · firma y sello · marca de agua</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+        </div>
+      }
+
+      @if (factura().codigo && !readonly_()) {
+        <section class="bl-card bl-card-peligro">
+          <button mat-button type="button" (click)="eliminar()"
+                  matTooltip="Sacar la factura del listado (queda en la base para la trazabilidad)">
+            <mat-icon>delete_outline</mat-icon> Eliminar factura
+          </button>
+        </section>
+      }
+    </aside>
+
+    <!-- ── Vista previa de la hoja ────────────────────────────────────── -->
+    <section class="bl-vista" [class]="'bl-escala-' + (escala() * 100).toFixed(0)">
+      <div class="bl-vista-barra">
+        <span class="bl-vista-titulo">
+          <mat-icon>visibility</mat-icon>
+          Vista previa
+        </span>
+        <span class="bl-vista-meta">
+          Hoja 21,7 × 28 cm · escala {{ escala() * 100 | number:'1.0-0' }} %
+        </span>
+        <button mat-icon-button type="button" (click)="cambiarEscala()"
+                matTooltip="Cambiar la escala de la vista previa">
+          <mat-icon>zoom_in</mat-icon>
+        </button>
+        <button mat-icon-button type="button" (click)="imprimir()"
+                matTooltip="Imprimir la factura">
+          <mat-icon>print</mat-icon>
+        </button>
+      </div>
+
+      @if (cargando()) {
+        <div class="bl-cargando">Preparando la hoja…</div>
+      } @else {
+        <div class="fx-lienzo" [innerHTML]="hoja()"></div>
+      }
+    </section>
+  </div>
+</div>

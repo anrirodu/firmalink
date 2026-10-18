@@ -21,12 +21,14 @@ interesado por correo electrónico.
 9. [Integración con el backend (Sandra Server)](#integración-con-el-backend-sandra-server)
 10. [Seguridad](#seguridad)
 11. [Reglas de negocio — Acuerdos](#reglas-de-negocio--acuerdos)
-12. [Impresión y exportación](#impresión-y-exportación)
-13. [Envío por correo](#envío-por-correo)
-14. [Tema visual y branding](#tema-visual-y-branding)
-15. [Integración con contenedor de escritorio](#integración-con-contenedor-de-escritorio)
-16. [Convenciones de desarrollo](#convenciones-de-desarrollo)
-17. [Créditos](#créditos)
+12. [Reglas de negocio — Clientes](#reglas-de-negocio--clientes)
+13. [Reglas de negocio — Facturación](#reglas-de-negocio--facturación)
+14. [Impresión y exportación](#impresión-y-exportación)
+15. [Envío por correo](#envío-por-correo)
+16. [Tema visual y branding](#tema-visual-y-branding)
+17. [Integración con contenedor de escritorio](#integración-con-contenedor-de-escritorio)
+18. [Convenciones de desarrollo](#convenciones-de-desarrollo)
+19. [Créditos](#créditos)
 
 ---
 
@@ -58,6 +60,13 @@ interesado por correo electrónico.
   `ccoleccion` solo admite Insert/Upsert, no borrados físicos). Un acuerdo **firmado no se elimina
   nunca** —su contenido y su huella son definitivos— y en su lugar puede anularse. El código de un
   acuerdo eliminado no se reutiliza.
+- **Registro de clientes** por categoría legal (V, E, J, G, diplomáticos y comunales) con su condición
+  ante el SENIAT, validación del **RIF por módulo 11** y detección de documentos repetidos.
+- **Listado de clientes con KPIs por categoría** que también filtran, búsqueda por nombre/documento y
+  ficha completa en un modal por pestañas.
+- **Facturación digital** sobre la hoja autorizada de 21,7 × 28 cm, con vista previa en vivo, el
+  formato de la plantilla (cabecera, renglones, totales e importe en letras, firma y sello) y el
+  trato fiscal del cliente: exención de IVA, IGTF de divisas y retenciones de IVA e ISLR.
 - **Autenticación** por JWT con interceptor de firma **HMAC**, guardas de ruta y cierre de sesión por
   inactividad.
 - **Tema claro / oscuro** persistente.
@@ -75,6 +84,9 @@ interesado por correo electrónico.
 | `/hiring` | `pages/hiring` | Gestión de contrataciones |
 | `/agreements/list-agreement` | `pages/agreements/list-agreement` | Listado de acuerdos (KPIs, filtros, orden, paginación y menú de acciones) |
 | `/agreements/new-agreement` | `pages/agreements/new-agreement` | Editor de acuerdo (alta y edición) |
+| `/customers` | `pages/customers` | Clientes: listado con KPIs por categoría, filtros y ficha completa en modal |
+| `/billing` | `pages/billing/list-billing` | Listado de facturas generadas: KPIs, filtros, emisión/anulación, huella SHA-256 y envío por correo en PDF |
+| `/billing/new` | `pages/billing` | Editor de la factura: vista previa en vivo de la hoja 21,7 × 28 cm (alta y consulta) |
 | `/change-password` | `pages/cambiar-contrasena` | Cambio de contraseña |
 | `/error` | `pages/miscellaneous/error` | Página de error |
 | `/not-authorized` | `pages/miscellaneous/not-authorized` | Acceso no autorizado |
@@ -132,6 +144,12 @@ firmalink/
 │   │   │   │       ├── enviar-correo.dialog.ts # Diálogo de destinatarios
 │   │   │   │       └── new-agreement.impresion.ts # Documento para impresión
 │   │   │   ├── cambiar-contrasena/
+│   │   │   ├── customers/          # Clientes
+│   │   │   │   ├── cliente.model.ts                  # Modelo, categorías, RIF (módulo 11) y validación
+│   │   │   │   ├── cliente.service.ts                # Persistencia y detección de documentos repetidos
+│   │   │   │   ├── customers.component.*             # Listado (KPIs, filtros, acciones)
+│   │   │   │   ├── salir-de-clientes.guard.ts        # Confirmación al salir con una ficha abierta
+│   │   │   │   └── customer-form/                    # Ficha del cliente (modal por pestañas)
 │   │   │   ├── hiring/             # Contrataciones
 │   │   │   └── miscellaneous/      # error, logout, maintenance, not-authorized
 │   │   ├── shared/
@@ -140,7 +158,7 @@ firmalink/
 │   │   │   ├── interceptors/       # auth (HMAC), token, zone
 │   │   │   ├── services/           # api, correo, idle, loading-screen, menu,
 │   │   │   │                       # notificacion, theme
-│   │   │   └── utils/sha256.service.ts
+│   │   │   └── utils/              # escapar-html.ts, sha256.service.ts
 │   │   ├── app.routes.ts
 │   │   ├── app.config.ts
 │   │   └── app.ts                  # Componente raíz
@@ -247,6 +265,8 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `driver.PRINCIPAL` | `MGDBA` | **ID de conexión** registrado en `sys-drivers` |
 | `driver.DATA_BASE` | `xxxxxxxx` | Base de datos |
 | `colecciones.ACUERDO` | `xxxxxxxx` | Colección de acuerdos |
+| `colecciones.CLIENTE` | `xxxxxxxx` | Colección de clientes |
+| `colecciones.FACTURA` | `firmalink_facturas` | Colección de facturas |
 | `colecciones.USER_TASK` | `xxxxxxx` | Tareas de usuario |
 
 > **Atención:** en `driver.PRINCIPAL` debe ir el **ID de la conexión** (`MGDBA`), **no** el tipo de
@@ -261,7 +281,13 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `ACTUALIZAR_CLAVE_USUARIO` | `_SYS_UUserPanel` | Cambio de contraseña |
 | `ACTUALIZAR_TOTP` | `_SYS_UUserTOTP` | Actualización de TOTP |
 | `CONSULTAR_ACUERDOS` | `_SYS_CFirmaLinkAcuerdos` | Listado liviano de acuerdos |
+| `CONSULTAR_ACUERDOS_CLIENTE` | `_SYS_CFirmaLinkAcuerdosCliente` | Acuerdos de un cliente (`cliente.codigo`) |
 | `CONSULTAR_ACUERDO` | `_SYS_CFirmaLinkAcuerdo` | Detalle completo de un acuerdo |
+| `CONSULTAR_CLIENTES` | `_SYS_CFirmaLinkClientes` | Listado liviano de clientes |
+| `CONSULTAR_CLIENTE` | `_SYS_CFirmaLinkCliente` | Detalle completo de un cliente |
+| `CONSULTAR_FACTURAS` | `_SYS_CFirmaLinkFacturas` | Listado de facturas (renglones, totales y copia del cliente) |
+| `CONSULTAR_FACTURAS_CLIENTE` | `_SYS_CFirmaLinkFacturasCliente` | Facturas de un cliente (`cliente.codigo`) |
+| `CONSULTAR_FACTURA` | `_SYS_CFirmaLinkFactura` | Detalle completo de una factura (`codigo`) |
 
 ### Proxy de desarrollo (`src/proxy.conf.json`)
 
@@ -285,7 +311,7 @@ Content-Type: application/json
 
 - `parametros` es una **cadena separada por comas** que sustituye `$0`, `$1`, … en la consulta
   definida en el backend.
-- Para las funciones `apicore` de acuerdos, el `query` tiene el formato
+- Para las funciones `apicore` de acuerdos y clientes, el `query` tiene el formato
   `"<filtro>;<proyeccion>"` — **el `;` es obligatorio** (p. ej. `{"codigo":"$0"};{"_id":0}`).
 - Un error de la función se devuelve con **HTTP 200** y cuerpo `{"msj":"Error en la funcion","tipo":77,…}`.
   No basta con comprobar `res.ok`.
@@ -324,6 +350,9 @@ El frontend no define permisos; se limita a renderizar lo que el backend entrega
   cuerpo solo envían `Authorization`. La cabecera `X-Skip-Interceptor` permite omitir la firma.
 - **Guardas de ruta**: `authGuard` protege el layout autenticado.
 - **Guarda `cambiosSinGuardarGuard`**: evita salir del editor con cambios sin guardar.
+- **Guarda `salirDeClientesGuard`**: pide confirmación al salir de `/customers` si la ficha de un
+  cliente tiene cambios sin guardar. A diferencia del editor, no respalda un borrador local: la ficha
+  contiene datos personales (cédula, teléfonos, domicilio) y no se persiste en el navegador.
 - **Cierre por inactividad** (`idle.service.ts`).
 - **Integridad del documento** con huella **SHA-256** (`sha256.service.ts`), verificada contra
   `shasum -a 256`.
@@ -376,6 +405,7 @@ interface Acuerdo {
   fechaFirma: string;
   honorario: string;
   quincena: string;
+  cliente: ClienteDocumento | null; // copia del cliente al suscribir (ver abajo)
   campos: Record<string, string>;
   documentoHtml: string;     // contenido del documento
   documentoTexto: string;    // versión texto plano (correo/búsqueda)
@@ -393,21 +423,233 @@ interface Acuerdo {
 > La huella SHA-256 se calcula sobre el contenido del documento; el **estado no forma parte** del
 > hash, por lo que cambiar de estado no invalida la huella.
 
+### Cliente del documento
+
+Cada acuerdo —y cada factura— guarda una **copia del cliente**: además de la copia, `codigo` es el
+vínculo con la ficha. La copia es la verdad documental: lo que dice el instrumento firmado no cambia
+porque el cliente cambie de domicilio o de condición fiscal después.
+
+El tipo vive en `pages/customers/cliente.model.ts` (`ClienteDocumento`, con `snapshotCliente()` y
+`direccionEnLinea()`), porque lo comparten el acuerdo y la factura.
+
+```ts
+interface ClienteDocumento {
+  codigo: string;                    // vínculo con la ficha (CLI000001)
+  categoria: CategoriaCliente;       // V · E · J · G
+  identificacion: string;            // V-11350296
+  rif: string;                       // V-11350296-3
+  nombre: string;                    // nombre completo al suscribir
+  condicionFiscal: CondicionFiscal;  // ordinario · formal · especial…
+  agenteRetencionIva: boolean;
+  porcentajeRetencionIva: number;
+  agenteRetencionIslr: boolean;
+  exentoIgtf: boolean;
+  correo: string;
+  telefono: string;
+  direccion: string;                 // domicilio fiscal en una línea
+  copiadoEn: string;                 // ISO de la copia
+}
+```
+
+| Aspecto | Comportamiento |
+|---------|----------------|
+| Obligatoriedad | Un acuerdo **nuevo** no se guarda sin cliente. Los acuerdos anteriores al vínculo se abren y guardan como "Sin cliente" |
+| Copia vs. ficha | El documento se redacta con la copia. La acción *Actualizar datos del cliente* relee la ficha (solo en borradores/en revisión) |
+| Campos del documento | El bloque **DATOS DEL CLIENTE** se llena con los campos `clienteNombre`, `clienteIdentificacion`, `clienteRif` y `clienteDireccion` |
+| Borrado del cliente | El borrado es lógico: los acuerdos ya emitidos conservan su copia |
+| Acuerdos de un cliente | La acción *Ver acuerdos del cliente* abre el listado acotado a él; el código viaja en el estado de navegación (no en la URL) y la consulta la resuelve `_SYS_CFirmaLinkAcuerdosCliente` |
+| Facturas del cliente | La misma copia viaja a la factura: de ella salen el RIF, el domicilio y el trato fiscal del documento |
+
+---
+
+## Reglas de negocio — Clientes
+
+### Categorías
+
+La categoría determina los datos que se capturan y el tipo de documento admitido:
+
+| Categoría | RIF / documento | Descripción |
+|-----------|-----------------|-------------|
+| `V` | `V` | Persona natural venezolana (cédula) |
+| `E` | `E`, `P` | Persona natural extranjera (cédula E o pasaporte) |
+| `J` | `J` | Persona jurídica (RIF J) |
+| `G` | `G` | Gobierno / ente público |
+| `D` | `G`, `J`, `E`, `P` | Misión diplomática, organismo internacional o funcionario acreditado |
+| `C` | `C` | Organización del Poder Popular (consejo comunal, comuna) |
+
+- `identificacion` es la **clave única de identidad**: `V-12345678`, `J-00012345`, `P-AB123456`.
+  `rif` es el RIF completo con dígito verificador (`J-12345678-9`); queda vacío en pasaportes.
+- El **RIF** se valida con el **módulo 11** del SENIAT (pesos `3,2,7,6,5,4,3,2`; la letra vale ×4).
+  El dígito de `C` es ambiguo entre fuentes (12 o 24), por lo que se aceptan **ambos** candidatos.
+- Al pegar un documento completo (`J-12345678-9`) en el campo de número, se reparte en **tipo,
+  número y dígito**, y se ajusta la categoría si el tipo no corresponde a la seleccionada.
+
+### Condición ante el SENIAT
+
+| Condición | Tratamiento por defecto |
+|-----------|-------------------------|
+| `especial` | Contribuyente especial: **agente de retención de IVA** (75 % general, 100 % en los supuestos del art. 5 de la PA SNAT/2025/000054) |
+| `ordinario` | Declarante regular de IVA, sin retención por defecto |
+| `formal` | Solo deberes formales del IVA |
+| `exento` | No paga ciertos tributos por ley; exige **base legal** |
+| `exonerado` | Dispensado por decreto, con **vigencia**; exige base legal |
+| `no_contribuyente` | Consumidor final: se factura con cédula o pasaporte |
+
+`tratamientoFiscal()` (en `cliente.model.ts`) deriva de estos datos las líneas de retención que ve el
+usuario. Notas:
+
+- **IVA**: no se retiene a proveedores formales, exentos ni exonerados.
+- **ISLR**: se advierte la obligación cuando el cliente es agente de retención (Decreto 1.808).
+- **IGTF (3 %)**: los entes públicos están exentos en cualquier moneda; las **misiones diplomáticas
+  solo en bolívares**, por lo que `D` **no** se marca exento de IGTF por defecto.
+
+### Numeración
+
+- Formato `CLI-` + consecutivo de 6 dígitos → `CLI-000001`.
+- El consecutivo se calcula sobre **todos** los clientes, **incluidos los eliminados** (un código no se
+  reutiliza).
+- El alta filtra el `upsert` por `{codigo, identificacion}` y **reintenta** (hasta 3 veces) si otro
+  usuario tomó ese código: el índice único de `codigo` rechaza la inserción en lugar de sobrescribir
+  al cliente ajeno.
+
+### Borrado lógico e integridad
+
+- `ccoleccion` no admite borrados físicos: **Eliminar** marca `estado: 'eliminado'` y `eliminado: true`
+  (el registro se conserva para trazabilidad). La ficha del formulario permite **restaurar** un cliente
+  eliminado cuando se vuelve a registrar su documento.
+- La colección `firmalink_clientes` lleva índices **únicos** en `codigo` e `identificacion` (esta
+  última parcial, solo para valores no vacíos), de modo que la unicidad se garantiza también en la
+  base de datos y no solo en la interfaz.
+- Si Mongo rechaza la operación, Sandra responde `null` con **HTTP 200**: el servicio lo interpreta como
+  fallo (`ClienteDuplicadoError` o reintento), no como éxito.
+- La función de listado devuelve una **proyección liviana**; la ficha completa se relee con
+  `_SYS_CFirmaLinkCliente` antes de editar, para no vaciar en el servidor los campos no proyectados.
+
+---
+
+## Reglas de negocio — Facturación
+
+La facturación tiene dos pantallas: el **listado** (`/billing`, `ListBillingComponent`) y el **editor**
+(`/billing/new`, `BillingComponent`). En el editor, a la izquierda los datos y a la derecha **la hoja
+tal como se imprime**. Vista previa, documento impreso, PDF y correo salen de la **misma función**
+(`construirHojaFactura()`), así que no pueden divergir. El listado es una proyección liviana: las
+acciones que necesitan el documento completo (imprimir, enviar, emitir) releen la factura con
+`obtener(codigo)` antes de actuar.
+
+### La hoja
+
+| Aspecto | Valor |
+|---------|-------|
+| Tamaño | 21,7 × 28 cm (media carta venezolana); `@page { size: 21.7cm 28cm; margin: 0 }` |
+| Márgenes | superior **4,5 cm** (ahí va la cabecera) · laterales **2 cm** · inferior **2,5 cm** |
+| Cabecera | Logo, razón social y RIF del emisor, formato (`FORMATO LIBRE` / `NOTA DE ENTREGA`) y N° de Control |
+| Renglones | Descripción, cantidad, precio unitario y total, en la retícula de la plantilla |
+| Totales | SubTotal, IVA, (IGTF), **Total Bs**, el importe en letras y, cuando retienen, las retenciones |
+| Pie | Razón social del emisor, teléfonos, rango de control autorizado, providencia y `ORIGINAL` |
+| Interruptores | cabecera y pie · firma y sello · marca de agua: son del documento y viajan guardados con él |
+
+Las imágenes de la hoja viven en `public/assets/factura/` (`emisor.png`, `firma.png`, `sello.png`).
+Los estilos de la hoja se inyectan desde `shared/impresion/factura-estilos.ts`, porque la vista previa
+se pinta con `[innerHTML]` y no hereda el encapsulado del componente.
+
+### Numeración y control
+
+- La factura lleva **dos** números: el de la factura (`0000001`, siete dígitos) y el de **control**
+  (`00-00000101`), que es el consecutivo del rango autorizado por el SENIAT.
+- El campo *N° de Control* trae un botón para copiar el número de factura; si el control cae fuera
+  del rango autorizado (`00-00000101` – `00-00000200` por defecto) se avisa, pero **no** se bloquea.
+- Código interno con el mismo esquema que los clientes: `FAC-000007`.
+
+### Fiscalidad: el trato del cliente manda
+
+| Concepto | Regla |
+|----------|-------|
+| IVA | 16 % general; **0 % si el cliente está exento** (`condicionFiscal: 'exento'`) |
+| IGTF | 3 % solo si la operación se paga en divisas **y** el cliente no está exento de IGTF |
+| Retención de IVA | El `porcentajeRetencionIva` del cliente cuando es agente de retención (75 % general) |
+| Retención de ISLR | `alicuotaIslr` (5 %) sobre el subtotal si el cliente es agente de retención |
+
+- **Total Bs** = subtotal + IVA (+ IGTF): es el importe que se factura y el que se escribe **en letras**.
+- **Neto a pagar** = Total Bs − retenciones: las retenciones no rebajan el total facturado, son pagos
+  a cuenta que el agente descuenta al pagar; por eso la hoja las informa **aparte**, bajo el total.
+- Los importes usan el formato venezolano (`29.946,00`) y el total se escribe en letras mayúsculas
+  (`montoEnLetras()`: `… BOLIVARES CON … CENTIMOS`).
+
+### Estados y guardado
+
+| Estado | Se puede | Notas |
+|--------|----------|-------|
+| `borrador` | editar, emitir, eliminar | Es lo que se guarda mientras se escribe |
+| `emitida` | anular (estado terminal) | Al emitir se **congelan los totales** y se calcula la huella SHA-256 del contenido |
+| `anulada` | — | Documento cerrado, solo consulta |
+| `eliminado` | — | Borrado lógico: la factura queda en la base para la trazabilidad |
+
+- Guardar reintenta hasta 3 veces si otro usuario tomó el mismo consecutivo (índice único de `codigo`).
+- El borrador se respalda en `localStorage` y el listado se cachea (`firmalink:facturas:list`), que
+  entra en pantalla al instante y se revalida contra el backend.
+- `cambiosSinGuardarGuard` protege la salida del editor.
+- Índices de `firmalink_facturas`: `codigo` (único), `numero`, `cliente.codigo` y `estado` + `fechaEmision`.
+
+### El listado (`/billing`)
+
+Patrón de `list-agreement`, con KPIs (Facturas, Borradores, Emitidas, Anuladas y **Facturado** en Bs),
+filtros por texto, estado y cliente, y menú de acciones por fila:
+
+| Acción | Disponible cuando | Detalle |
+|--------|-------------------|---------|
+| Editar / Ver factura | `borrador` → edición; emitida o anulada → consulta | Navega a `/billing/new` con `facturas.marcarParaEditar(codigo)` |
+| Imprimir | siempre | Relee la factura, rasteriza la hoja y abre la ventana de impresión |
+| Enviar por correo (PDF) | solo `emitida` | Genera el PDF, lo adjunta y prellena el correo del cliente (ver [Envío por correo](#envío-por-correo)) |
+| Emitir | solo `borrador` | Relee, valida y guarda `estado: 'emitida'`: congela totales y huella |
+| Anular | solo `emitida` | Estado terminal, vía `cambiarEstado(codigo, 'anulada', estado)` |
+| Eliminar | `borrador` o `anulada` | Borrado lógico (`estado: 'eliminado'`); una emitida **no** se elimina, se anula |
+| Copiar huella | facturas con huella | Copia el SHA-256 completo al portapapeles |
+
+- La **huella** se muestra en verde (`.lb-huella`), el mismo lenguaje visual de los acuerdos: firma
+  digital del contenido, visible en la columna y copiable de un clic.
+- El cliente se muestra con avatar de iniciales, nombre y RIF/documento; el *tooltip* de la fila
+  explica por qué una factura cerrada no se puede editar.
+- Por debajo de 1024 px la cabecera colapsa a un **speed dial** flotante (los listeners de escape y
+  clic externo van en fase *captura*, porque SweetAlert y Bootstrap se comen la burbuja).
+
 ---
 
 ## Impresión y exportación
 
-La impresión se realiza con un **iframe oculto** y reglas `@page` (`size: letter portrait;
-margin: 0`), usando una tabla de marco con `<thead>`/`<tfoot>` para repetir cabecera y pie en cada
-página. Los márgenes del acuerdo se aplican desde el modelo (`margen`).
+**Acuerdos.** La impresión se realiza con un **iframe oculto** y reglas `@page` (`size: letter
+portrait; margin: 0`), usando una tabla de marco con `<thead>`/`<tfoot>` para repetir cabecera y pie
+en cada página. Los márgenes del acuerdo se aplican desde el modelo (`margen`).
 
 Verificado sobre el PDF resultante: 5 páginas, margen izquierdo 3,00 cm.
+
+**Facturas.** La hoja se imprime desde una **ventana aparte** (`imprimirFactura()`), que escribe el
+documento completo con sus estilos y espera a que carguen las imágenes antes de llamar a `print()`:
+así la hoja sale sola, sin la barra lateral ni el panel de la aplicación, y con el papel que declara
+`@page` (21,7 × 28 cm). Desde el diálogo del sistema se obtiene el **PDF** con *Guardar como PDF*;
+no se usa `PdfService`, que está atado al acuerdo.
+
+Para el **correo**, el PDF se genera en el navegador (`factura-pdf.ts`): la misma hoja se rasteriza
+con `html2canvas` a 192 ppp y se compone en un jsPDF de 21,7 × 28 cm, con paginado geométrico si la
+factura desborda una página. Topes de seguridad: 8 páginas incrustadas y un presupuesto de
+28 MB − 2 MB de holgura; los nombres de las imágenes se sanitizan (`sanitizarContentId`).
+
+> **La página mide lo mismo que el lienzo.** html2canvas dimensiona el lienzo con
+> `floor(ceil(pxCss) × escala)`: redondea la altura **antes** de escalar. La hoja mide 28 cm =
+> 1058,27 px CSS, así que el lienzo sale de 2118 px mientras que un `round(pxCss × escala)` daría
+> 2117. Ese píxel de sobra hacía que el paginado creyera que quedaba contenido pendiente y añadía
+> **una página en blanco** al PDF del correo. Por eso el tamaño de página se calcula con la misma
+> regla que html2canvas (`paginaPx()`), y los restos menores que `RESTO_MINIMO_PX` no abren hoja
+> nueva. Al tocar estas medidas, verificar con
+> `/var/folders/gp/nxkwmywj0_n9zdkpt1hwtdrm0000gn/T/opencode/factura-pdf/verificar.js`.
 
 ---
 
 ## Envío por correo
 
-El acuerdo se puede remitir por correo **desde el listado** o **desde el editor**.
+Tanto el **acuerdo** como la **factura** se pueden remitir por correo (la factura solo cuando está
+**emitida**).
+
+### Acuerdos
 
 1. Se compone el mensaje con `construirCorreoAcuerdo()` (`acuerdo-correo.ts`): asunto
    `Acuerdo <codigo> — <titulo>`, cuerpo **HTML** y versión **texto plano**.
@@ -416,6 +658,17 @@ El acuerdo se puede remitir por correo **desde el listado** o **desde el editor*
 3. Se envía a través de `CorreoService` → `POST /v1/api/email/enviar`.
 4. Si en el editor hay cambios sin guardar, se ofrece **Guardar y enviar**, **Enviar sin guardar** o
    **Cancelar**.
+
+### Facturas
+
+1. Se genera el PDF de la hoja en el navegador (ver [Impresión y exportación](#impresión-y-exportación))
+   y se arma el cuerpo con `construirCorreoFactura()` (`factura-correo.ts`): asunto
+   `Factura <numero> — <cliente>`, datos de control y totales, la hoja incrustada como `cid:` y el
+   bloque de **huella SHA-256** en verde; el PDF viaja como adjunto.
+2. `pedirDestinatariosCorreoFactura()` prellena los destinatarios con el correo fiscal del cliente
+   (`cliente.correo`, hoy `correoFacturacion`); el envío es idempotente por clave
+   `${codigo}:${huella}:${Date.now()}`.
+3. Errores `noHabilitado` (503) y `rechazoProveedor` (422) se reportan con opción de reintentar.
 
 Errores contemplados: `503` (servicio de correo no habilitado), `422` (rechazo del proveedor),
 `400`, `403`, `413` (adjuntos demasiado grandes) y `429` (demasiadas peticiones).

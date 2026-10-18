@@ -73,56 +73,110 @@ export class AcuerdoService {
   }
 
   /**
+   * Acuerdos de un cliente.
+   *
+   * El filtro lo resuelve el servidor (`_SYS_CFirmaLinkAcuerdosCliente` consulta
+   * por `cliente.codigo`): al abrir "Ver acuerdos" desde la ficha de un cliente
+   * solo viajan sus registros. Si la función no está registrada se cae al
+   * listado completo filtrado en el navegador.
+   */
+  async listarPorCliente(codigo: string, incluirEliminados = false): Promise<Acuerdo[]> {
+    if (!codigo) {
+      return this.listar(incluirEliminados);
+    }
+
+    const fn = (environment as any).functions?.CONSULTAR_ACUERDOS_CLIENTE;
+    const delServidor = await this.consultarServidorRemoto(
+      fn,
+      codigo,
+      `los acuerdos de ${codigo}`,
+      false,
+    );
+    const lista = delServidor ?? this.filtrarPorCliente(this.leerCacheLocal(), codigo);
+    return incluirEliminados ? lista : lista.filter((a) => !estaEliminado(a));
+  }
+
+  /** Respaldo local del vínculo: acuerdos cuya copia apunta a ese cliente. */
+  private filtrarPorCliente(lista: Acuerdo[], codigo: string): Acuerdo[] {
+    return lista.filter((a) => a.cliente?.codigo === codigo);
+  }
+
+  /**
    * Consulta el listado completo del servidor (con los mismos avisos de
    * degradación a cache local).
    */
   private async consultarServidor(): Promise<Acuerdo[]> {
-    const fn = (environment as any).functions?.CONSULTAR_ACUERDOS;
-    if (fn) {
-      try {
-        const data = await firstValueFrom(
-          this.api.Ejecutar({ funcion: fn, parametros: '' }),
-        );
-        let cuerpo = (data as any)?.Cuerpo !== undefined ? (data as any).Cuerpo : data;
-        if (typeof cuerpo === 'string') {
-          try {
-            cuerpo = JSON.parse(cuerpo);
-          } catch (e) {
-            cuerpo = [];
-          }
-        }
+    const lista = await this.consultarServidorRemoto(
+      (environment as any).functions?.CONSULTAR_ACUERDOS,
+      '',
+      'el listado de acuerdos',
+      true,
+    );
+    return lista ?? this.leerCacheLocal();
+  }
 
-        // Respuesta del motor cuando la función no está registrada o falló: { msj, tipo }
-        // tipo 77 = "Error en la funcion" (incluye "Verifique la funcion no exite")
-        if (cuerpo && !Array.isArray(cuerpo) && (cuerpo as any).tipo !== undefined) {
-          this.notificar.aviso(
-            'No se pudo consultar el listado de acuerdos',
-            `El servidor respondió: ${(cuerpo as any).msj ?? 'sin detalle'}. ` +
-              'La numeración se calcula con la lista local de este navegador.',
-          );
-          return this.leerCacheLocal();
-        }
-
-        if (Array.isArray(cuerpo)) {
-          const lista = cuerpo as Acuerdo[];
-          this.guardarCacheLocal(lista);
-          return lista;
-        }
-
-        this.notificar.aviso(
-          'Respuesta inesperada al listar acuerdos',
-          `La función ${fn} no devolvió una lista. Se usará la lista local.`,
-        );
-      } catch (e) {
-        console.warn('[AcuerdoService] Falló consulta vía función; usar cache local.', e);
-        this.notificar.aviso(
-          'No se pudo consultar el listado de acuerdos',
-          `Error de comunicación con el servidor (${NotificacionService.detalle(e)}). ` +
-            'La numeración se calcula con la lista local de este navegador.',
-        );
-      }
+  /**
+   * Ejecuta una función `apicore` de consulta de acuerdos y desempaqueta la
+   * respuesta del motor. Devuelve null cuando hubo aviso o error.
+   *
+   * @param cachear guarda la respuesta como listado local (solo el listado
+   *   completo: una consulta por cliente no debe pisar la cache del navegador,
+   *   que alimenta la numeración offline).
+   */
+  private async consultarServidorRemoto(
+    fn: string | undefined,
+    parametros: string,
+    contexto: string,
+    cachear: boolean,
+  ): Promise<Acuerdo[] | null> {
+    if (!fn) {
+      return null;
     }
-    return this.leerCacheLocal();
+
+    try {
+      const data = await firstValueFrom(this.api.Ejecutar({ funcion: fn, parametros }));
+      const cuerpo: any = (data as any)?.Cuerpo !== undefined ? (data as any).Cuerpo : data;
+      let valor: any = cuerpo;
+      if (typeof valor === 'string') {
+        try {
+          valor = JSON.parse(valor);
+        } catch (e) {
+          valor = [];
+        }
+      }
+
+      // Respuesta del motor cuando la función no está registrada o falló: { msj, tipo }
+      // tipo 77 = "Error en la funcion" (incluye "Verifique la funcion no exite")
+      if (valor && !Array.isArray(valor) && valor.tipo !== undefined) {
+        this.notificar.aviso(
+          `No se pudo consultar ${contexto}`,
+          `El servidor respondió: ${valor.msj ?? 'sin detalle'}.` +
+            (cachear ? ' La numeración se calcula con la lista local de este navegador.' : ''),
+        );
+        return null;
+      }
+
+      if (Array.isArray(valor)) {
+        const lista = valor as Acuerdo[];
+        if (cachear) {
+          this.guardarCacheLocal(lista);
+        }
+        return lista;
+      }
+
+      this.notificar.aviso(
+        `Respuesta inesperada al consultar ${contexto}`,
+        `La función ${fn} no devolvió una lista.`,
+      );
+    } catch (e) {
+      console.warn(`[AcuerdoService] Falló la consulta de ${contexto}; se usa la copia local.`, e);
+      this.notificar.aviso(
+        `No se pudo consultar ${contexto}`,
+        `Error de comunicación con el servidor (${NotificacionService.detalle(e)}).` +
+          (cachear ? ' La numeración se calcula con la lista local de este navegador.' : ''),
+      );
+    }
+    return null;
   }
 
   /**

@@ -367,6 +367,207 @@
 }
 
 /* ═══════════════════════════════════════════
+   CLIENTE DEL ACUERDO
+   Contraparte del instrumento. Vive fuera de la hoja (como la identificación)
+   y tiene dos formas: la ficha con la copia que quedó guardada en el acuerdo,
+   o el buscador mientras no haya cliente vinculado.
+   ═══════════════════════════════════════════ */
+.na-cliente {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 1rem;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+.na-cliente-libre {
+  align-items: flex-start;
+  gap: 0.35rem 1rem;
+}
+
+.na-cli-buscar {
+  flex: 1 1 420px;
+  max-width: 620px;
+}
+
+.na-cli-ficha {
+  display: flex;
+  flex: 1 1 380px;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.na-cli-avatar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(140deg, #0c2d48, #2a6fb0);
+  border-radius: 50%;
+  cursor: default;
+}
+
+.na-cli-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.na-cli-nombre {
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--primary, #0c2d48);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.na-cli-linea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #757575);
+}
+
+.na-cli-perfil {
+  font-size: 0.75rem;
+}
+
+.na-cli-ident {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: var(--primary-light, #2a6fb0);
+}
+
+.na-cli-sep {
+  color: var(--border, #e0e0e0);
+}
+
+.na-cli-codigo {
+  font-weight: 600;
+}
+
+.na-cli-acciones {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.na-icon-btn-peligro {
+  color: #b3261e;
+
+  &:hover:not(:disabled) {
+    background: rgba(179, 38, 30, 0.12);
+    border-color: #b3261e;
+  }
+}
+
+/* Sugerencias fiscales del cliente (retenciones, IGTF, IVA): informan la
+   redacción de las cláusulas, pero no escriben en el documento por su cuenta. */
+.na-cli-fiscal {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    border-radius: 999px;
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+  }
+}
+
+.na-fiscal-ok {
+  color: #0f7b5f;
+  background: rgba(0, 201, 167, 0.12);
+  border-color: rgba(0, 201, 167, 0.4);
+}
+
+.na-fiscal-info {
+  color: #2a6fb0;
+  background: rgba(42, 111, 176, 0.1);
+  border-color: rgba(42, 111, 176, 0.35);
+}
+
+.na-fiscal-aviso {
+  color: #8a5a00;
+  background: rgba(240, 173, 78, 0.16);
+  border-color: rgba(240, 173, 78, 0.45);
+}
+
+.na-cli-nota {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #757575);
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.na-cli-nota-error {
+  color: #b3261e;
+}
+
+.na-cli-enlace {
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--primary-light, #2a6fb0);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+:host-context([data-theme="dark"]) .na-cliente {
+  border-color: var(--border, #2f3b46);
+}
+
+:host-context([data-theme="dark"]) .na-cli-nombre {
+  color: #e6edf3;
+}
+
+:host-context([data-theme="dark"]) .na-cli-perfil {
+  color: #b3c0cb;
+}
+
+/* ═══════════════════════════════════════════
    EDITOR — HOJA OFICIO
    ═══════════════════════════════════════════ */
 .na-doc {
@@ -828,6 +1029,7 @@
   }
 
   .na-identidad.na-oculto-movil,
+  .na-cliente.na-oculto-movil,
   .na-toolbar.na-oculto-movil {
     display: none;
   }

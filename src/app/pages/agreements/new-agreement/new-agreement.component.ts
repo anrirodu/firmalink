@@ -5,19 +5,42 @@ import {
   HostListener,
   OnDestroy,
   ViewChild,
+  computed,
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { CAMPOS_DEFAULT, DOCUMENTO_DEFAULT } from './new-agreement.documento';
 import Swal from 'sweetalert2';
 import { AcuerdoService } from './acuerdo.service';
-import { Acuerdo, AcuerdoEstado, esEditable, motivoBloqueo, transicionesPermitidas } from './acuerdo.model';
+import {
+  Acuerdo,
+  AcuerdoEstado,
+  esEditable,
+  motivoBloqueo,
+  transicionesPermitidas,
+} from './acuerdo.model';
+import { ClienteService } from '../../customers/cliente.service';
+import {
+  Cliente,
+  ClienteDocumento,
+  ESTADOS_CLIENTE,
+  EstadoCliente,
+  estaEliminado as clienteEliminado,
+  infoCategoria,
+  infoCondicion,
+  nombreCliente,
+  snapshotCliente,
+  tratamientoFiscal,
+} from '../../customers/cliente.model';
 import { construirDocumentoImpresion } from './new-agreement.impresion';
 import { AuthService } from '../../../auth/services/auth.service';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
@@ -27,7 +50,20 @@ import { construirCorreoAcuerdo } from '../acuerdo-correo';
 import { cargarLogoCorreo, generarPdfAcuerdo } from '../acuerdo-pdf';
 import type { PdfAcuerdoGenerado } from '../acuerdo-pdf';
 import { pedirDestinatariosCorreo } from '../enviar-correo.dialog';
+import { escaparHtml } from '../../../shared/utils/escapar-html';
 import { PuedeSalir } from '../../../shared/guards/cambios-sin-guardar.guard';
+
+/**
+ * Minúsculas y sin acentos, para que "maria" encuentre a "María" y "rif"
+ * encuentre a "RIF". Se usa solo para comparar, nunca para mostrar.
+ */
+function sinAcentos(texto: string): string {
+  return (texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
 
 /** Presets de márgenes de hoja (en centímetros) */
 interface PresetMargen {
@@ -54,7 +90,17 @@ interface PresetMargen {
 @Component({
   selector: 'app-new-agreement',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatTooltipModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    MatIconModule,
+    MatButtonModule,
+    MatTooltipModule,
+    MatAutocompleteModule,
+    MatFormFieldModule,
+    MatInputModule,
+  ],
   templateUrl: './new-agreement.component.html',
   styleUrls: ['./new-agreement.component.scss'],
 })
@@ -114,6 +160,245 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
 
   alternarOpcionesHoja(): void {
     this.mostrarOpcionesHoja.update((visible) => !visible);
+  }
+
+  // ============================================================
+  // Cliente del acuerdo
+  // ============================================================
+
+  /**
+   * El acuerdo declara a un cliente como contraparte. El editor lo guarda de
+   * dos formas a la vez:
+   *
+   *  - `cliente` — la copia congelada que se imprime en el documento y viaja
+   *    dentro del acuerdo. No cambia aunque después se edite la ficha.
+   *  - el código dentro de esa copia — el vínculo con la ficha del cliente,
+   *    que permite listar todos los acuerdos de un cliente.
+   *
+   * `clienteActual` es la ficha viva (se relee del servidor al abrir el
+   * acuerdo) y solo alimenta las sugerencias fiscales del panel: nunca
+   * reescribe el documento por su cuenta.
+   */
+  readonly clientes = signal<Cliente[]>([]);
+  readonly cargandoClientes = signal(false);
+  /** true si el catálogo no se pudo consultar (se distingue de "no hay ninguno") */
+  readonly errorClientes = signal(false);
+  readonly cliente = signal<ClienteDocumento | null>(null);
+  readonly clienteActual = signal<Cliente | null>(null);
+
+  /** Sugerencias fiscales del cliente vinculado (retenciones, IGTF, IVA) */
+  readonly lineasFiscales = computed(() => {
+    const c = this.clienteActual();
+    return c ? tratamientoFiscal(c) : [];
+  });
+
+  /** Buscador del selector de clientes */
+  readonly controlCliente = new FormControl('', { nonNullable: true });
+
+  /** Cuántas coincidencias se ofrecen a la vez en el buscador */
+  private readonly MAX_SUGERENCIAS_CLIENTE = 25;
+
+  /** Evita repetir el aviso de "acuerdo sin cliente" en cada autoguardado */
+  private avisoSinClienteMostrado = false;
+
+  /**
+   * Carga el catálogo de clientes del selector. Corre en paralelo con la
+   * apertura del documento; si falla, el acuerdo se puede seguir redactando
+   * (solo se pierde la posibilidad de vincularlo en esta sesión).
+   */
+  private async cargarClientes(): Promise<void> {
+    if (this.clientes().length) {
+      return;
+    }
+
+    this.cargandoClientes.set(true);
+    try {
+      const lista = await this.catalogo.listar();
+      // El selector no ofrece clientes eliminados: un acuerdo nuevo no se
+      // vincula a una ficha borrada (los acuerdos antiguos conservan su copia).
+      this.clientes.set(lista.filter((c) => !clienteEliminado(c)));
+      this.errorClientes.set(false);
+    } catch (e) {
+      console.error('[NewAgreement] No se pudo cargar el catálogo de clientes:', e);
+      this.errorClientes.set(true);
+      this.notificar.aviso(
+        'No se pudo cargar el catálogo de clientes',
+        `El acuerdo se puede redactar, pero no vincularlo (${NotificacionService.detalle(e)}).`,
+      );
+    } finally {
+      this.cargandoClientes.set(false);
+    }
+  }
+
+  /** Reintenta traer el catálogo de clientes tras un fallo de consulta */
+  reintentarClientes(): void {
+    this.errorClientes.set(false);
+    void this.cargarClientes();
+  }
+
+  /** Lleva a la pantalla de clientes (para registrar el que falta) */
+  irAClientes(): void {
+    void this.router.navigate(['/customers']);
+  }
+
+  /** Clientes que coinciden con lo escrito en el buscador */
+  clientesFiltrados(): Cliente[] {
+    const buscado = sinAcentos(this.controlCliente.value);
+    const todos = this.clientes();
+
+    if (!buscado) {
+      return todos.slice(0, this.MAX_SUGERENCIAS_CLIENTE);
+    }
+
+    return todos
+      .filter((c) => this.textoBuscableDe(c).includes(buscado))
+      .slice(0, this.MAX_SUGERENCIAS_CLIENTE);
+  }
+
+  /** ¿Hay más coincidencias de las que caben en el panel? */
+  hayMasClientes(): boolean {
+    const buscado = sinAcentos(this.controlCliente.value);
+    const coincidencias = buscado
+      ? this.clientes().filter((c) => this.textoBuscableDe(c).includes(buscado)).length
+      : this.clientes().length;
+    return coincidencias > this.MAX_SUGERENCIAS_CLIENTE;
+  }
+
+  /** Todo lo por lo que se puede buscar un cliente, en una sola cadena */
+  private textoBuscableDe(c: Cliente): string {
+    return sinAcentos(
+      [c.codigo, c.identificacion, c.rif, nombreCliente(c), c.nombreComercial, c.actividadEconomica]
+        .filter(Boolean)
+        .join(' '),
+    );
+  }
+
+  nombreDe(c: Cliente): string {
+    return nombreCliente(c);
+  }
+
+  etiquetaCategoriaCliente(c: { categoria: string }): string {
+    return infoCategoria(c.categoria)?.etiqueta ?? c.categoria;
+  }
+
+  etiquetaCondicionCliente(c: { condicionFiscal: string }): string {
+    return infoCondicion(c.condicionFiscal)?.etiqueta ?? c.condicionFiscal;
+  }
+
+  etiquetaEstadoCliente(estado: EstadoCliente): string {
+    return this.estadosCliente.find((e) => e.valor === estado)?.etiqueta ?? estado;
+  }
+
+  iconoEstadoCliente(estado: EstadoCliente): string {
+    return this.estadosCliente.find((e) => e.valor === estado)?.icono ?? 'help_outline';
+  }
+
+  /** Lo que muestra el input tras elegir una opción (evita "[object Object]") */
+  readonly mostrarCliente = (c: Cliente | null): string => (c ? `${c.codigo} — ${nombreCliente(c)}` : '');
+
+  /** Vincula el cliente elegido en el buscador y copia sus datos al documento */
+  elegirCliente(c: Cliente): void {
+    if (this.contenidoBloqueado) {
+      return;
+    }
+
+    this.clienteActual.set(c);
+    this.cliente.set(snapshotCliente(c));
+    this.aplicarClienteAlDocumento();
+    this.controlCliente.setValue('', { emitEvent: false });
+  }
+
+  /** Desvincula el cliente del acuerdo (con confirmación) */
+  async quitarCliente(): Promise<void> {
+    const vinculado = this.cliente();
+    if (!vinculado) {
+      return;
+    }
+
+    if (this.contenidoBloqueado) {
+      void this.notificar.errorModal(
+        'El acuerdo no admite cambios',
+        `${this.motivoBloqueoActual} El cliente quedó declarado en el documento firmado.`,
+      );
+      return;
+    }
+
+    const decision = await Swal.fire({
+      icon: 'warning',
+      title: '¿Quitar el cliente del acuerdo?',
+      html:
+        `El acuerdo dejará de estar vinculado a <strong>${escaparHtml(vinculado.nombre)}</strong> ` +
+        `(<code>${escaparHtml(vinculado.identificacion)}</code>) y sus datos se borrarán del documento.`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, quitar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#b3261e',
+    });
+
+    if (!decision.isConfirmed) {
+      return;
+    }
+
+    this.cliente.set(null);
+    this.clienteActual.set(null);
+    this.aplicarClienteAlDocumento();
+  }
+
+  /**
+   * Vuelve a copiar los datos del cliente desde su ficha.
+   *
+   * Es una acción explícita: la copia del acuerdo es la que se firmó y no se
+   * actualiza sola. Sirve para un borrador en el que el cliente cambió de
+   * domicilio o de condición fiscal antes de suscribirse.
+   */
+  async actualizarDatosCliente(): Promise<void> {
+    const vinculado = this.cliente();
+    if (!vinculado || this.contenidoBloqueado) {
+      return;
+    }
+
+    try {
+      const vivo = await this.catalogo.obtener(vinculado.codigo);
+      this.clienteActual.set(vivo);
+      this.cliente.set(snapshotCliente(vivo));
+      this.aplicarClienteAlDocumento();
+      this.notificar.info(
+        'Datos del cliente actualizados',
+        `Se copiaron los datos vigentes de ${nombreCliente(vivo)} en el documento.`,
+      );
+    } catch (e) {
+      this.notificar.aviso(
+        'No se pudo actualizar el cliente',
+        `Se mantiene la copia que ya tenía el acuerdo (${NotificacionService.detalle(e)}).`,
+      );
+    }
+  }
+
+  /** Trae la ficha viva del cliente vinculado (sugerencias fiscales del panel) */
+  private async cargarClienteVivo(codigo: string): Promise<void> {
+    try {
+      this.clienteActual.set(await this.catalogo.obtener(codigo));
+    } catch {
+      // El acuerdo conserva su copia: sin ficha viva solo se pierden las
+      // sugerencias fiscales, que son un apoyo y no parte del instrumento.
+      this.clienteActual.set(null);
+    }
+  }
+
+  /** Escribe los datos de la copia del cliente en los campos del documento */
+  private aplicarClienteAlDocumento(): void {
+    const c = this.cliente();
+    const valores: Record<string, string> = {
+      clienteNombre: c?.nombre ?? '',
+      clienteIdentificacion: c?.identificacion ?? '',
+      clienteRif: c?.rif ?? '',
+      clienteDireccion: c?.direccion ?? '',
+    };
+
+    for (const [campo, valor] of Object.entries(valores)) {
+      this.campos[campo] = valor;
+      this.sincronizarCampo(campo);
+    }
   }
 
   // --- Campos editables del panel izquierdo ---
@@ -181,6 +466,9 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     { valor: 'firmado', etiqueta: 'Firmado' },
     { valor: 'anulado', etiqueta: 'Anulado' },
   ];
+
+  /** Estados de un cliente (distintivo del selector de clientes) */
+  readonly estadosCliente = ESTADOS_CLIENTE;
   estado: AcuerdoEstado = 'borrador';
   /**
    * Estado tal como está registrado en el servidor (o el último guardado).
@@ -210,6 +498,7 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   constructor(
     private router: Router,
     private acuerdos: AcuerdoService,
+    private catalogo: ClienteService,
     private correo: CorreoService,
     private auth: AuthService,
     private notificar: NotificacionService,
@@ -313,6 +602,10 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
    *  3. Acuerdo en blanco con el siguiente consecutivo.
    */
   private async iniciarDocumento(): Promise<void> {
+    // El catálogo de clientes se trae en paralelo: no bloquea la apertura del
+    // documento y solo hace falta si el usuario quiere vincular el acuerdo.
+    void this.cargarClientes();
+
     const codigoPendiente = this.acuerdos.tomarPendienteEdicion();
     if (codigoPendiente && (await this.abrirParaEdicion(codigoPendiente))) {
       return;
@@ -438,6 +731,16 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     this.estadoPrevio = this.estado;
     this.hashDocumento = acuerdo.hashDocumento ?? '';
     this.acuerdoId = acuerdo._id ?? '';
+
+    // El acuerdo pudo vincularse a un cliente (los anteriores al vínculo no
+    // traen copia). La copia guardada es la que se imprime: la ficha viva solo
+    // se consulta para las sugerencias fiscales del panel.
+    this.cliente.set(acuerdo.cliente ?? null);
+    this.clienteActual.set(null);
+    this.controlCliente.setValue('', { emitEvent: false });
+    if (acuerdo.cliente?.codigo) {
+      void this.cargarClienteVivo(acuerdo.cliente.codigo);
+    }
 
     if (editor) {
       editor.innerHTML = acuerdo.documentoHtml || DOCUMENTO_DEFAULT;
@@ -616,6 +919,12 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
       // El código es la identificación del acuerdo (va fuera de la hoja): se conserva
       const codigo = this.campos['codigo'];
       this.campos = { ...CAMPOS_DEFAULT, codigo };
+
+      // El cliente también es identidad del acuerdo (como el código): la hoja
+      // puede quedar en blanco, pero el acuerdo sigue siendo del mismo cliente.
+      if (this.cliente()) {
+        this.aplicarClienteAlDocumento();
+      }
 
       const editor = this.editorTexto?.nativeElement;
       if (editor) {
@@ -1158,6 +1467,14 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
       this.estadoPrevio = 'borrador';
       this.hashDocumento = '';
       this.acuerdoId = '';
+
+      // "Por defecto" devuelve el acuerdo al modelo en blanco: el vínculo con
+      // el cliente es parte del contenido, así que también se limpia.
+      this.cliente.set(null);
+      this.clienteActual.set(null);
+      this.controlCliente.setValue('', { emitEvent: false });
+      this.avisoSinClienteMostrado = false;
+
       this.cargarDocumento();
       this.acuerdos.descartarBorradorLocal();
       await this.generarCodigoAutomatico();
@@ -1233,6 +1550,7 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
       fechaFirma: this.campos['fechaFirma'] ?? '',
       honorario: this.campos['honorario'] ?? '',
       quincena: this.campos['quincena'] ?? '',
+      cliente: this.cliente(),
       campos: { ...this.campos },
       documentoHtml: this.documentoHtml,
       documentoTexto: this.documentoTexto,
@@ -1299,6 +1617,37 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
         });
       }
       return false;
+    }
+
+    // El cliente es obligatorio: es la contraparte que el documento declara.
+    // Los acuerdos registrados antes de que existiera el vínculo se abren y se
+    // guardan igual (ya tienen su contenido firmado); sobre ellos solo se
+    // avisa una vez, para no bloquear su edición ni repetir el mensaje en cada
+    // autoguardado.
+    if (!this.cliente()) {
+      if (this.acuerdoId) {
+        if (!this.avisoSinClienteMostrado) {
+          this.avisoSinClienteMostrado = true;
+          this.notificar.aviso(
+            'Acuerdo sin cliente vinculado',
+            'Este acuerdo se registró antes del vínculo con clientes. Puede seguir editándolo, pero conviene asignarle un cliente.',
+          );
+        }
+      } else if (silencioso) {
+        // Sin cliente todavía no hay nada que registrar: el autoguardado
+        // espera sin insistir (el trabajo igual queda respaldado al salir).
+        return false;
+      } else {
+        void Swal.fire({
+          icon: 'warning',
+          title: 'Falta el cliente del acuerdo',
+          html:
+            'Seleccione el cliente en el buscador que está debajo de la identificación.<br>' +
+            '<small>Si el cliente aún no está registrado, créelo antes en <strong>Clientes</strong>.</small>',
+          confirmButtonColor: '#0c2d48',
+        });
+        return false;
+      }
     }
 
     this.autoGuardado = 'guardando';

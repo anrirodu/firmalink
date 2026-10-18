@@ -1,0 +1,946 @@
+/* ============================================
+   BILLING — Facturación digital
+   Panel de datos (izquierda) + vista previa de la
+   hoja 21,7 × 28 cm (derecha).
+   Los estilos de LA HOJA viven en
+   `shared/impresion/factura-estilos.ts`: se inyectan
+   en el documento porque la vista previa se pinta
+   con `[innerHTML]` (no hereda el encapsulado).
+   ============================================ */
+
+.bl-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ---------- Header ---------- */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+
+  .header-content {
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #0c2d48;
+      margin: 0 0 0.35rem 0;
+    }
+
+    p {
+      color: #757575;
+      font-size: 0.9rem;
+      margin: 0;
+      max-width: 64ch;
+    }
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    button {
+      min-height: 42px;
+
+      mat-icon {
+        margin-right: 0.35rem;
+      }
+    }
+  }
+}
+
+/* ---------- Chip de estado ---------- */
+.bl-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--bl-estado-color, #0c2d48);
+  background: color-mix(in srgb, var(--bl-estado-color, #0c2d48) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bl-estado-color, #0c2d48) 35%, transparent);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* ---------- Avisos ---------- */
+.bl-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+
+  mat-icon {
+    flex: 0 0 auto;
+  }
+
+  ul {
+    margin: 0.35rem 0 0;
+    padding-left: 1.1rem;
+  }
+}
+
+.bl-aviso-bloqueo {
+  background: rgba(255, 193, 7, 0.14);
+  border: 1px solid rgba(255, 160, 0, 0.4);
+  color: #7a4b00;
+}
+
+.bl-aviso-datos {
+  background: rgba(3, 169, 244, 0.1);
+  border: 1px solid rgba(3, 169, 244, 0.32);
+  color: #08415c;
+}
+
+/* ---------- Distribución ---------- */
+.bl-layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.bl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* ---------- Tarjetas ---------- */
+.bl-card {
+  background: #ffffff;
+  border: 1px solid #e3e7eb;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(12, 45, 72, 0.06);
+  padding: 0.9rem 1rem;
+
+  .bl-card-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #5c6b7a;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #00c9a7;
+    }
+  }
+
+  .bl-card-acciones {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+  }
+}
+
+.bl-card-peligro {
+  padding: 0.4rem;
+
+  button {
+    color: #a12c2c;
+    width: 100%;
+  }
+}
+
+.bl-contador {
+  margin-left: auto;
+  background: rgba(12, 45, 72, 0.08);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  color: #0c2d48;
+}
+
+.bl-vacio {
+  margin: 0;
+  color: #757575;
+  font-size: 0.85rem;
+}
+
+/* ---------- Buscador de clientes ---------- */
+.bl-buscador {
+  width: 100%;
+
+  mat-icon[matPrefix] {
+    margin-right: 0.4rem;
+    color: #8a97a3;
+  }
+}
+
+.bl-opcion {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+
+  .bl-opcion-nombre {
+    font-weight: 600;
+    color: #0c2d48;
+  }
+
+  .bl-opcion-meta {
+    font-size: 0.75rem;
+    color: #757575;
+  }
+}
+
+/* ---------- Ficha del cliente dentro de la factura ---------- */
+.bl-cliente {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.bl-cliente-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 201, 167, 0.14);
+  color: #0b7f6c;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.bl-cliente-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+
+  strong {
+    color: #0c2d48;
+    font-size: 0.92rem;
+    line-height: 1.3;
+  }
+
+  > span {
+    font-size: 0.8rem;
+    color: #5c6b7a;
+    word-break: break-word;
+  }
+
+  .bl-cliente-linea {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.3rem;
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+      margin-top: 1px;
+      color: #8a97a3;
+    }
+  }
+}
+
+.bl-cliente-acciones {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+
+  button {
+    font-size: 0.78rem;
+  }
+}
+
+.bl-notas {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  .bl-nota {
+    display: flex;
+    gap: 0.45rem;
+    align-items: flex-start;
+    padding: 0.45rem 0.55rem;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+
+    mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+    }
+
+    strong {
+      display: block;
+      font-size: 0.78rem;
+    }
+
+    span {
+      color: #5c6b7a;
+    }
+  }
+
+  .bl-nota-info {
+    background: rgba(3, 169, 244, 0.09);
+    color: #08415c;
+  }
+
+  .bl-nota-ok {
+    background: rgba(0, 201, 167, 0.12);
+    color: #0b7f6c;
+  }
+
+  .bl-nota-aviso {
+    background: rgba(255, 193, 7, 0.14);
+    color: #7a4b00;
+  }
+}
+
+/* ---------- Campos del formulario ---------- */
+.bl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.bl-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+
+  > span {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #7b8794;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: #17324a;
+    background: #ffffff;
+    border: 1px solid #d8dee5;
+    border-radius: 9px;
+    padding: 0.45rem 0.55rem;
+    min-height: 38px;
+
+    &:focus {
+      outline: none;
+      border-color: #00c9a7;
+      box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.16);
+    }
+
+    &[readonly],
+    &[disabled] {
+      background: #f5f7f9;
+      color: #5c6b7a;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+    line-height: 1.35;
+  }
+
+  .bl-hint {
+    font-size: 0.72rem;
+    color: #8a97a3;
+    line-height: 1.3;
+  }
+}
+
+.bl-campo-ancho {
+  grid-column: 1 / -1;
+}
+
+.bl-campo-corto {
+  flex: 1 1 6rem;
+}
+
+.bl-campo-grupo {
+  display: flex;
+  gap: 0.3rem;
+
+  .bl-prefijo {
+    flex: 0 0 3.2rem;
+    text-align: center;
+  }
+}
+
+.bl-campo > span.bl-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: #17324a;
+  text-transform: none;
+  letter-spacing: normal;
+
+  input {
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    accent-color: #00c9a7;
+  }
+
+  label {
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+}
+
+.bl-mini {
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  padding: 0;
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+}
+
+.bl-aviso-campo {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: #a12c2c;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* ---------- Renglones ---------- */
+.bl-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bl-item {
+  border: 1px solid #e8ecf0;
+  border-radius: 11px;
+  padding: 0.5rem 0.55rem;
+  background: #fbfcfd;
+}
+
+.bl-item-desc {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+
+  .bl-item-num {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(12, 45, 72, 0.08);
+    color: #0c2d48;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    margin-top: 0.35rem;
+  }
+
+  textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: #17324a;
+    background: #ffffff;
+    border: 1px solid #d8dee5;
+    border-radius: 9px;
+    padding: 0.4rem 0.5rem;
+    resize: vertical;
+    line-height: 1.35;
+
+    &:focus {
+      outline: none;
+      border-color: #00c9a7;
+      box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.16);
+    }
+
+    &[readonly] {
+      background: #f5f7f9;
+      color: #5c6b7a;
+    }
+  }
+}
+
+.bl-item-cifras {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-end;
+  margin-top: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.bl-item-total {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-left: auto;
+
+  span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #7b8794;
+  }
+
+  strong {
+    font-size: 0.86rem;
+    color: #0c2d48;
+    white-space: nowrap;
+  }
+}
+
+.bl-item-quitar {
+  color: #a12c2c;
+}
+
+/* ---------- Resumen de totales ---------- */
+.bl-totales {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  dt {
+    color: #5c6b7a;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    color: #17324a;
+    white-space: nowrap;
+  }
+
+  .bl-total {
+    border-top: 1px solid #e3e7eb;
+    margin-top: 0.25rem;
+    padding-top: 0.45rem;
+
+    dt,
+    dd {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #0c2d48;
+    }
+  }
+
+  .bl-retencion dd {
+    color: #a12c2c;
+  }
+
+  .bl-neto {
+    dt,
+    dd {
+      color: #0b7f6c;
+    }
+  }
+}
+
+/* ---------- Interruptores ---------- */
+.bl-interruptores {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  button {
+    justify-content: flex-start;
+    border-color: #d8dee5;
+    color: #5c6b7a;
+
+    mat-icon {
+      margin-right: 0.35rem;
+    }
+
+    &.activo {
+      color: #0b7f6c;
+      border-color: rgba(0, 201, 167, 0.45);
+      background: rgba(0, 201, 167, 0.08);
+    }
+  }
+}
+
+/* ---------- Vista previa ---------- */
+.bl-vista {
+  background: #e9ecef;
+  border: 1px solid #d8dee5;
+  border-radius: 14px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.bl-vista-barra {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #0c2d48;
+  color: #ffffff;
+
+  .bl-vista-titulo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #00c9a7;
+    }
+  }
+
+  .bl-vista-meta {
+    margin-left: auto;
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  button {
+    color: #ffffff;
+  }
+}
+
+.bl-cargando {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #5c6b7a;
+  font-size: 0.9rem;
+}
+
+/* La escala de la hoja viaja como variable CSS hasta `.fx-hoja`, que la usa
+   en su `zoom` (la hoja mide 21,7 cm y no cabe entera en pantallas angostas). */
+.bl-vista { --fx-escala: 1; }
+.bl-escala-100 { --fx-escala: 1; }
+.bl-escala-85  { --fx-escala: 0.85; }
+.bl-escala-70  { --fx-escala: 0.7; }
+.bl-escala-55  { --fx-escala: 0.55; }
+
+/* ---------- Tema oscuro ---------- */
+:host-context([data-theme="dark"]) {
+  .page-header .header-content {
+    h1 { color: #e8eef4; }
+    p { color: #9aa7b4; }
+  }
+
+  .bl-card {
+    background: #1b2430;
+    border-color: #2c3746;
+    box-shadow: none;
+
+    .bl-card-titulo { color: #9aa7b4; }
+  }
+
+  .bl-contador {
+    background: rgba(255, 255, 255, 0.08);
+    color: #cfd8e3;
+  }
+
+  .bl-vacio { color: #9aa7b4; }
+
+  .bl-aviso-bloqueo {
+    background: rgba(255, 193, 7, 0.12);
+    border-color: rgba(255, 193, 7, 0.3);
+    color: #f0c674;
+  }
+
+  .bl-aviso-datos {
+    background: rgba(3, 169, 244, 0.12);
+    border-color: rgba(3, 169, 244, 0.3);
+    color: #8fd0f0;
+  }
+
+  .bl-opcion .bl-opcion-nombre { color: #e8eef4; }
+  .bl-opcion .bl-opcion-meta { color: #9aa7b4; }
+
+  .bl-cliente-datos {
+    strong { color: #e8eef4; }
+    > span { color: #9aa7b4; }
+  }
+
+  .bl-cliente-avatar {
+    background: rgba(0, 201, 167, 0.18);
+    color: #5fe0c8;
+  }
+
+  .bl-notas .bl-nota span { color: #b9c4d0; }
+  .bl-nota-info { background: rgba(3, 169, 244, 0.14); color: #8fd0f0; }
+  .bl-nota-ok { background: rgba(0, 201, 167, 0.16); color: #5fe0c8; }
+
+  .bl-campo {
+    > span { color: #8a97a3; }
+
+    input,
+    select,
+    textarea {
+      background: #131b24;
+      border-color: #2c3746;
+      color: #e8eef4;
+
+      &[readonly],
+      &[disabled] {
+        background: #101821;
+        color: #8a97a3;
+      }
+    }
+
+    .bl-hint { color: #7f8b98; }
+  }
+
+  .bl-switch {
+    color: #e8eef4;
+  }
+
+  .bl-item {
+    background: #16202a;
+    border-color: #2c3746;
+  }
+
+  .bl-item-desc {
+    .bl-item-num { background: rgba(255, 255, 255, 0.08); color: #cfd8e3; }
+
+    textarea {
+      background: #131b24;
+      border-color: #2c3746;
+      color: #e8eef4;
+
+      &[readonly] { background: #101821; color: #8a97a3; }
+    }
+  }
+
+  .bl-item-total strong { color: #e8eef4; }
+
+  .bl-totales {
+    dt { color: #9aa7b4; }
+    dd { color: #e8eef4; }
+
+    .bl-total {
+      border-top-color: #2c3746;
+
+      dt,
+      dd { color: #e8eef4; }
+    }
+
+    .bl-retencion dd { color: #f08a8a; }
+    .bl-neto dt,
+    .bl-neto dd { color: #5fe0c8; }
+  }
+
+  .bl-interruptores button {
+    border-color: #2c3746;
+    color: #9aa7b4;
+
+    &.activo {
+      color: #5fe0c8;
+      border-color: rgba(0, 201, 167, 0.4);
+      background: rgba(0, 201, 167, 0.12);
+    }
+  }
+
+  .bl-vista {
+    background: #0f151d;
+    border-color: #2c3746;
+  }
+
+  .bl-acciones-trigger {
+    background: #1b2430;
+    border-color: #2c3746;
+    color: #cfd8e3;
+  }
+
+  .bl-cargando { color: #9aa7b4; }
+
+  .bl-card-peligro button { color: #f08a8a; }
+}
+
+/* ---------- Pantallas angostas ---------- */
+@media (max-width: 1200px) {
+  .bl-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .page-header .header-actions {
+    width: 100%;
+
+    button {
+      flex: 1 1 auto;
+    }
+  }
+
+  .bl-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bl-item-total {
+    margin-left: 0;
+  }
+}
+
+/* Un solo botón contextual con todas las acciones (Nueva, Imprimir,
+   Guardar, Emitir, Anular), al nivel del título. */
+.bl-acciones-trigger {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #d8dee5;
+  background: #ffffff;
+  color: #0c2d48;
+
+  mat-icon { color: inherit; }
+}
+
+/* ---------- Secciones como botones (móvil/tablet) ---------- */
+.bl-secciones {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.bl-seccion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #e3e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: rgba(0, 201, 167, 0.5);
+    box-shadow: 0 2px 8px rgba(12, 45, 72, 0.08);
+  }
+
+  > mat-icon:first-child {
+    color: #00c9a7;
+    flex: 0 0 auto;
+  }
+
+  .bl-seccion-texto {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+
+    strong {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #0c2d48;
+    }
+
+    small {
+      font-size: 0.76rem;
+      color: #7b8794;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .bl-seccion-flecha {
+    color: #a5b0bb;
+    flex: 0 0 auto;
+  }
+}
+
+/* Cabecera del modal de sección (solo visible en modal) */
+.bl-seccion-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem 0.75rem;
+  border-bottom: 1px solid #e3e7eb;
+  margin-bottom: 0.85rem;
+
+  strong {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #0c2d48;
+  }
+}
+
+/* ---------- Tema oscuro (secciones) ---------- */
+:host-context([data-theme="dark"]) {
+  .bl-seccion {
+    background: #1b2430;
+    border-color: #2c3746;
+
+    .bl-seccion-texto strong { color: #e8eef4; }
+    .bl-seccion-texto small { color: #9aa7b4; }
+    .bl-seccion-flecha { color: #7f8b98; }
+  }
+
+  .bl-seccion-cabecera {
+    border-bottom-color: #2c3746;
+
+    strong { color: #e8eef4; }
+  }
+}

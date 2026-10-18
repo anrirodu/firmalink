@@ -13,7 +13,13 @@ export const environment = {
     ACTUALIZAR_CLAVE_USUARIO: '_SYS_UUserPanel',
     ACTUALIZAR_TOTP: '_SYS_UUserTOTP',
     CONSULTAR_ACUERDOS: '_SYS_CFirmaLinkAcuerdos',
+    CONSULTAR_ACUERDOS_CLIENTE: '_SYS_CFirmaLinkAcuerdosCliente',
     CONSULTAR_ACUERDO: '_SYS_CFirmaLinkAcuerdo',
+    CONSULTAR_CLIENTES: '_SYS_CFirmaLinkClientes',
+    CONSULTAR_CLIENTE: '_SYS_CFirmaLinkCliente',
+    CONSULTAR_FACTURAS: '_SYS_CFirmaLinkFacturas',
+    CONSULTAR_FACTURAS_CLIENTE: '_SYS_CFirmaLinkFacturasCliente',
+    CONSULTAR_FACTURA: '_SYS_CFirmaLinkFactura',
   },
   driver: {
     // ID de la conexión registrada en `sys-drivers` (MGDBA → MongoDB local / BD code-epic).
@@ -24,5 +30,7 @@ export const environment = {
   colecciones: {
     USER_TASK: 'user_tasks',
     ACUERDO: 'firmalink_acuerdos',
+    CLIENTE: 'firmalink_clientes',
+    FACTURA: 'firmalink_facturas',
   },
 };

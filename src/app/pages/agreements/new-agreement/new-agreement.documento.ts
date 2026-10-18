@@ -8,6 +8,10 @@
  * Los campos editables desde el panel son:
  *   codigo, titulo, proyecto, area, gerente, cedula, cedulaFirma,
  *   vigencia, honorario, quincena, ciudad, fechaFirma, representante
+ *
+ * Además viajan cuatro campos que no se escriben a mano: se copian del cliente
+ * elegido en el selector (`clienteNombre`, `clienteIdentificacion`,
+ * `clienteRif`, `clienteDireccion`).
  */
 
 /**
@@ -31,12 +35,23 @@ export const CAMPOS_DEFAULT: Record<string, string> = {
   ciudad: '',
   fechaFirma: '',
   representante: '',
+  // Copiados del cliente (no se editan a mano en el panel)
+  clienteNombre: '',
+  clienteIdentificacion: '',
+  clienteRif: '',
+  clienteDireccion: '',
 };
 
 /** Acuerdo predeterminado cargado en el editor (HTML del contrato) */
 export const DOCUMENTO_DEFAULT = `
 <p class="doc-codigo"><strong><span data-campo="codigo"></span></strong></p>
 <p class="doc-titulo"><strong><span data-campo="titulo"></span></strong></p>
+
+<p class="doc-clausula"><strong>DATOS DEL CLIENTE</strong></p>
+<p><strong>Nombre / Razón social:</strong> <span data-campo="clienteNombre"></span></p>
+<p><strong>Identificación:</strong> <span data-campo="clienteIdentificacion"></span></p>
+<p><strong>RIF:</strong> <span data-campo="clienteRif"></span></p>
+<p><strong>Domicilio fiscal:</strong> <span data-campo="clienteDireccion"></span></p>
 
 <p class="doc-clausula"><strong>CLÁUSULA PRIMERA: DATOS DEL PROYECTO Y CONTEXTO OPERATIVO</strong></p>
 <p>Mediante el presente instrumento, las Partes suscribientes formalizan la iniciación de las actividades operativas de supervisión, auditoría y detección proactiva de incidencias sobre la infraestructura tecnológica destinada al Ecosistema de Gestión Documental y Administración de Archivos "Sandra Ecosystem™", con especial atención en su nodo central de procesamiento y almacenamiento "Sandra Server".</p>

@@ -1,0 +1,1270 @@
+<!-- ============================================
+     MODAL CLIENTE — alta y edición
+     Patrón del modal de Nueva Contratación: backdrop con blur, tarjeta con
+     slideUp, cabecera en degradado, cuerpo por pestañas y pie con acciones.
+     ============================================ -->
+@let val = validacion();
+
+<div class="cf-backdrop" (click)="solicitarCierre()">
+  <div
+    class="cf-card"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cf-titulo"
+    (click)="$event.stopPropagation()"
+  >
+    <!-- Header -->
+    <div class="cf-header">
+      <div class="cf-header-icon">
+        <mat-icon>{{ esNuevo() ? 'person_add' : 'manage_accounts' }}</mat-icon>
+      </div>
+      <div>
+        <h3 class="cf-title" id="cf-titulo">
+          {{ restaurar() ? 'Restaurar cliente' : esNuevo() ? 'Nuevo cliente' : 'Editar cliente' }}
+        </h3>
+        <p class="cf-subtitle">
+          @if (esNuevo()) {
+            Código <strong>se asigna al guardar</strong>
+          } @else {
+            Código <strong>{{ m.codigo }}</strong>
+          }
+          · {{ categoriaInfo?.etiqueta }}
+        </p>
+      </div>
+      <button class="cf-close" type="button" (click)="solicitarCierre()" aria-label="Cerrar">
+        &times;
+      </button>
+    </div>
+
+    <!-- Pestañas -->
+    <nav class="cf-tabs" role="tablist" aria-label="Secciones de la ficha del cliente">
+      @for (p of pestanas; track p.id; let i = $index) {
+        <button
+          type="button"
+          role="tab"
+          class="cf-tab"
+          [class.activa]="pestana() === p.id"
+          [class.con-error]="intentado() && val.porPestana[p.id]"
+          [attr.aria-selected]="pestana() === p.id"
+          (click)="irAPestana(p.id)"
+        >
+          <span class="cf-tab-num">{{ i + 1 }}</span>
+          <mat-icon>{{ p.icono }}</mat-icon>
+          <span class="cf-tab-label">{{ p.etiqueta }}</span>
+          @if (intentado() && val.porPestana[p.id]) {
+            <span class="cf-tab-badge" [title]="val.porPestana[p.id] + ' dato(s) por corregir'">
+              {{ val.porPestana[p.id] }}
+            </span>
+          }
+        </button>
+      }
+    </nav>
+
+    <!-- Body -->
+    <div class="cf-body" #cuerpo role="tabpanel">
+      @if (restaurar()) {
+        <div class="cf-banner">
+          <mat-icon>restore_from_trash</mat-icon>
+          <span>
+            Este cliente fue eliminado el {{ fechaHora(cliente()?.eliminadoEn) }}
+            @if (cliente()?.eliminadoPorNombre) {
+              por {{ cliente()?.eliminadoPorNombre }}
+            }. Al guardar vuelve a estar <strong>activo</strong> en el listado.
+          </span>
+        </div>
+      }
+
+      <!-- Errores (después del primer intento de guardar) -->
+      @if (intentado() && val.errores.length) {
+        <div class="cf-error-box">
+          <mat-icon>error_outline</mat-icon>
+          <div>
+            <strong>
+              {{ val.errores.length }}
+              {{ val.errores.length === 1 ? 'dato por corregir' : 'datos por corregir' }}
+            </strong>
+            <ul>
+              @for (e of val.errores; track $index) {
+                <li>
+                  <button type="button" (click)="irAProblema(e)">
+                    <span>{{ etiquetaPestana(e.pestana) }}:</span> {{ e.mensaje }}
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+
+      <!-- Advertencias (no bloquean el guardado) -->
+      @if (val.avisos.length) {
+        <div class="cf-warn-box">
+          <mat-icon>warning_amber</mat-icon>
+          <ul>
+            @for (a of val.avisos; track $index) {
+              <li>{{ a.mensaje }}</li>
+            }
+          </ul>
+        </div>
+      }
+
+      @switch (pestana()) {
+        <!-- ═══════════ 1. IDENTIFICACIÓN ═══════════ -->
+        @case ('identificacion') {
+          <section class="cf-section">
+            <h4 class="cf-section-title">
+              <mat-icon>category</mat-icon> Categoría del cliente <span class="cf-required">*</span>
+            </h4>
+            <div class="cf-cat-grid" role="radiogroup" aria-label="Categoría del cliente">
+              @for (cat of categorias; track cat.valor) {
+                <label
+                  class="cf-cat"
+                  [ngClass]="'cat-' + cat.valor"
+                  [class.checked]="m.categoria === cat.valor"
+                >
+                  <input
+                    type="radio"
+                    name="cf-categoria"
+                    [value]="cat.valor"
+                    [checked]="m.categoria === cat.valor"
+                    (change)="elegirCategoria(cat.valor)"
+                  />
+                  <span class="cf-cat-icon"><mat-icon>{{ cat.icono }}</mat-icon></span>
+                  <span class="cf-cat-text">
+                    <span class="cf-cat-title">
+                      {{ cat.etiqueta }} <span class="cf-cat-code">{{ cat.valor }}</span>
+                    </span>
+                    <span class="cf-cat-desc">{{ cat.descripcion }}</span>
+                  </span>
+                </label>
+              }
+            </div>
+          </section>
+
+          <section class="cf-section">
+            <h4 class="cf-section-title"><mat-icon>badge</mat-icon> Documento de identidad</h4>
+            <div class="cf-grid">
+              <div class="cf-field">
+                <label class="cf-label" for="cf-tipo-doc">
+                  Tipo de documento <span class="cf-required">*</span>
+                </label>
+                <select
+                  id="cf-tipo-doc"
+                  class="cf-input"
+                  data-campo="tipoDocumento"
+                  [class.cf-invalido]="msg(val, 'tipoDocumento')"
+                  [ngModel]="m.tipoDocumento"
+                  (ngModelChange)="cambiarTipoDocumento($event)"
+                >
+                  @for (t of documentosPermitidos; track t) {
+                    <option [value]="t">{{ tiposDocumento[t] }}</option>
+                  }
+                </select>
+                @if (msg(val, 'tipoDocumento'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+
+              <div class="cf-field">
+                <label class="cf-label" for="cf-numero">
+                  {{ etiquetaNumero }} <span class="cf-required">*</span>
+                </label>
+                <input
+                  id="cf-numero"
+                  class="cf-input"
+                  data-campo="numeroDocumento"
+                  maxlength="20"
+                  autocomplete="off"
+                  [placeholder]="m.tipoDocumento === 'P' ? 'AB1234567' : '12345678'"
+                  [class.cf-invalido]="msg(val, 'numeroDocumento')"
+                  [(ngModel)]="m.numeroDocumento"
+                  (blur)="alSalirDelDocumento()"
+                />
+                @if (msg(val, 'numeroDocumento'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                } @else if (m.tipoDocumento !== 'P') {
+                  <small class="cf-hint">Puede pegar el documento completo: J-12345678-9.</small>
+                }
+              </div>
+
+              @if (esRifOrganizacion(m.tipoDocumento)) {
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-dv">
+                    Dígito verificador <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-dv"
+                    class="cf-input cf-input-dv"
+                    data-campo="digitoVerificador"
+                    maxlength="1"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="0"
+                    [class.cf-invalido]="msg(val, 'digitoVerificador')"
+                    [(ngModel)]="m.digitoVerificador"
+                  />
+                  @if (msg(val, 'digitoVerificador'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  } @else if (dvSugerido) {
+                    <small class="cf-hint">Módulo 11 del SENIAT: corresponde {{ dvSugerido }}.</small>
+                  }
+                </div>
+              } @else if (m.tipoDocumento === 'P') {
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-pais-emisor">
+                    País emisor <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-pais-emisor"
+                    class="cf-input"
+                    data-campo="paisEmisor"
+                    maxlength="60"
+                    placeholder="Ej.: Colombia"
+                    [class.cf-invalido]="msg(val, 'paisEmisor')"
+                    [(ngModel)]="m.paisEmisor"
+                  />
+                  @if (msg(val, 'paisEmisor'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+              } @else {
+                <div class="cf-field">
+                  <span class="cf-label">RIF (derivado de la cédula)</span>
+                  <div class="cf-readonly">
+                    <mat-icon>fingerprint</mat-icon>
+                    {{ rifCalculado || 'Se calcula al escribir la cédula' }}
+                  </div>
+                </div>
+              }
+
+              <div class="cf-field">
+                <label class="cf-label" for="cf-estado">Estado del cliente</label>
+                <select id="cf-estado" class="cf-input" [(ngModel)]="m.estado">
+                  @for (e of estados; track e.valor) {
+                    <option [value]="e.valor">{{ e.etiqueta }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            @if (duplicado(); as dup) {
+              <div class="cf-dup" [class.eliminado]="estaEliminado(dup)">
+                <mat-icon>{{ estaEliminado(dup) ? 'restore_from_trash' : 'person_search' }}</mat-icon>
+                <div>
+                  <strong>
+                    {{ formatearDocumento(dup) }} ya pertenece a
+                    {{ dup.codigo }} · {{ nombreCliente(dup) }}
+                  </strong>
+                  <span>
+                    {{
+                      estaEliminado(dup)
+                        ? 'Ese cliente fue eliminado: puede restaurarlo con su historial en lugar de duplicarlo.'
+                        : 'No se permiten dos clientes con el mismo documento.'
+                    }}
+                  </span>
+                </div>
+                <button type="button" class="cf-btn-nav" (click)="abrirDuplicado()">
+                  <mat-icon>{{ estaEliminado(dup) ? 'restore' : 'open_in_new' }}</mat-icon>
+                  {{ estaEliminado(dup) ? 'Restaurar' : 'Abrir ficha' }}
+                </button>
+              </div>
+            }
+          </section>
+        }
+
+        <!-- ═══════════ 2. DATOS GENERALES ═══════════ -->
+        @case ('datos') {
+          @if (m.categoria === 'D') {
+            <section class="cf-section">
+              <h4 class="cf-section-title"><mat-icon>flag</mat-icon> Estatus diplomático</h4>
+              <div class="cf-grid">
+                <div class="cf-field span-2">
+                  <label class="cf-label" for="cf-sujeto">
+                    Tipo de sujeto <span class="cf-required">*</span>
+                  </label>
+                  <select
+                    id="cf-sujeto"
+                    class="cf-input"
+                    data-campo="tipoSujetoDiplomatico"
+                    [class.cf-invalido]="msg(val, 'tipoSujetoDiplomatico')"
+                    [(ngModel)]="m.tipoSujetoDiplomatico"
+                  >
+                    <option value="">Seleccione...</option>
+                    @for (t of tiposSujetoDiplomatico; track t.valor) {
+                      <option [value]="t.valor">{{ t.etiqueta }}</option>
+                    }
+                  </select>
+                  @if (msg(val, 'tipoSujetoDiplomatico'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-pais-rep">
+                    País u organismo representado <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-pais-rep"
+                    class="cf-input"
+                    data-campo="paisRepresentado"
+                    maxlength="80"
+                    placeholder="Ej.: República de Colombia / ONU"
+                    [class.cf-invalido]="msg(val, 'paisRepresentado')"
+                    [(ngModel)]="m.paisRepresentado"
+                  />
+                  @if (msg(val, 'paisRepresentado'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-credencial">
+                    N° de credencial (Cancillería) <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-credencial"
+                    class="cf-input"
+                    data-campo="credencialDiplomatica"
+                    maxlength="40"
+                    placeholder="Carnet o credencial del MPPRE"
+                    [class.cf-invalido]="msg(val, 'credencialDiplomatica')"
+                    [(ngModel)]="m.credencialDiplomatica"
+                  />
+                  @if (msg(val, 'credencialDiplomatica'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-venc-cred">Vencimiento de la credencial</label>
+                  <input
+                    id="cf-venc-cred"
+                    type="date"
+                    class="cf-input"
+                    data-campo="vencimientoCredencial"
+                    [(ngModel)]="m.vencimientoCredencial"
+                  />
+                </div>
+              </div>
+            </section>
+          }
+
+          @if (persona) {
+            <section class="cf-section">
+              <h4 class="cf-section-title"><mat-icon>person</mat-icon> Datos personales</h4>
+              <div class="cf-grid">
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-nombres">
+                    Nombres <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-nombres"
+                    class="cf-input"
+                    data-campo="nombres"
+                    maxlength="80"
+                    autocomplete="given-name"
+                    [class.cf-invalido]="msg(val, 'nombres')"
+                    [(ngModel)]="m.nombres"
+                  />
+                  @if (msg(val, 'nombres'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-apellidos">
+                    Apellidos <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-apellidos"
+                    class="cf-input"
+                    data-campo="apellidos"
+                    maxlength="80"
+                    autocomplete="family-name"
+                    [class.cf-invalido]="msg(val, 'apellidos')"
+                    [(ngModel)]="m.apellidos"
+                  />
+                  @if (msg(val, 'apellidos'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-nacimiento">Fecha de nacimiento</label>
+                  <input
+                    id="cf-nacimiento"
+                    type="date"
+                    class="cf-input"
+                    data-campo="fechaNacimiento"
+                    [class.cf-invalido]="msg(val, 'fechaNacimiento')"
+                    [(ngModel)]="m.fechaNacimiento"
+                  />
+                  @if (msg(val, 'fechaNacimiento'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-sexo">Sexo</label>
+                  <select id="cf-sexo" class="cf-input" [(ngModel)]="m.sexo">
+                    <option value="">Sin indicar</option>
+                    <option value="F">Femenino</option>
+                    <option value="M">Masculino</option>
+                  </select>
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-civil">Estado civil</label>
+                  <select id="cf-civil" class="cf-input" [(ngModel)]="m.estadoCivil">
+                    <option value="">Sin indicar</option>
+                    @for (e of estadosCiviles; track e) {
+                      <option [value]="e">{{ e }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-nacionalidad">
+                    Nacionalidad
+                    @if (m.categoria !== 'V') {
+                      <span class="cf-required">*</span>
+                    }
+                  </label>
+                  <input
+                    id="cf-nacionalidad"
+                    class="cf-input"
+                    data-campo="nacionalidad"
+                    maxlength="60"
+                    [class.cf-invalido]="msg(val, 'nacionalidad')"
+                    [(ngModel)]="m.nacionalidad"
+                  />
+                  @if (msg(val, 'nacionalidad'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field" [class.span-2]="m.categoria !== 'E'">
+                  <label class="cf-label" for="cf-profesion">Profesión u ocupación</label>
+                  <input
+                    id="cf-profesion"
+                    class="cf-input"
+                    maxlength="80"
+                    placeholder="Ej.: Abogado, comerciante, ingeniera"
+                    [(ngModel)]="m.profesion"
+                  />
+                </div>
+                @if (m.categoria === 'E') {
+                  <div class="cf-field">
+                    <label class="cf-label" for="cf-migratoria">Condición migratoria</label>
+                    <select id="cf-migratoria" class="cf-input" [(ngModel)]="m.condicionMigratoria">
+                      <option value="">Sin indicar</option>
+                      <option value="residente">Residente</option>
+                      <option value="transeunte">Transeúnte</option>
+                    </select>
+                  </div>
+                }
+              </div>
+            </section>
+          } @else {
+            <section class="cf-section">
+              <h4 class="cf-section-title">
+                <mat-icon>{{ categoriaInfo?.icono }}</mat-icon> Datos de la organización
+              </h4>
+              <div class="cf-grid">
+                <div class="cf-field span-2">
+                  <label class="cf-label" for="cf-razon">
+                    {{ etiquetaRazonSocial(m.categoria) }} <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-razon"
+                    class="cf-input"
+                    data-campo="razonSocial"
+                    maxlength="150"
+                    autocomplete="organization"
+                    [class.cf-invalido]="msg(val, 'razonSocial')"
+                    [(ngModel)]="m.razonSocial"
+                  />
+                  @if (msg(val, 'razonSocial'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-comercial">Nombre comercial o siglas</label>
+                  <input
+                    id="cf-comercial"
+                    class="cf-input"
+                    maxlength="100"
+                    [(ngModel)]="m.nombreComercial"
+                  />
+                </div>
+                <div class="cf-field span-full">
+                  <label class="cf-label" for="cf-actividad">Actividad económica u objeto</label>
+                  <input
+                    id="cf-actividad"
+                    class="cf-input"
+                    maxlength="200"
+                    placeholder="Ej.: Servicios de consultoría jurídica"
+                    [(ngModel)]="m.actividadEconomica"
+                  />
+                </div>
+              </div>
+            </section>
+
+            @switch (m.categoria) {
+              @case ('J') {
+                <section class="cf-section">
+                  <h4 class="cf-section-title"><mat-icon>gavel</mat-icon> Registro mercantil</h4>
+                  <div class="cf-grid">
+                    <div class="cf-field span-full">
+                      <label class="cf-label" for="cf-reg-oficina">Oficina de registro</label>
+                      <input
+                        id="cf-reg-oficina"
+                        class="cf-input"
+                        maxlength="150"
+                        placeholder="Ej.: Registro Mercantil Primero del Distrito Capital"
+                        [(ngModel)]="m.registroMercantil.oficina"
+                      />
+                    </div>
+                    <div class="cf-field">
+                      <label class="cf-label" for="cf-reg-numero">Número</label>
+                      <input
+                        id="cf-reg-numero"
+                        class="cf-input"
+                        maxlength="20"
+                        [(ngModel)]="m.registroMercantil.numero"
+                      />
+                    </div>
+                    <div class="cf-field">
+                      <label class="cf-label" for="cf-reg-tomo">Tomo</label>
+                      <input
+                        id="cf-reg-tomo"
+                        class="cf-input"
+                        maxlength="20"
+                        [(ngModel)]="m.registroMercantil.tomo"
+                      />
+                    </div>
+                    <div class="cf-field">
+                      <label class="cf-label" for="cf-reg-fecha">Fecha de inscripción</label>
+                      <input
+                        id="cf-reg-fecha"
+                        type="date"
+                        class="cf-input"
+                        [(ngModel)]="m.registroMercantil.fecha"
+                      />
+                    </div>
+                  </div>
+                </section>
+              }
+              @case ('G') {
+                <section class="cf-section">
+                  <h4 class="cf-section-title"><mat-icon>account_balance</mat-icon> Ente público</h4>
+                  <div class="cf-grid">
+                    <div class="cf-field">
+                      <label class="cf-label" for="cf-nivel">
+                        Nivel de gobierno <span class="cf-required">*</span>
+                      </label>
+                      <select
+                        id="cf-nivel"
+                        class="cf-input"
+                        data-campo="nivelGobierno"
+                        [class.cf-invalido]="msg(val, 'nivelGobierno')"
+                        [(ngModel)]="m.nivelGobierno"
+                      >
+                        <option value="">Seleccione...</option>
+                        @for (n of nivelesGobierno; track n.valor) {
+                          <option [value]="n.valor">{{ n.etiqueta }}</option>
+                        }
+                      </select>
+                      @if (msg(val, 'nivelGobierno'); as error) {
+                        <small class="cf-error">{{ error }}</small>
+                      }
+                    </div>
+                    <div class="cf-field span-2">
+                      <label class="cf-label" for="cf-adscripcion">Ente de adscripción</label>
+                      <input
+                        id="cf-adscripcion"
+                        class="cf-input"
+                        maxlength="150"
+                        placeholder="Ej.: Ministerio del Poder Popular para…"
+                        [(ngModel)]="m.enteAdscripcion"
+                      />
+                    </div>
+                    <div class="cf-field span-2">
+                      <label class="cf-label" for="cf-unidad">Unidad administradora o contratante</label>
+                      <input
+                        id="cf-unidad"
+                        class="cf-input"
+                        maxlength="150"
+                        [(ngModel)]="m.unidadAdministradora"
+                      />
+                    </div>
+                    <div class="cf-field">
+                      <label class="cf-label" for="cf-partida">Partida presupuestaria habitual</label>
+                      <input
+                        id="cf-partida"
+                        class="cf-input"
+                        maxlength="30"
+                        placeholder="Ej.: 4.02.01.01.00"
+                        [(ngModel)]="m.partidaPresupuestaria"
+                      />
+                    </div>
+                  </div>
+                </section>
+              }
+              @case ('C') {
+                <section class="cf-section">
+                  <h4 class="cf-section-title"><mat-icon>groups</mat-icon> Organización comunal</h4>
+                  <div class="cf-grid">
+                    <div class="cf-field">
+                      <label class="cf-label" for="cf-tipo-comunal">
+                        Tipo de organización <span class="cf-required">*</span>
+                      </label>
+                      <select
+                        id="cf-tipo-comunal"
+                        class="cf-input"
+                        data-campo="tipoOrganizacionComunal"
+                        [class.cf-invalido]="msg(val, 'tipoOrganizacionComunal')"
+                        [(ngModel)]="m.tipoOrganizacionComunal"
+                      >
+                        <option value="">Seleccione...</option>
+                        @for (t of tiposOrganizacionComunal; track t.valor) {
+                          <option [value]="t.valor">{{ t.etiqueta }}</option>
+                        }
+                      </select>
+                      @if (msg(val, 'tipoOrganizacionComunal'); as error) {
+                        <small class="cf-error">{{ error }}</small>
+                      }
+                    </div>
+                    <div class="cf-field span-2">
+                      <label class="cf-label" for="cf-reg-comunal">
+                        Código de registro (Ministerio de Comunas) <span class="cf-required">*</span>
+                      </label>
+                      <input
+                        id="cf-reg-comunal"
+                        class="cf-input"
+                        data-campo="registroComunal"
+                        maxlength="40"
+                        placeholder="Código SITUR u otro registro oficial"
+                        [class.cf-invalido]="msg(val, 'registroComunal')"
+                        [(ngModel)]="m.registroComunal"
+                      />
+                      @if (msg(val, 'registroComunal'); as error) {
+                        <small class="cf-error">{{ error }}</small>
+                      }
+                    </div>
+                  </div>
+                </section>
+              }
+            }
+
+            <section class="cf-section">
+              <h4 class="cf-section-title">
+                <mat-icon>how_to_reg</mat-icon> Representante legal o contacto institucional
+              </h4>
+              <div class="cf-grid">
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-rep-nombre">Nombre y apellido</label>
+                  <input
+                    id="cf-rep-nombre"
+                    class="cf-input"
+                    maxlength="120"
+                    [(ngModel)]="m.representante.nombre"
+                  />
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-rep-doc">Cédula o pasaporte</label>
+                  <input
+                    id="cf-rep-doc"
+                    class="cf-input"
+                    maxlength="20"
+                    placeholder="V-12.345.678"
+                    [(ngModel)]="m.representante.documento"
+                  />
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-rep-cargo">Cargo</label>
+                  <input
+                    id="cf-rep-cargo"
+                    class="cf-input"
+                    maxlength="80"
+                    placeholder="Ej.: Presidente, director, vocero"
+                    [(ngModel)]="m.representante.cargo"
+                  />
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-rep-tel">Teléfono</label>
+                  <input
+                    id="cf-rep-tel"
+                    class="cf-input"
+                    data-campo="representante.telefono"
+                    maxlength="22"
+                    inputmode="tel"
+                    placeholder="0414-1234567"
+                    [class.cf-invalido]="msg(val, 'representante.telefono')"
+                    [(ngModel)]="m.representante.telefono"
+                  />
+                  @if (msg(val, 'representante.telefono'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field span-2">
+                  <label class="cf-label" for="cf-rep-correo">Correo</label>
+                  <input
+                    id="cf-rep-correo"
+                    type="email"
+                    class="cf-input"
+                    data-campo="representante.correo"
+                    maxlength="120"
+                    [class.cf-invalido]="msg(val, 'representante.correo')"
+                    [(ngModel)]="m.representante.correo"
+                  />
+                  @if (msg(val, 'representante.correo'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+              </div>
+            </section>
+          }
+        }
+
+        <!-- ═══════════ 3. PERFIL FISCAL ═══════════ -->
+        @case ('fiscal') {
+          <section class="cf-section">
+            <h4 class="cf-section-title">
+              <mat-icon>policy</mat-icon> Condición ante el SENIAT <span class="cf-required">*</span>
+            </h4>
+            <div class="cf-cond-grid" role="radiogroup" aria-label="Condición ante el SENIAT">
+              @for (cond of condiciones; track cond.valor) {
+                <label class="cf-cond" [class.checked]="m.condicionFiscal === cond.valor">
+                  <input
+                    type="radio"
+                    name="cf-condicion"
+                    data-campo="condicionFiscal"
+                    [value]="cond.valor"
+                    [checked]="m.condicionFiscal === cond.valor"
+                    (change)="elegirCondicion(cond.valor)"
+                  />
+                  <mat-icon>{{ cond.icono }}</mat-icon>
+                  <span>
+                    <span class="cf-cond-title">{{ cond.etiqueta }}</span>
+                    <span class="cf-cond-desc">{{ cond.descripcion }}</span>
+                  </span>
+                </label>
+              }
+            </div>
+          </section>
+
+          <section class="cf-section">
+            <h4 class="cf-section-title"><mat-icon>percent</mat-icon> Retenciones y beneficios</h4>
+            <div class="cf-checks">
+              <label class="cf-check" [class.checked]="m.agenteRetencionIva">
+                <input
+                  type="checkbox"
+                  data-campo="agenteRetencionIva"
+                  [ngModel]="m.agenteRetencionIva"
+                  (ngModelChange)="alternarRetencionIva($event)"
+                />
+                <span class="cf-check-box"><mat-icon>check</mat-icon></span>
+                <span class="cf-check-label">Agente de retención de IVA</span>
+              </label>
+              <label class="cf-check" [class.checked]="m.agenteRetencionIslr">
+                <input type="checkbox" [(ngModel)]="m.agenteRetencionIslr" />
+                <span class="cf-check-box"><mat-icon>check</mat-icon></span>
+                <span class="cf-check-label">Agente de retención de ISLR</span>
+              </label>
+              <label class="cf-check" [class.checked]="m.exentoIgtf">
+                <input type="checkbox" [(ngModel)]="m.exentoIgtf" />
+                <span class="cf-check-box"><mat-icon>check</mat-icon></span>
+                <span class="cf-check-label">Exento de IGTF</span>
+              </label>
+            </div>
+
+            <div class="cf-grid cf-grid-fiscal">
+              @if (m.agenteRetencionIva) {
+                <div class="cf-field">
+                  <span class="cf-label">
+                    Retención de IVA <span class="cf-required">*</span>
+                  </span>
+                  <div class="cf-segmented" data-campo="porcentajeRetencionIva">
+                    <button
+                      type="button"
+                      [class.activo]="m.porcentajeRetencionIva === 75"
+                      (click)="m.porcentajeRetencionIva = 75"
+                    >
+                      75 % · general
+                    </button>
+                    <button
+                      type="button"
+                      [class.activo]="m.porcentajeRetencionIva === 100"
+                      (click)="m.porcentajeRetencionIva = 100"
+                    >
+                      100 %
+                    </button>
+                  </div>
+                  @if (msg(val, 'porcentajeRetencionIva'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+              }
+              @if (requiereBaseLegal || m.categoria === 'D') {
+                <div class="cf-field span-2">
+                  <label class="cf-label" for="cf-base-legal">
+                    Base legal del beneficio
+                    @if (requiereBaseLegal) {
+                      <span class="cf-required">*</span>
+                    }
+                  </label>
+                  <input
+                    id="cf-base-legal"
+                    class="cf-input"
+                    data-campo="baseLegalBeneficio"
+                    maxlength="200"
+                    [placeholder]="placeholderBaseLegal"
+                    [class.cf-invalido]="msg(val, 'baseLegalBeneficio')"
+                    [(ngModel)]="m.baseLegalBeneficio"
+                  />
+                  @if (msg(val, 'baseLegalBeneficio'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+              }
+              @if (m.condicionFiscal === 'exonerado') {
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-vigencia">
+                    Exoneración vigente hasta <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-vigencia"
+                    type="date"
+                    class="cf-input"
+                    data-campo="vigenciaBeneficio"
+                    [class.cf-invalido]="msg(val, 'vigenciaBeneficio')"
+                    [(ngModel)]="m.vigenciaBeneficio"
+                  />
+                  @if (msg(val, 'vigenciaBeneficio'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+              }
+            </div>
+          </section>
+
+          <section class="cf-section">
+            <h4 class="cf-section-title">
+              <mat-icon>fact_check</mat-icon> Tratamiento fiscal (referencial)
+            </h4>
+            <ul class="cf-tratamiento">
+              @for (linea of tratamiento(); track linea.titulo) {
+                <li [ngClass]="'tono-' + linea.tono">
+                  <mat-icon>{{ linea.icono }}</mat-icon>
+                  <div>
+                    <strong>{{ linea.titulo }}</strong>
+                    <span>{{ linea.detalle }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+            <small class="cf-hint">
+              Orientativo según el perfil configurado; confirme el tratamiento con su asesor tributario.
+            </small>
+          </section>
+        }
+
+        <!-- ═══════════ 4. CONTACTO Y DOMICILIO ═══════════ -->
+        @case ('contacto') {
+          <section class="cf-section">
+            <h4 class="cf-section-title"><mat-icon>contact_phone</mat-icon> Medios de contacto</h4>
+            <div class="cf-grid">
+              <div class="cf-field">
+                <label class="cf-label" for="cf-correo">Correo electrónico</label>
+                <input
+                  id="cf-correo"
+                  type="email"
+                  class="cf-input"
+                  data-campo="correo"
+                  maxlength="120"
+                  autocomplete="email"
+                  [class.cf-invalido]="msg(val, 'correo')"
+                  [(ngModel)]="m.correo"
+                />
+                @if (msg(val, 'correo'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                } @else {
+                  <small class="cf-hint">Se exige al menos un correo o un teléfono.</small>
+                }
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-correo-fact">Correo para facturas digitales</label>
+                <input
+                  id="cf-correo-fact"
+                  type="email"
+                  class="cf-input"
+                  data-campo="correoFacturacion"
+                  maxlength="120"
+                  [class.cf-invalido]="msg(val, 'correoFacturacion')"
+                  [(ngModel)]="m.correoFacturacion"
+                />
+                @if (msg(val, 'correoFacturacion'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-sitio">Sitio web</label>
+                <input
+                  id="cf-sitio"
+                  class="cf-input"
+                  data-campo="sitioWeb"
+                  maxlength="150"
+                  placeholder="www.ejemplo.com.ve"
+                  [class.cf-invalido]="msg(val, 'sitioWeb')"
+                  [(ngModel)]="m.sitioWeb"
+                />
+                @if (msg(val, 'sitioWeb'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-movil">Teléfono móvil</label>
+                <input
+                  id="cf-movil"
+                  class="cf-input"
+                  data-campo="telefonoMovil"
+                  maxlength="22"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  placeholder="0414-1234567"
+                  [class.cf-invalido]="msg(val, 'telefonoMovil')"
+                  [(ngModel)]="m.telefonoMovil"
+                />
+                @if (msg(val, 'telefonoMovil'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-fijo">Teléfono fijo</label>
+                <input
+                  id="cf-fijo"
+                  class="cf-input"
+                  data-campo="telefonoFijo"
+                  maxlength="22"
+                  inputmode="tel"
+                  placeholder="0212-1234567"
+                  [class.cf-invalido]="msg(val, 'telefonoFijo')"
+                  [(ngModel)]="m.telefonoFijo"
+                />
+                @if (msg(val, 'telefonoFijo'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+            </div>
+          </section>
+
+          <section class="cf-section">
+            <h4 class="cf-section-title">
+              <mat-icon>location_on</mat-icon> Domicilio fiscal
+              @if (requiereDomicilio) {
+                <span class="cf-required">*</span>
+              }
+            </h4>
+            <div class="cf-grid">
+              <div class="cf-field">
+                <label class="cf-label" for="cf-dir-estado">
+                  Estado
+                  @if (requiereDomicilio) {
+                    <span class="cf-required">*</span>
+                  }
+                </label>
+                <select
+                  id="cf-dir-estado"
+                  class="cf-input"
+                  data-campo="direccion.estado"
+                  [class.cf-invalido]="msg(val, 'direccion.estado')"
+                  [(ngModel)]="m.direccion.estado"
+                >
+                  <option value="">Seleccione...</option>
+                  @for (e of estadosVenezuela; track e) {
+                    <option [value]="e">{{ e }}</option>
+                  }
+                </select>
+                @if (msg(val, 'direccion.estado'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-dir-municipio">Municipio</label>
+                <input
+                  id="cf-dir-municipio"
+                  class="cf-input"
+                  maxlength="80"
+                  [(ngModel)]="m.direccion.municipio"
+                />
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-dir-parroquia">Parroquia</label>
+                <input
+                  id="cf-dir-parroquia"
+                  class="cf-input"
+                  maxlength="80"
+                  [(ngModel)]="m.direccion.parroquia"
+                />
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-dir-ciudad">Ciudad</label>
+                <input
+                  id="cf-dir-ciudad"
+                  class="cf-input"
+                  maxlength="80"
+                  [(ngModel)]="m.direccion.ciudad"
+                />
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-dir-zona">Zona postal</label>
+                <input
+                  id="cf-dir-zona"
+                  class="cf-input"
+                  data-campo="direccion.zonaPostal"
+                  maxlength="4"
+                  inputmode="numeric"
+                  placeholder="1010"
+                  [class.cf-invalido]="msg(val, 'direccion.zonaPostal')"
+                  [(ngModel)]="m.direccion.zonaPostal"
+                />
+                @if (msg(val, 'direccion.zonaPostal'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field span-full">
+                <label class="cf-label" for="cf-dir-domicilio">
+                  Domicilio (avenida, calle, edificio, piso, local)
+                  @if (requiereDomicilio) {
+                    <span class="cf-required">*</span>
+                  }
+                </label>
+                <textarea
+                  id="cf-dir-domicilio"
+                  class="cf-input"
+                  rows="2"
+                  data-campo="direccion.domicilio"
+                  maxlength="300"
+                  [class.cf-invalido]="msg(val, 'direccion.domicilio')"
+                  [(ngModel)]="m.direccion.domicilio"
+                ></textarea>
+                @if (msg(val, 'direccion.domicilio'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field span-full">
+                <label class="cf-label" for="cf-dir-ref">Punto de referencia</label>
+                <input
+                  id="cf-dir-ref"
+                  class="cf-input"
+                  maxlength="150"
+                  [(ngModel)]="m.direccion.referencia"
+                />
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- ═══════════ 5. COMERCIAL ═══════════ -->
+        @case ('comercial') {
+          <section class="cf-section">
+            <h4 class="cf-section-title"><mat-icon>sell</mat-icon> Condiciones de venta</h4>
+            <div class="cf-grid">
+              <div class="cf-field">
+                <label class="cf-label" for="cf-moneda">Moneda de facturación</label>
+                <select id="cf-moneda" class="cf-input" [(ngModel)]="m.moneda">
+                  @for (mo of monedas; track mo.valor) {
+                    <option [value]="mo.valor">{{ mo.etiqueta }}</option>
+                  }
+                </select>
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-forma-pago">Forma de pago habitual</label>
+                <select id="cf-forma-pago" class="cf-input" [(ngModel)]="m.formaPago">
+                  <option value="">Sin indicar</option>
+                  @for (f of formasPago; track f.valor) {
+                    <option [value]="f.valor">{{ f.etiqueta }}</option>
+                  }
+                </select>
+              </div>
+              <div class="cf-field">
+                <span class="cf-label">Condición de pago</span>
+                <div class="cf-segmented">
+                  <button
+                    type="button"
+                    [class.activo]="m.condicionPago === 'contado'"
+                    (click)="elegirCondicionPago('contado')"
+                  >
+                    Contado
+                  </button>
+                  <button
+                    type="button"
+                    [class.activo]="m.condicionPago === 'credito'"
+                    (click)="elegirCondicionPago('credito')"
+                  >
+                    Crédito
+                  </button>
+                </div>
+              </div>
+              @if (m.condicionPago === 'credito') {
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-dias">
+                    Días de crédito <span class="cf-required">*</span>
+                  </label>
+                  <input
+                    id="cf-dias"
+                    type="number"
+                    min="1"
+                    max="365"
+                    step="1"
+                    class="cf-input"
+                    data-campo="diasCredito"
+                    [class.cf-invalido]="msg(val, 'diasCredito')"
+                    [(ngModel)]="m.diasCredito"
+                  />
+                  @if (msg(val, 'diasCredito'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+                <div class="cf-field">
+                  <label class="cf-label" for="cf-limite">Límite de crédito ({{ m.moneda }})</label>
+                  <input
+                    id="cf-limite"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="cf-input"
+                    data-campo="limiteCredito"
+                    placeholder="Sin límite"
+                    [class.cf-invalido]="msg(val, 'limiteCredito')"
+                    [(ngModel)]="m.limiteCredito"
+                  />
+                  @if (msg(val, 'limiteCredito'); as error) {
+                    <small class="cf-error">{{ error }}</small>
+                  }
+                </div>
+              }
+              <div class="cf-field">
+                <label class="cf-label" for="cf-ejecutivo">Ejecutivo de cuenta</label>
+                <input
+                  id="cf-ejecutivo"
+                  class="cf-input"
+                  maxlength="80"
+                  [(ngModel)]="m.ejecutivo"
+                />
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-origen">¿Cómo llegó el cliente?</label>
+                <select id="cf-origen" class="cf-input" [(ngModel)]="m.origen">
+                  <option value="">Sin indicar</option>
+                  @for (o of origenes; track o.valor) {
+                    <option [value]="o.valor">{{ o.etiqueta }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="cf-section">
+            <h4 class="cf-section-title">
+              <mat-icon>account_balance_wallet</mat-icon> Datos bancarios (conciliación de pagos)
+            </h4>
+            <div class="cf-grid">
+              <div class="cf-field">
+                <label class="cf-label" for="cf-banco">Banco</label>
+                <select id="cf-banco" class="cf-input" [(ngModel)]="m.bancario.banco">
+                  <option value="">Sin indicar</option>
+                  @for (b of bancos; track b.valor) {
+                    <option [value]="b.valor">{{ b.valor }} · {{ b.etiqueta }}</option>
+                  }
+                </select>
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-tipo-cuenta">Tipo de cuenta</label>
+                <select id="cf-tipo-cuenta" class="cf-input" [(ngModel)]="m.bancario.tipoCuenta">
+                  <option value="">Sin indicar</option>
+                  <option value="corriente">Corriente</option>
+                  <option value="ahorro">Ahorro</option>
+                </select>
+              </div>
+              <div class="cf-field">
+                <label class="cf-label" for="cf-pago-movil">Teléfono de pago móvil</label>
+                <input
+                  id="cf-pago-movil"
+                  class="cf-input"
+                  data-campo="bancario.telefonoPagoMovil"
+                  maxlength="16"
+                  inputmode="tel"
+                  placeholder="0414-1234567"
+                  [class.cf-invalido]="msg(val, 'bancario.telefonoPagoMovil')"
+                  [(ngModel)]="m.bancario.telefonoPagoMovil"
+                />
+                @if (msg(val, 'bancario.telefonoPagoMovil'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                }
+              </div>
+              <div class="cf-field span-full">
+                <label class="cf-label" for="cf-cuenta">Número de cuenta (20 dígitos)</label>
+                <input
+                  id="cf-cuenta"
+                  class="cf-input cf-mono"
+                  data-campo="bancario.numeroCuenta"
+                  maxlength="29"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="0134 0000 00 0000000000"
+                  [class.cf-invalido]="msg(val, 'bancario.numeroCuenta')"
+                  [(ngModel)]="m.bancario.numeroCuenta"
+                  (blur)="alSalirDeCuenta()"
+                />
+                @if (msg(val, 'bancario.numeroCuenta'); as error) {
+                  <small class="cf-error">{{ error }}</small>
+                } @else {
+                  <small class="cf-hint">Los 4 primeros dígitos identifican al banco.</small>
+                }
+              </div>
+            </div>
+          </section>
+
+          <section class="cf-section">
+            <h4 class="cf-section-title"><mat-icon>notes</mat-icon> Observaciones</h4>
+            <textarea
+              class="cf-input"
+              rows="3"
+              maxlength="1000"
+              aria-label="Observaciones"
+              placeholder="Acuerdos especiales, preferencias de atención, historial relevante…"
+              [(ngModel)]="m.observaciones"
+            ></textarea>
+          </section>
+        }
+      }
+    </div>
+
+    <!-- Footer -->
+    <div class="cf-footer">
+      <div class="cf-footer-info">
+        <mat-icon>{{ categoriaInfo?.icono }}</mat-icon>
+        <span>{{ formatearDocumento(m) || 'Sin documento' }} · {{ nombreCliente(m) }}</span>
+      </div>
+      <button class="cf-btn-cancel" type="button" (click)="solicitarCierre()" [disabled]="guardando()">
+        <mat-icon>close</mat-icon> Cancelar
+      </button>
+      @if (indicePestana() > 0) {
+        <button class="cf-btn-nav" type="button" (click)="pestanaAnterior()">
+          <mat-icon>chevron_left</mat-icon> Anterior
+        </button>
+      }
+      @if (indicePestana() < pestanas.length - 1) {
+        <button class="cf-btn-nav" type="button" (click)="pestanaSiguiente()">
+          Siguiente <mat-icon>chevron_right</mat-icon>
+        </button>
+      }
+      <button
+        class="cf-btn-accept"
+        type="button"
+        (click)="guardar()"
+        [disabled]="guardando()"
+        title="Guardar (Ctrl+S)"
+      >
+        @if (guardando()) {
+          <span class="cf-spinner" aria-hidden="true"></span> Guardando…
+        } @else {
+          <mat-icon>save</mat-icon> {{ esNuevo() ? 'Registrar cliente' : 'Guardar cambios' }}
+        }
+      </button>
+    </div>
+  </div>
+</div>

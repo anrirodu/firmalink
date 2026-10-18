@@ -9,6 +9,8 @@
  * La interfaz no ofrece este estado en "Cambiar estado" ni en el filtro: se
  * llega a él con la acción "Eliminar" del listado.
  */
+import { ClienteDocumento } from '../../customers/cliente.model';
+
 export type AcuerdoEstado = 'borrador' | 'en_revision' | 'firmado' | 'anulado' | 'eliminado';
 
 export interface AcuerdoMargen {
@@ -35,6 +37,18 @@ export interface Acuerdo {
   fechaFirma: string;
   honorario: string;
   quincena: string;
+  /**
+   * Cliente del acuerdo: el vínculo (`codigo`) y la copia congelada de sus
+   * datos en el momento de guardar.
+   *
+   * Se guarda la copia, y no solo el código, porque un acuerdo firmado es un
+   * instrumento cerrado: su huella SHA-256 no vuelve a calcularse y el
+   * documento debe seguir mostrando los datos del cliente tal como estaban al
+   * suscribirse, aunque después se edite la ficha del cliente. El código
+   * mantiene el vínculo vivo (para listar los acuerdos de un cliente). Los
+   * acuerdos anteriores al vínculo quedan con `null` y siguen siendo válidos.
+   */
+  cliente?: ClienteDocumento | null;
   campos: Record<string, string>;
   documentoHtml: string;
   documentoTexto: string;
@@ -143,3 +157,4 @@ export function motivoBloqueo(estado: AcuerdoEstado | undefined): string {
   }
   return '';
 }
+

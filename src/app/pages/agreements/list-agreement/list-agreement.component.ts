@@ -81,6 +81,7 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
   displayedColumns: string[] = [
     'codigo',
     'titulo',
+    'cliente',
     'estado',
     'huella',
     'actualizadoEn',
@@ -153,19 +154,56 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     document.addEventListener('keydown', this.alPulsarEscape, true);
+
+    // "Ver acuerdos" desde la ficha de un cliente: el código y el nombre del
+    // cliente viajan en el estado de navegación (no en la URL) y la consulta
+    // la resuelve el servidor.
+    const pedido = this.clienteDeLaNavegacion();
+    if (pedido?.codigo) {
+      this.clienteConsultado = pedido.codigo;
+      this.filtroCliente = pedido.codigo;
+      this.nombreClientePedido = pedido.nombre ?? '';
+    }
+
     void this.cargar();
+  }
+
+  /**
+   * Cliente pedido al abrir el listado.
+   *
+   * `history.state` conserva lo que envió `Router.navigate({ state })` —incluso
+   * si se recarga la página— y `getCurrentNavigation()` lo cubre en la misma
+   * navegación.
+   */
+  private clienteDeLaNavegacion(): { codigo: string; nombre?: string } | null {
+    const estado =
+      (this.router.getCurrentNavigation()?.extras?.state as any) ??
+      (typeof history !== 'undefined' ? (history.state as any) : null);
+    const codigo = estado?.cliente ?? '';
+    return codigo ? { codigo: String(codigo), nombre: estado?.clienteNombre ?? '' } : null;
   }
 
   ngOnDestroy(): void {
     document.removeEventListener('keydown', this.alPulsarEscape, true);
   }
 
-  /** Carga el listado desde el servidor (con avisos de degradación a local) */
-  async cargar(): Promise<void> {
+  /**
+   * Carga el listado desde el servidor (con avisos de degradación a local).
+   *
+   * @param codigoCliente acota la consulta a un cliente; vacío = todos. Al
+   *   llegar desde la ficha de un cliente solo bajan sus acuerdos.
+   */
+  async cargar(codigoCliente: string = this.clienteConsultado): Promise<void> {
+    this.clienteConsultado = codigoCliente;
+    this.filtroCliente = codigoCliente;
     this.cargando = true;
     try {
-      const lista = await this.acuerdos.listar();
+      const lista = codigoCliente
+        ? await this.acuerdos.listarPorCliente(codigoCliente)
+        : await this.acuerdos.listar();
       this.dataSource.data = this.ordenar(lista);
+      this.clientesEnLista = this.clientesDelListado(this.dataSource.data);
+      this.aplicarFiltros();
     } catch (e) {
       this.notificar.error(
         'No se pudo cargar el listado de acuerdos',
@@ -181,6 +219,10 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
         this.dataSource.sortingDataAccessor = (item, propiedad) => {
           if (propiedad === 'actualizadoEn') {
             return new Date(this.fecha(item)).getTime() || 0;
+          }
+          // El cliente se ordena por nombre (la celda muestra más de un dato)
+          if (propiedad === 'cliente') {
+            return (item.cliente?.nombre ?? '').toLowerCase();
           }
           return String((item as unknown as Record<string, unknown>)[propiedad] ?? '').toLowerCase();
         };
@@ -203,14 +245,15 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
     return typeof f === 'string' ? f : '';
   }
 
-  /** Filtro combinado: texto libre (búsqueda + estado seleccionado) */
+  /** Filtro combinado: texto libre + estado + cliente seleccionado */
   private aplicarFiltros(): void {
     const texto = (this.filtroTexto ?? '').trim().toLowerCase();
     const estado = this.filtroEstado;
+    const cliente = this.filtroCliente;
 
     this.dataSource.filterPredicate = (a: Acuerdo) => {
-      const coincideEstado = !estado || a.estado === estado;
-      if (!coincideEstado) return false;
+      if (estado && a.estado !== estado) return false;
+      if (cliente && a.cliente?.codigo !== cliente) return false;
       if (!texto) return true;
       const heno = [
         a.codigo,
@@ -222,6 +265,12 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
         a.cedula,
         a.ciudad,
         a.creadoPorNombre,
+        // La copia del cliente también se busca: permite encontrar los
+        // acuerdos de una persona por su nombre o su cédula.
+        a.cliente?.nombre,
+        a.cliente?.identificacion,
+        a.cliente?.rif,
+        a.cliente?.codigo,
       ]
         .filter(Boolean)
         .join(' ')
@@ -229,11 +278,56 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
       return heno.includes(texto);
     };
 
-    this.dataSource.filter = `${texto}|${estado}|${Date.now()}`;
+    this.dataSource.filter = `${texto}|${estado}|${cliente}|${Date.now()}`;
   }
 
   filtroTexto = '';
   filtroEstado: AcuerdoEstado | '' = '';
+  /** Código del cliente por el que se filtra (vacío = todos) */
+  filtroCliente = '';
+
+  /**
+   * Cliente por el que se está consultando el listado (vacío = todos).
+   *
+   * Se guarda aparte de `filtroCliente` porque la consulta se resuelve en el
+   * servidor: cambiar de cliente exige volver a preguntar por sus acuerdos.
+   */
+  clienteConsultado = '';
+
+  /**
+   * Clientes que aparecen en el listado, para el filtro.
+   *
+   * Se arma a partir de los acuerdos cargados (no de la ficha de clientes):
+   * el filtro solo ofrece clientes que tienen acuerdos, que es lo que el
+   * listado puede mostrar.
+   */
+  clientesEnLista: { codigo: string; nombre: string }[] = [];
+
+  /**
+   * Nombre del cliente pedido desde su ficha ("Ver acuerdos"). Se usa para
+   * etiquetar el filtro cuando todavía no llegó ningún acuerdo suyo.
+   */
+  nombreClientePedido = '';
+
+  private clientesDelListado(lista: Acuerdo[]): { codigo: string; nombre: string }[] {
+    const porCodigo = new Map<string, string>();
+    for (const a of lista) {
+      const c = a.cliente;
+      if (c?.codigo && !porCodigo.has(c.codigo)) {
+        porCodigo.set(c.codigo, c.nombre || c.codigo);
+      }
+    }
+
+    // Un cliente por el que se consultó y no tiene acuerdos se agrega igual:
+    // el selector lo muestra y el usuario puede quitarlo.
+    if (this.clienteConsultado && !porCodigo.has(this.clienteConsultado)) {
+      porCodigo.set(this.clienteConsultado, this.nombreClientePedido || this.clienteConsultado);
+    }
+
+    return [...porCodigo]
+      .map(([codigo, nombre]) => ({ codigo, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }
 
   onFiltroTexto(valor: string): void {
     this.filtroTexto = valor ?? '';
@@ -245,10 +339,35 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
     this.aplicarFiltros();
   }
 
+  /**
+   * Cambio de cliente en el filtro: si el listado ya venía acotado a otro
+   * cliente hay que volver a consultar (los acuerdos que no son suyos no
+   * están cargados); si se vuelve a "Todos los clientes" se pide el listado
+   * completo.
+   */
+  onFiltroCliente(valor: string): void {
+    const codigo = valor ?? '';
+    this.filtroCliente = codigo;
+    if (codigo !== this.clienteConsultado) {
+      void this.cargar(codigo);
+      return;
+    }
+    this.aplicarFiltros();
+  }
+
   limpiarFiltros(entrada?: HTMLInputElement): void {
     this.filtroTexto = '';
     this.filtroEstado = '';
+    this.filtroCliente = '';
+    const recargar = this.clienteConsultado !== '';
+    this.clienteConsultado = '';
+    this.nombreClientePedido = '';
     if (entrada) entrada.value = '';
+    if (recargar) {
+      // Con un cliente puesto el listado está acotado: hay que traerlo completo.
+      void this.cargar('');
+      return;
+    }
     this.aplicarFiltros();
   }
 
@@ -285,6 +404,30 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
   /** Título visible: el título del acuerdo o el proyecto como respaldo */
   tituloVisible(a: Acuerdo): string {
     return a.titulo?.trim() || a.proyecto?.trim() || '(Acuerdo sin título)';
+  }
+
+  /**
+   * Iniciales del cliente, para el avatar de la columna.
+   * Se toman las dos primeras palabras con letra o dígito, para que "Inversiones
+   * Demo, C.A." dé "ID" y no "I,".
+   */
+  inicialesCliente(a: Acuerdo): string {
+    const palabras = (a.cliente?.nombre ?? '').split(/\s+/).filter((p) => /^[\p{L}\d]/u.test(p));
+    return palabras
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('');
+  }
+
+  /** Detalle del cliente para el tooltip de la celda */
+  detalleCliente(a: Acuerdo): string {
+    const c = a.cliente;
+    if (!c) {
+      return 'Sin cliente vinculado (acuerdos anteriores al vínculo con clientes)';
+    }
+    return [c.identificacion, c.rif ? `RIF ${c.rif}` : '', c.codigo, c.correo]
+      .filter(Boolean)
+      .join(' — ');
   }
 
   /** "hace 5 min", "ayer 14:30"... a partir de la fecha efectiva */

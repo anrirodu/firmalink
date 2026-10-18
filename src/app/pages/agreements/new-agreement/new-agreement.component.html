@@ -25,8 +25,8 @@
       (click)="alternarIdentidad()"
       [class.activo]="mostrarIdentidad()"
       [attr.aria-expanded]="mostrarIdentidad()"
-      matTooltip="Mostrar u ocultar la identificación del acuerdo"
-      aria-label="Identificación del acuerdo"
+      matTooltip="Mostrar u ocultar la identificación del acuerdo y su cliente"
+      aria-label="Identificación del acuerdo y cliente"
     >
       <mat-icon>badge</mat-icon>
     </button>
@@ -207,6 +207,140 @@
       (ngModelChange)="sincronizarCampo('titulo')"
     />
   </div>
+</div>
+
+<!-- ═══════ CLIENTE DEL ACUERDO ═══════
+     El acuerdo declara a un cliente como contraparte. El bloque vive fuera de
+     la hoja (como la identificación) y viaja con el acuerdo en dos partes: el
+     vínculo con su ficha y la copia congelada de sus datos, que es la que
+     queda impresa en el documento. -->
+<div
+  class="na-cliente"
+  [class.na-cliente-libre]="!cliente()"
+  [class.na-oculto-movil]="!mostrarIdentidad()"
+  aria-label="Cliente del acuerdo"
+>
+  @if (cliente(); as cli) {
+    <div class="na-cli-ficha">
+      <span class="na-cli-avatar" [matTooltip]="etiquetaCategoriaCliente(cli)">{{ cli.categoria }}</span>
+
+      <div class="na-cli-texto">
+        <span class="na-cli-nombre">{{ cli.nombre }}</span>
+        <span class="na-cli-linea">
+          <code class="na-cli-ident">{{ cli.identificacion }}</code>
+          @if (cli.rif) {
+            <span class="na-cli-sep">·</span> RIF {{ cli.rif }}
+          }
+          <span class="na-cli-sep">·</span>
+          <span class="na-cli-codigo">{{ cli.codigo }}</span>
+        </span>
+        <span class="na-cli-linea na-cli-perfil">
+          {{ etiquetaCondicionCliente(cli) }}
+          @if (cli.agenteRetencionIva) {
+            <span class="na-cli-sep">·</span> Retiene IVA {{ cli.porcentajeRetencionIva || 75 }} %
+          }
+          @if (cli.agenteRetencionIslr) {
+            <span class="na-cli-sep">·</span> Retiene ISLR
+          }
+          @if (cli.exentoIgtf) {
+            <span class="na-cli-sep">·</span> Exento de IGTF
+          }
+        </span>
+      </div>
+
+      <div class="na-cli-acciones">
+        @if (!contenidoBloqueado && clienteActual()) {
+          <button
+            type="button"
+            class="na-icon-btn"
+            matTooltip="Volver a copiar los datos vigentes del cliente en el documento"
+            aria-label="Actualizar los datos del cliente"
+            (click)="actualizarDatosCliente()"
+          >
+            <mat-icon>sync</mat-icon>
+          </button>
+        }
+        <button
+          type="button"
+          class="na-icon-btn na-icon-btn-peligro"
+          [disabled]="contenidoBloqueado"
+          [matTooltip]="contenidoBloqueado ? motivoBloqueoActual : 'Quitar el cliente del acuerdo'"
+          aria-label="Quitar el cliente del acuerdo"
+          (click)="quitarCliente()"
+        >
+          <mat-icon>link_off</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sugerencias fiscales del cliente: informan la redacción, no escriben
+         en el documento por su cuenta. -->
+    @if (lineasFiscales().length) {
+      <ul class="na-cli-fiscal" aria-label="Condiciones fiscales del cliente">
+        @for (linea of lineasFiscales(); track linea.titulo) {
+          <li class="na-fiscal-{{ linea.tono }}" [matTooltip]="linea.detalle">
+            <mat-icon>{{ linea.icono }}</mat-icon>
+            <span>{{ linea.titulo }}</span>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <mat-form-field appearance="outline" class="na-cli-buscar" subscriptSizing="dynamic">
+      <mat-label>Cliente del acuerdo</mat-label>
+      <mat-icon matPrefix>person_search</mat-icon>
+      <input
+        type="text"
+        matInput
+        [formControl]="controlCliente"
+        [matAutocomplete]="autoCliente"
+        [disabled]="contenidoBloqueado"
+        placeholder="Buscar por nombre, código, identificación o RIF…"
+        aria-label="Buscar el cliente del acuerdo"
+      />
+    </mat-form-field>
+
+    <mat-autocomplete
+      #autoCliente="matAutocomplete"
+      [displayWith]="mostrarCliente"
+      panelWidth="min(560px, 92vw)"
+      (optionSelected)="elegirCliente($event.option.value)"
+    >
+      @for (c of clientesFiltrados(); track c.codigo) {
+        <mat-option [value]="c">
+          {{ nombreDe(c) }} · {{ c.identificacion }} · {{ c.codigo }}@if (c.estado !== 'activo') { · {{ etiquetaEstadoCliente(c.estado) }} }
+        </mat-option>
+      }
+
+      @if (!clientesFiltrados().length) {
+        <mat-option disabled>
+          {{ clientes().length ? 'Ningún cliente coincide con la búsqueda' : 'No hay clientes registrados' }}
+        </mat-option>
+      }
+
+      @if (hayMasClientes()) {
+        <mat-option disabled>Hay más clientes: escriba para afinar la búsqueda</mat-option>
+      }
+    </mat-autocomplete>
+
+    @if (cargandoClientes()) {
+      <span class="na-cli-nota">
+        <mat-icon>hourglass_top</mat-icon> Consultando el catálogo de clientes…
+      </span>
+    } @else if (errorClientes()) {
+      <span class="na-cli-nota na-cli-nota-error">
+        <mat-icon>cloud_off</mat-icon>
+        No se pudo consultar el catálogo de clientes.
+        <button type="button" class="na-cli-enlace" (click)="reintentarClientes()">Reintentar</button>
+      </span>
+    } @else if (!clientes().length) {
+      <span class="na-cli-nota na-cli-nota-error">
+        <mat-icon>person_off</mat-icon>
+        No hay clientes registrados: el acuerdo necesita un cliente para guardarse.
+        <button type="button" class="na-cli-enlace" (click)="irAClientes()">Ir a Clientes</button>
+      </span>
+    }
+  }
 </div>
 
 <div class="na-layout">

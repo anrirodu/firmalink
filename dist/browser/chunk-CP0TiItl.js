@@ -1,0 +1,1 @@
+var r={"&":`&amp;`,"<":`&lt;`,">":`&gt;`,'"':`&quot;`,"'":`&#39;`};function g(t){return String(t??``).replace(/[&<>"']/g,n=>r[n]??n)}export{g as t};
