@@ -8,6 +8,19 @@
    con `[innerHTML]` (no hereda el encapsulado).
    ============================================ */
 
+/* El editor se presenta como un modal a PANTALLA COMPLETA sobre el layout:
+   ocupa todo el viewport y no deja ver el sidebar ni la topbar. La ruta
+   sigue existiendo (deep-links y guards intactos); sólo cambia el pintado. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: block;
+  overflow: auto;
+  background: #f4f6f8;
+  padding: 1.5rem;
+}
+
 .bl-page {
   display: flex;
   flex-direction: column;
@@ -36,6 +49,16 @@
       font-size: 0.9rem;
       margin: 0;
       max-width: 64ch;
+    }
+  }
+
+  /* El editor es un modal de pantalla completa: el sidebar ya no está a la
+     vista, así que el regreso al listado se ofrece aquí, junto al título. */
+  .bl-volver-fila {
+    margin-bottom: 0.35rem;
+
+    button {
+      color: #12406b;
     }
   }
 

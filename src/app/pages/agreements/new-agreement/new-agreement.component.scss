@@ -4,6 +4,19 @@
    (editor sobre hoja oficio con márgenes de contrato).
    ============================================ */
 
+/* El editor se presenta como un modal a PANTALLA COMPLETA sobre el layout:
+   ocupa todo el viewport y no deja ver el sidebar ni la topbar. La ruta
+   sigue existiendo (deep-links y guards intactos); sólo cambia el pintado. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: block;
+  overflow: auto;
+  background: #f4f6f8;
+  padding: 1rem 1.5rem 1.5rem;
+}
+
 /* ---------- Header ---------- */
 .page-header {
   display: flex;

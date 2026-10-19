@@ -2,8 +2,10 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  EventEmitter,
   HostListener,
   OnDestroy,
+  Output,
   ViewChild,
   computed,
   signal,
@@ -52,7 +54,7 @@ import { cargarLogoCorreo, generarPdfAcuerdo } from '../acuerdo-pdf';
 import type { PdfAcuerdoGenerado } from '../acuerdo-pdf';
 import { pedirDestinatariosCorreo } from '../enviar-correo.dialog';
 import { escaparHtml } from '../../../shared/utils/escapar-html';
-import { PuedeSalir } from '../../../shared/guards/cambios-sin-guardar.guard';
+import { PuedeSalir, confirmarSalida } from '../../../shared/guards/cambios-sin-guardar.guard';
 
 /**
  * Minúsculas y sin acentos, para que "maria" encuentre a "María" y "rif"
@@ -237,9 +239,19 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     void this.cargarClientes();
   }
 
-  /** Lleva a la pantalla de clientes (para registrar el que falta) */
-  irAClientes(): void {
-    void this.router.navigate(['/customers']);
+  /**
+   * Lleva a la pantalla de clientes (para registrar el que falta).
+   *
+   * Como el editor es un MODAL del listado, primero pide el cierre —que confirma
+   * si hay cambios sin guardar— y sólo si se permite salir navega a Clientes.
+   * Si el usuario cancela la confirmación, el modal se queda abierto y no se
+   * navega a ninguna parte.
+   */
+  async irAClientes(): Promise<void> {
+    if (!(await confirmarSalida(this))) {
+      return; // el usuario canceló: sigue en el editor
+    }
+    await this.router.navigate(['/customers']);
   }
 
   /** Clientes que coinciden con lo escrito en el buscador */
@@ -508,6 +520,13 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   ) {}
 
   /**
+   * El listado monta este editor como MODAL de pantalla completa. Al pulsar
+   * «Acuerdos» se pide el cierre; el listado decide si hay cambios pendientes
+   * antes de desmontarlo (ver `confirmarSalida`).
+   */
+  @Output() cerrar = new EventEmitter<void>();
+
+  /**
    * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
    * editor de acuerdos? Manda sobre los botones de escritura; el servidor vuelve
    * a validarlo.
@@ -696,8 +715,8 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
       });
 
       if (eleccion.isDismissed) {
-        // Canceló: volver al listado sin descartar nada
-        await this.router.navigate(['/agreements/list-agreement']);
+        // Canceló: cerrar el editor sin descartar nada
+        this.cerrar.emit();
         return true;
       }
 
@@ -1746,8 +1765,12 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
   }
 
   /** Navega al listado de acuerdos (la guarda confirmará si hay cambios) */
+  /**
+   * Pide cerrar el editor (botón «Acuerdos»). El listado dueño del modal
+   * confirma la salida si hay cambios pendientes antes de desmontarlo.
+   */
   irAlListado(): void {
-    void this.router.navigate(['/agreements/list-agreement']);
+    this.cerrar.emit();
   }
 
   /**

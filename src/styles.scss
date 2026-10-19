@@ -259,6 +259,15 @@ a {
   box-shadow: var(--shadow-md) !important;
 }
 
+/* Los editores de presupuesto, factura, acuerdo y la ficha de cliente se pintan
+   como modales a PANTALLA COMPLETA con z-index 3000/3050 (ver :host de cada
+   componente). Los overlays de Material —diálogos, menús, autocompletes,
+   tooltips— viven en `.cdk-overlay-container`, cuyo z-index por defecto (1000)
+   quedaría POR DEBAJO y se vería tapado. Se sube por encima de esos overlares. */
+.cdk-overlay-container {
+  z-index: 3100;
+}
+
 /* ---------- Utility Classes ---------- */
 .fade-in {
   animation: fadeIn 0.5s ease-out;

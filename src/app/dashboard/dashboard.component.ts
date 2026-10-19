@@ -36,7 +36,8 @@ export class DashboardComponent {
       icono: 'handshake',
       color: '#0c2d48',
       bg: 'linear-gradient(135deg, #0c2d48 0%, #12406b 100%)',
-      ruta: '/agreements/new-agreement',
+      // El editor de acuerdos es ahora un modal del listado: se entra por ahí.
+      ruta: '/agreements/list-agreement',
     },
     {
       titulo: 'Firmar Documento',

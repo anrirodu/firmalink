@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -36,6 +36,8 @@ import { cargarLogoCorreo } from '../../agreements/acuerdo-pdf';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
 import { PrivilegiosService } from '../../../shared/services/privilegios.service';
 import { CorreoError, CorreoService } from '../../../shared/services/correo.service';
+import { PuedeSalir, confirmarSalida } from '../../../shared/guards/cambios-sin-guardar.guard';
+import { BillingComponent } from '../new/billing.component';
 
 /**
  * LIST BILLING — Facturas generadas.
@@ -83,6 +85,7 @@ interface KpiEstado {
     MatDividerModule,
     MatSelectModule,
     MatProgressBarModule,
+    BillingComponent,
   ],
   templateUrl: './list-billing.component.html',
   styleUrls: ['./list-billing.component.scss'],
@@ -103,6 +106,14 @@ export class ListBillingComponent implements OnInit, OnDestroy {
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
+
+  /**
+   * Editor de facturas montado como MODAL de pantalla completa. El listado es
+   * su dueño: lo abre por estado (ya no es una ruta) y controla el cierre,
+   * confirmando antes si hay cambios sin guardar.
+   */
+  readonly editorAbierto = signal(false);
+  readonly editor = viewChild<BillingComponent>(BillingComponent);
 
   /**
    * Speed dial flotante (móvil y tablet): el botón de acción principal
@@ -527,7 +538,7 @@ export class ListBillingComponent implements OnInit, OnDestroy {
         return;
       }
       this.facturas.marcarParaEditar(doc.codigo);
-      await this.router.navigate(['/billing/new']);
+      this.editorAbierto.set(true);
     } catch (e) {
       this.notificar.errorModal(
         'No se pudo abrir la factura',
@@ -541,7 +552,22 @@ export class ListBillingComponent implements OnInit, OnDestroy {
   /** Abre el editor en blanco (factura nueva) */
   async nuevaFactura(): Promise<void> {
     this.facturas.marcarParaEditar('');
-    await this.router.navigate(['/billing/new']);
+    this.editorAbierto.set(true);
+  }
+
+  /**
+   * Cierra el editor-modal. Si el editor tiene cambios sin guardar, la salida
+   * se confirma con SweetAlert (misma lógica que el antiguo guard de ruta):
+   * Guardar y salir / Salir sin guardar / Cancelar.
+   */
+  async cerrarEditor(): Promise<void> {
+    const editor = this.editor();
+    if (editor && !(await confirmarSalida(editor as PuedeSalir))) {
+      return; // el usuario canceló: el modal se queda abierto
+    }
+    this.editorAbierto.set(false);
+    // El editor pudo emitir, anular o eliminar: se refresca la tabla al cerrarlo.
+    void this.cargar();
   }
 
   /**

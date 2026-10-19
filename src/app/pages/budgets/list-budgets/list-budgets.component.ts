@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -40,6 +40,8 @@ import { cargarLogoCorreo } from '../../agreements/acuerdo-pdf';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
 import { CorreoError, CorreoService } from '../../../shared/services/correo.service';
 import { PrivilegiosService } from '../../../shared/services/privilegios.service';
+import { PuedeSalir, confirmarSalida } from '../../../shared/guards/cambios-sin-guardar.guard';
+import { BudgetsComponent } from '../new/budget.component';
 
 /**
  * LIST BUDGETS — Presupuestos generados.
@@ -89,6 +91,7 @@ interface KpiEstado {
     MatDividerModule,
     MatSelectModule,
     MatProgressBarModule,
+    BudgetsComponent,
   ],
   templateUrl: './list-budgets.component.html',
   styleUrls: ['./list-budgets.component.scss'],
@@ -109,6 +112,14 @@ export class ListBudgetsComponent implements OnInit, OnDestroy {
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
+
+  /**
+   * Editor de presupuestos montado como MODAL de pantalla completa. El listado
+   * es su dueño: lo abre por estado (ya no es una ruta) y controla el cierre,
+   * confirmando antes si hay cambios sin guardar.
+   */
+  readonly editorAbierto = signal(false);
+  readonly editor = viewChild<BudgetsComponent>(BudgetsComponent);
 
   /**
    * Speed dial flotante (móvil y tablet): el botón de acción principal
@@ -563,13 +574,28 @@ export class ListBudgetsComponent implements OnInit, OnDestroy {
     }
 
     this.presupuestos.marcarParaEditar(p.codigo);
-    await this.router.navigate(['/budgets/new']);
+    this.editorAbierto.set(true);
   }
 
   /** Abre el editor en blanco (presupuesto nuevo) */
   async nuevaPresupuesto(): Promise<void> {
     this.presupuestos.marcarParaEditar('');
-    await this.router.navigate(['/budgets/new']);
+    this.editorAbierto.set(true);
+  }
+
+  /**
+   * Cierra el editor-modal. Si el editor tiene cambios sin guardar, la salida
+   * se confirma con SweetAlert (misma lógica que el antiguo guard de ruta):
+   * Guardar y salir / Salir sin guardar / Cancelar.
+   */
+  async cerrarEditor(): Promise<void> {
+    const editor = this.editor();
+    if (editor && !(await confirmarSalida(editor as PuedeSalir))) {
+      return; // el usuario canceló: el modal se queda abierto
+    }
+    this.editorAbierto.set(false);
+    // El editor pudo guardar o eliminar: se refresca la tabla al cerrarlo.
+    void this.cargar();
   }
 
   /**

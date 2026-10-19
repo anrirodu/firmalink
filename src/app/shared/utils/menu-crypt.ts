@@ -52,7 +52,7 @@ export function rutasDelMenu(menu: unknown): Set<string> {
 
 /**
  * Ruta comparable: sin query, sin ancla, sin barras de sobra y en minúsculas,
- * para que `/Budgets/New/` y `budgets/new?paso=2` sean la misma ruta.
+ * para que `/Budgets/` y `budgets?estado=borrador` sean la misma ruta.
  */
 export function normalizarRuta(url: string | undefined | null): string {
   return (url ?? '')
@@ -80,9 +80,10 @@ export type DecisionAcceso = 'libre' | 'autorizado' | 'restringido' | 'alterado'
  * Decide si la sesión puede entrar a una ruta.
  *
  * La comparación es por **ruta exacta** y nunca por prefijo: que el menú traiga
- * `budgets` no autoriza `budgets/new`, igual que facturas declara `billing` y
- * `billing/new` por separado. Cada pantalla que el usuario pueda abrir tiene
- * que estar en su menú.
+ * `agreements` no autoriza `agreements/list-agreement`. Cada pantalla que el
+ * usuario pueda abrir tiene que estar en su menú. Los editores (presupuesto,
+ * factura, acuerdo) ya no son rutas —son modales del listado—, así que su
+ * acceso no pasa por aquí.
  */
 export function decidirAcceso(
   url: string,

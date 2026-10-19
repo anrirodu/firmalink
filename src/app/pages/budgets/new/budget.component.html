@@ -3,6 +3,12 @@
   <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
   <header class="page-header">
     <div class="header-content">
+      <div class="bl-volver-fila">
+        <button mat-icon-button type="button" (click)="volver()"
+                matTooltip="Volver al listado de presupuestos" aria-label="Volver al listado">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+      </div>
       <h1>Presupuestos</h1>
       <p>
         Presupuesto <strong>{{ formatearNumeroPresupuesto(presupuesto().numero) }}</strong>

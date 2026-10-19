@@ -44,6 +44,18 @@ export const cambiosSinGuardarGuard: CanDeactivateFn<PuedeSalir> = async (
     return true;
   }
 
+  return confirmarSalida(component);
+};
+
+/**
+ * Confirmación de salida compartida.
+ *
+ * La usan tanto el guard de ruta como los listados que montan el editor como
+ * **modal** (presupuesto, factura, acuerdo): al cerrar el modal se llama a esta
+ * función con el componente del editor y devuelve `true` si se puede cerrar
+ * (y ya respaldó el borrador local) o `false` si el usuario canceló.
+ */
+export async function confirmarSalida(component: PuedeSalir): Promise<boolean> {
   if (!component.hayCambiosSinGuardar()) {
     return true;
   }
@@ -80,4 +92,4 @@ export const cambiosSinGuardarGuard: CanDeactivateFn<PuedeSalir> = async (
   }
 
   return false;
-};
+}

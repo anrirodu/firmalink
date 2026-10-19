@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -31,6 +31,8 @@ import { PdfService } from '../../../shared/services/pdf.service';
 import { construirCorreoAcuerdo } from '../acuerdo-correo';
 import { cargarLogoCorreo, generarPdfAcuerdo } from '../acuerdo-pdf';
 import { pedirDestinatariosCorreo } from '../enviar-correo.dialog';
+import { PuedeSalir, confirmarSalida } from '../../../shared/guards/cambios-sin-guardar.guard';
+import { NewAgreementComponent } from '../new-agreement/new-agreement.component';
 
 /**
  * LIST AGREEMENT — Acuerdos registrados.
@@ -74,6 +76,7 @@ interface KpiEstado {
     MatDividerModule,
     MatSelectModule,
     MatProgressBarModule,
+    NewAgreementComponent,
   ],
   templateUrl: './list-agreement.component.html',
   styleUrls: ['./list-agreement.component.scss'],
@@ -93,6 +96,14 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
+
+  /**
+   * Editor de acuerdos montado como MODAL de pantalla completa. El listado es
+   * su dueño: lo abre por estado (ya no es una ruta) y controla el cierre,
+   * confirmando antes si hay cambios sin guardar.
+   */
+  readonly editorAbierto = signal(false);
+  readonly editor = viewChild<NewAgreementComponent>(NewAgreementComponent);
 
   /**
    * Speed dial flotante (móvil y tablet): el botón de acción principal
@@ -539,7 +550,7 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
       // (así el editor lo recupera aunque se recargue la página)
       this.acuerdos.setAcuerdoParaEditar(doc);
       this.acuerdos.marcarParaEditar(doc.codigo);
-      await this.router.navigate(['/agreements/new-agreement']);
+      this.editorAbierto.set(true);
     } catch (e) {
       this.notificar.errorModal(
         'No se pudo abrir el acuerdo',
@@ -813,7 +824,22 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
   async nuevoAcuerdo(): Promise<void> {
     this.acuerdos.setAcuerdoParaEditar(null);
     this.acuerdos.marcarParaEditar('');
-    await this.router.navigate(['/agreements/new-agreement']);
+    this.editorAbierto.set(true);
+  }
+
+  /**
+   * Cierra el editor-modal. Si el editor tiene cambios sin guardar, la salida
+   * se confirma con SweetAlert (misma lógica que el antiguo guard de ruta):
+   * Guardar y salir / Salir sin guardar / Cancelar.
+   */
+  async cerrarEditor(): Promise<void> {
+    const editor = this.editor();
+    if (editor && !(await confirmarSalida(editor as PuedeSalir))) {
+      return; // el usuario canceló: el modal se queda abierto
+    }
+    this.editorAbierto.set(false);
+    // El editor pudo guardar o cambiar de estado: se refresca la tabla al cerrarlo.
+    void this.cargar();
   }
 
   /** Copia la huella completa al portapapeles */

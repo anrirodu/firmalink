@@ -360,3 +360,9 @@
     }
   </mat-card-content>
 </mat-card>
+
+<!-- Editor de acuerdos como MODAL de pantalla completa. Se monta por estado
+     (ya no es una ruta); al cerrarse el listado recarga la tabla. -->
+@if (editorAbierto()) {
+  <app-new-agreement (cerrar)="cerrarEditor()"></app-new-agreement>
+}

@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { authGuardGuard } from './auth/guards/auth-guard.guard';
-import { cambiosSinGuardarGuard } from './shared/guards/cambios-sin-guardar.guard';
 import { salirDeClientesGuard } from './pages/customers/salir-de-clientes.guard';
 
 export const routes: Routes = [
@@ -21,8 +20,8 @@ export const routes: Routes = [
     // entrada o recarga completa). Para que el control de acceso se evalúe en
     // **cada** navegación entre pantallas —el sidebar usa router.navigate, no
     // recarga— hace falta `canActivateChild`, que corre en cada hijo que se
-    // activa. Con sólo `canActivate`, entrar de /budgets a /budgets/new pasaría
-    // sin revisar el menú.
+    // activa. Con sólo `canActivate`, pasar de /budgets a /billing no revisaría
+    // el menú.
     path: '',
     canActivate: [authGuardGuard],
     canActivateChild: [authGuardGuard],
@@ -47,14 +46,6 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'agreements/new-agreement',
-        canDeactivate: [cambiosSinGuardarGuard],
-        loadComponent: () =>
-          import('./pages/agreements/new-agreement/new-agreement.component').then(
-            m => m.NewAgreementComponent,
-          ),
-      },
-      {
         // Clientes. `salirDeClientesGuard` pide confirmación si hay una ficha
         // con cambios sin guardar (el menú del JWT ya incluye esta entrada).
         path: 'customers',
@@ -72,14 +63,6 @@ export const routes: Routes = [
           ),
       },
       {
-        // Editor de facturas (nueva o en consulta). `cambiosSinGuardarGuard`
-        // evita perder una factura a medio escribir.
-        path: 'billing/new',
-        canDeactivate: [cambiosSinGuardarGuard],
-        loadComponent: () =>
-          import('./pages/billing/new/billing.component').then(m => m.BillingComponent),
-      },
-      {
         // Presupuestos. Documento comercial (no fiscal) que se cotiza antes de
         // facturar: aterriza en el listado y ofrece el ciclo completo
         // borrador → enviado → aprobado/rechazado → anulado.
@@ -88,14 +71,6 @@ export const routes: Routes = [
           import('./pages/budgets/list-budgets/list-budgets.component').then(
             m => m.ListBudgetsComponent,
           ),
-      },
-      {
-        // Editor de presupuestos (nuevo o en consulta). `cambiosSinGuardarGuard`
-        // evita perder un presupuesto a medio escribir.
-        path: 'budgets/new',
-        canDeactivate: [cambiosSinGuardarGuard],
-        loadComponent: () =>
-          import('./pages/budgets/new/budget.component').then(m => m.BudgetsComponent),
       },
       {
         path: 'change-password',

@@ -1,7 +1,9 @@
 import {
   Component,
+  EventEmitter,
   OnDestroy,
   OnInit,
+  Output,
   TemplateRef,
   computed,
   signal,
@@ -153,6 +155,13 @@ export class BudgetsComponent implements OnInit, OnDestroy, PuedeSalir {
   ) {}
 
   /**
+   * El listado monta este editor como MODAL de pantalla completa. Al pulsar
+   * «volver» se pide el cierre; el listado decide si hay cambios pendientes
+   * antes de desmontarlo (ver `confirmarSalida`).
+   */
+  @Output() cerrar = new EventEmitter<void>();
+
+  /**
    * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
    * editor de presupuestos? Manda sobre los botones de escritura: guardar y
    * responder exigen `Update`, eliminar exige `Delete`. El servidor vuelve a
@@ -213,6 +222,14 @@ export class BudgetsComponent implements OnInit, OnDestroy, PuedeSalir {
     this.buscarCliente.setValue('', { emitEvent: false });
     this.cambiado.set(false);
     this.cargando.set(false);
+  }
+
+  /**
+   * Pide cerrar el editor. El listado dueño del modal confirma la salida si hay
+   * cambios pendientes antes de desmontarlo.
+   */
+  volver(): void {
+    this.cerrar.emit();
   }
 
   /** Escribe un campo del documento y marca los cambios pendientes. */

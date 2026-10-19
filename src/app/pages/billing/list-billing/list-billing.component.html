@@ -389,3 +389,9 @@
     }
   </mat-card-content>
 </mat-card>
+
+<!-- Editor de facturas como MODAL de pantalla completa. Se monta por estado
+     (ya no es una ruta); al cerrarse el listado recarga la tabla. -->
+@if (editorAbierto()) {
+  <app-billing (cerrar)="cerrarEditor()"></app-billing>
+}
