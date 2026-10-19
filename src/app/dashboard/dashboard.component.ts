@@ -79,6 +79,14 @@ export class DashboardComponent {
       bg: 'linear-gradient(135deg, #0c2d48 0%, #00c9a7 100%)',
       ruta: null,
     },
+    {
+      titulo: 'Calculadora',
+      descripcion: 'Proyecte cuánto queda libre de una factura cobrada por depósito',
+      icono: 'calculate',
+      color: '#0f7a5f',
+      bg: 'linear-gradient(135deg, #0f7a5f 0%, #17936f 100%)',
+      ruta: '/calculator',
+    },
   ];
 
   servicios: Servicio[] = [

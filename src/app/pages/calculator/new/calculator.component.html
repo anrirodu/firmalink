@@ -1,0 +1,490 @@
+<div class="cl-page">
+
+  <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="cl-volver-fila">
+        <button mat-icon-button type="button" (click)="volver()"
+                matTooltip="Volver al listado de cálculos" aria-label="Volver al listado">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+      </div>
+      <div class="cl-titulo-bloque">
+        <h1>Calculadora</h1>
+        <p class="cl-subtitulo">
+          <strong>{{ nombreCalculo(calculo()) }}</strong>
+          @if (calculo().codigo) { <span class="cl-punto">·</span> {{ calculo().codigo }} }
+          <span class="cl-punto">·</span> {{ calculo().fechaTexto }}
+        </p>
+        <div class="cl-huella">
+          <span class="cl-huella-codigo">
+            <mat-icon class="cl-huella-icono" inline>tag</mat-icon>
+            <strong>{{ calculo().codigo || 'Sin registrar' }}</strong>
+          </span>
+          @if (calculo().huella) {
+            <span class="cl-huella-chip"
+                  matTooltip="Huella SHA-256 del cálculo: cambia si alguien altera sus cifras">
+              <mat-icon class="cl-huella-chip-icono" inline>fingerprint</mat-icon>
+              {{ calculo().huella }}
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      @if (cambiado()) {
+        <span class="cl-pendiente">
+          <mat-icon inline>edit_note</mat-icon> Sin guardar
+        </span>
+      }
+
+      <button mat-stroked-button type="button" (click)="recalcularTodo()" [disabled]="!hayAjustes()"
+              matTooltip="Devuelve a la fórmula las cifras que escribió a mano">
+        <mat-icon>restart_alt</mat-icon> Volver a la fórmula
+      </button>
+
+      @if (calculo().codigo) {
+        <button mat-stroked-button type="button" (click)="eliminar()">
+          <mat-icon>delete_outline</mat-icon> Eliminar
+        </button>
+      }
+
+      @if (calculo().estado === 'borrador') {
+        <button mat-stroked-button color="primary" type="button" (click)="procesar()" [disabled]="guardando()"
+                matTooltip="Cerrar el cálculo: sus cifras ya no admiten ediciones">
+          <mat-icon>task_alt</mat-icon> Procesar
+        </button>
+      } @else {
+        <span class="cl-estado-chip" [style.color]="infoEstado(calculo().estado).color">
+          <mat-icon inline>{{ infoEstado(calculo().estado).icono }}</mat-icon>
+          {{ infoEstado(calculo().estado).etiqueta }}
+        </span>
+      }
+
+      <button mat-flat-button color="primary" type="button" (click)="guardar()" [disabled]="guardando()">
+        <mat-icon>save</mat-icon> {{ guardando() ? 'Guardando…' : 'Guardar' }}
+      </button>
+
+      <button mat-icon-button type="button" (click)="nuevo()" [disabled]="guardando()"
+              matTooltip="Empezar un cálculo nuevo">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </header>
+
+  @if (cargando()) {
+    <div class="cl-cargando">
+      <mat-icon>hourglass_top</mat-icon> Preparando la calculadora…
+    </div>
+  } @else {
+
+    <div class="cl-lienzo">
+
+    <div class="cl-columna-form">
+
+    <!-- ── Datos del cálculo ──────────────────────────────────────────── -->
+    <section class="cl-card">
+      <h2 class="cl-card-titulo"><mat-icon>badge</mat-icon> Datos del cálculo</h2>
+
+      <div class="cl-grid">
+        <label class="cl-campo cl-campo-ancho">
+          <span>Nombre del cálculo</span>
+          <input type="text" [value]="calculo().nombre"
+                 (input)="setNombre($any($event.target).value)"
+                 placeholder="Ej.: Contrato Suministros 2026 · lote 3">
+          <small class="cl-hint">Con este nombre se reconoce el cálculo en el listado.</small>
+        </label>
+
+        <label class="cl-campo">
+          <span>Código interno</span>
+          <input type="text" [value]="calculo().codigo" readonly placeholder="Se asigna al guardar">
+        </label>
+
+        <label class="cl-campo">
+          <span>Estatus</span>
+          <select [value]="calculo().estado" (change)="setEstado($any($event.target).value)">
+            @for (e of estados; track e) {
+              <option [value]="e">{{ infoEstado(e).etiqueta }}</option>
+            }
+          </select>
+          <small class="cl-hint">«Procesado» cierra el cálculo; «Anulada» lo descarta sin borrarlo.</small>
+        </label>
+
+        <label class="cl-campo">
+          <span>Fecha impresa</span>
+          <input type="text" [value]="calculo().fechaTexto"
+                 (input)="setFechaTexto($any($event.target).value)">
+        </label>
+      </div>
+    </section>
+
+    <!-- ── Paso 1 · La factura ────────────────────────────────────────── -->
+    <section class="cl-card">
+      <h2 class="cl-card-titulo">
+        <span class="cl-paso">1</span> La factura
+        <em class="cl-leyenda">el IVA y el total salen del monto subtotal</em>
+      </h2>
+
+      <div class="cl-factura">
+        <label class="cl-campo cl-campo-cifra">
+          <span>Monto subtotal de la factura</span>
+          <div class="cl-input-sufijo">
+            <input type="text" inputmode="decimal" autocomplete="off"
+                   [value]="calculo().montoSubtotal"
+                   (input)="setFuente('montoSubtotal', $any($event.target).value)">
+            <em>Bs</em>
+          </div>
+          <small class="cl-hint">{{ formatoBs(calculo().montoSubtotal) }} Bs · sin IVA</small>
+        </label>
+
+        <label class="cl-campo cl-campo-corto">
+          <span>Alícuota de IVA</span>
+          <div class="cl-input-sufijo">
+            <input type="text" inputmode="decimal"
+                   [value]="calculo().ivaPorcentaje"
+                   (input)="setFuente('ivaPorcentaje', $any($event.target).value)">
+            <em>%</em>
+          </div>
+          <small class="cl-hint">General: {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</small>
+        </label>
+      </div>
+
+      <div class="cl-derivadas">
+        <label class="cl-campo cl-campo-destacado" [class.cl-ajustado]="esAjuste('montoIva')">
+          <span>
+            IVA de la factura
+            <button type="button" class="cl-candado" (click)="alternarAjuste('montoIva')"
+                    [matTooltip]="esAjuste('montoIva') ? 'Volver al cálculo automático' : 'Escribir esta cifra a mano'">
+              <mat-icon inline>{{ esAjuste('montoIva') ? 'undo' : 'edit' }}</mat-icon>
+              @if (esAjuste('montoIva')) { <i>ajustado</i> }
+            </button>
+          </span>
+          <div class="cl-input-sufijo">
+            <input type="text" inputmode="decimal" [value]="calculo().montoIva"
+                   [readOnly]="!esAjuste('montoIva')"
+                   (input)="setDerivado('montoIva', $any($event.target).value)">
+            <em>Bs</em>
+          </div>
+          <small class="cl-hint">Subtotal × {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</small>
+        </label>
+
+        <label class="cl-campo cl-campo-destacado" [class.cl-ajustado]="esAjuste('montoTotal')">
+          <span>
+            Monto total de la factura
+            <button type="button" class="cl-candado" (click)="alternarAjuste('montoTotal')"
+                    [matTooltip]="esAjuste('montoTotal') ? 'Volver al cálculo automático' : 'Escribir esta cifra a mano'">
+              <mat-icon inline>{{ esAjuste('montoTotal') ? 'undo' : 'edit' }}</mat-icon>
+              @if (esAjuste('montoTotal')) { <i>ajustado</i> }
+            </button>
+          </span>
+          <div class="cl-input-sufijo">
+            <input type="text" inputmode="decimal" [value]="calculo().montoTotal"
+                   [readOnly]="!esAjuste('montoTotal')"
+                   (input)="setDerivado('montoTotal', $any($event.target).value)">
+            <em>Bs</em>
+          </div>
+          <small class="cl-hint">Subtotal + IVA</small>
+        </label>
+      </div>
+    </section>
+
+    <!-- ── Paso 2 · El depósito ───────────────────────────────────────── -->
+    <section class="cl-card">
+      <h2 class="cl-card-titulo">
+        <span class="cl-paso">2</span> El depósito
+        <em class="cl-leyenda">lo que abonó el banco</em>
+      </h2>
+
+      <div class="cl-deposito">
+        <label class="cl-campo cl-campo-destacado cl-campo-cifra">
+          <span>
+            Monto depositado
+            @if (!depositadoManual()) { <em class="cl-chip-suave">= total − deducciones</em> }
+          </span>
+          <div class="cl-input-sufijo">
+            <input type="text" inputmode="decimal" [value]="calculo().montoDepositado"
+                   (input)="setDepositado($any($event.target).value)">
+            <em>Bs</em>
+          </div>
+          <small class="cl-hint">
+            {{ formatoBs(calculo().montoDepositado) }} Bs
+            @if (hayTasa()) { · ≈ {{ depositadoEnDivisa() }} {{ simboloDivisa() }} }
+          </small>
+        </label>
+
+        @if (depositadoManual()) {
+          <button type="button" class="cl-enlace cl-enlace-boton" (click)="usarDepositoAutomatico()">
+            <mat-icon inline>undo</mat-icon> Volver al depósito automático
+          </button>
+        }
+      </div>
+
+      <div class="cl-nota">
+        <mat-icon inline>info</mat-icon>
+        El banco abona el <strong>total de la factura menos las deducciones</strong> del paso 3. Escriba el monto a mano solo si el abono real no coincide.
+      </div>
+    </section>
+
+    <!-- ── Paso 3 · Deducciones ───────────────────────────────────────── -->
+    <section class="cl-card cl-card-deducciones">
+      <h2 class="cl-card-titulo">
+        <span class="cl-paso">3</span> Deducciones
+        <em class="cl-leyenda">
+          {{ deducciones().length }} {{ deducciones().length === 1 ? 'deducción' : 'deducciones' }} · las que necesite
+        </em>
+      </h2>
+
+      @if (deducciones().length > 0) {
+        <div class="cl-deducciones">
+          <div class="cl-deduccion-cabecera">
+            <span>Concepto</span>
+            <span>Tipo</span>
+            <span>Valor</span>
+            <span>Base</span>
+            <span>Monto</span>
+            <span aria-hidden="true"></span>
+          </div>
+
+          @for (d of deducciones(); track d.id) {
+            <div class="cl-deduccion">
+              <input class="cl-deduccion-nombre" type="text" [value]="d.nombre"
+                     placeholder="Nombre de la deducción"
+                     (input)="setDeduccionNombre(d, $any($event.target).value)">
+
+              <select class="cl-deduccion-tipo" [value]="d.tipo"
+                      (change)="setDeduccionTipo(d, $any($event.target).value)"
+                      matTooltip="Un porcentaje sobre una base, o un monto fijo en bolívares">
+                @for (t of tipos; track t.valor) {
+                  <option [value]="t.valor">{{ t.etiqueta }}</option>
+                }
+              </select>
+
+              <input class="cl-deduccion-valor" type="text" inputmode="decimal" [value]="d.valor"
+                     (input)="setDeduccionValor(d, $any($event.target).value)"
+                     [matTooltip]="d.tipo === 'monto' ? 'Monto en bolívares' : 'Porcentaje a aplicar'">
+
+              <select class="cl-deduccion-base" [value]="d.base" [disabled]="d.tipo === 'monto'"
+                      (change)="setDeduccionBase(d, $any($event.target).value)"
+                      [matTooltip]="d.tipo === 'monto' ? 'No aplica: es un monto fijo' : 'Cifra sobre la que se aplica el porcentaje'">
+                @for (b of bases; track b.valor) {
+                  <option [value]="b.valor">{{ b.etiqueta }}</option>
+                }
+              </select>
+
+              <span class="cl-deduccion-monto" [class.cl-ajustado]="esAjusteDeduccion(d)"
+                    [matTooltip]="detalleDeduccion(d)">
+                @if (d.tipo === 'monto') {
+                  <strong>{{ formatoBs(d.monto) }} Bs</strong>
+                } @else {
+                  <input type="text" inputmode="decimal" [value]="d.monto"
+                         [readOnly]="!esAjusteDeduccion(d)"
+                         (input)="setDeduccionMonto(d, $any($event.target).value)">
+                  <button type="button" class="cl-candado cl-candado-mini" (click)="alternarAjusteDeduccion(d)"
+                          [matTooltip]="esAjusteDeduccion(d) ? 'Volver al porcentaje' : 'Escribir el monto a mano'">
+                    <mat-icon inline>{{ esAjusteDeduccion(d) ? 'undo' : 'edit' }}</mat-icon>
+                  </button>
+                }
+              </span>
+
+              <button mat-icon-button type="button" class="cl-deduccion-quitar" (click)="quitarDeduccion(d)"
+                      matTooltip="Quitar esta deducción" aria-label="Quitar la deducción">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+
+        <footer class="cl-deduccion-total">
+          <span>Total deducciones ({{ deducciones().length }})</span>
+          <strong>− {{ formatoBs(calculo().subtotalDeducciones) }} Bs</strong>
+        </footer>
+      } @else {
+        <p class="cl-vacio">
+          <mat-icon inline>check_circle</mat-icon>
+          Sin deducciones: el saldo disponible es el monto depositado completo.
+        </p>
+      }
+
+      <div class="cl-deduccion-acciones">
+        <button mat-stroked-button type="button" (click)="agregarDeduccion()">
+          <mat-icon>add</mat-icon> Agregar deducción
+        </button>
+        @for (p of presets; track p.id; let i = $index) {
+          <button mat-button type="button" class="cl-preset" (click)="agregarPreset(i)">{{ p.etiqueta }}</button>
+        }
+      </div>
+
+      @if (excedido()) {
+        <div class="cl-aviso cl-aviso-suave">
+          <mat-icon>warning_amber</mat-icon>
+          <div>
+            <strong>Las deducciones superan el monto depositado.</strong>
+            Revise las cifras: el saldo disponible queda por debajo de cero.
+          </div>
+        </div>
+      }
+    </section>
+
+    <!-- ── Pendientes de guardar ──────────────────────────────────────── -->
+    @if (problemas().length > 0) {
+      <div class="cl-aviso">
+        <mat-icon>error_outline</mat-icon>
+        <div>
+          <strong>Para guardar falta:</strong>
+          <ul>
+            @for (p of problemas(); track p.campo) {
+              <li>{{ p.mensaje }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+    }
+
+    </div><!-- /.cl-columna-form -->
+
+    <!-- ── Panel de resultados (columna pegajosa) ─────────────────────── -->
+    <aside class="cl-columna-resultados">
+
+      <section class="cl-card cl-card-resultados">
+        <h2 class="cl-card-titulo">
+          <span class="cl-paso">4</span> Resultados
+          <em class="cl-leyenda">lo que queda</em>
+        </h2>
+
+        <div class="cl-resultados">
+          <div class="cl-resultado">
+            <span>Saldo disponible</span>
+            <strong>{{ formatoBs(calculo().saldoDisponible) }} Bs</strong>
+            <small>Depósito − {{ formatoBs(calculo().subtotalDeducciones) }} Bs de deducciones</small>
+          </div>
+
+          <div class="cl-resultado cl-resultado-libre">
+            <span>Saldo libre</span>
+            <strong>{{ formatoBs(calculo().saldoLibre) }} Bs</strong>
+            @if (hayTasa()) {
+              <small>≈ {{ saldoLibreEnDivisa() }} {{ simboloDivisa() }}</small>
+            } @else {
+              <small>Disponible − ganancia</small>
+            }
+          </div>
+        </div>
+
+        <div class="cl-ganancia">
+          <label class="cl-campo cl-campo-corto">
+            <span>Ganancia objetivo</span>
+            <div class="cl-input-sufijo">
+              <input type="text" inputmode="decimal"
+                     [value]="calculo().gananciaPorcentaje"
+                     (input)="setFuente('gananciaPorcentaje', $any($event.target).value)">
+              <em>%</em>
+            </div>
+            <small class="cl-hint">Sobre el saldo disponible</small>
+          </label>
+
+          <label class="cl-campo cl-campo-destacado" [class.cl-ajustado]="esAjuste('ganancia')">
+            <span>
+              Ganancia
+              <button type="button" class="cl-candado" (click)="alternarAjuste('ganancia')"
+                      [matTooltip]="esAjuste('ganancia') ? 'Volver al cálculo automático' : 'Escribir esta cifra a mano'">
+                <mat-icon inline>{{ esAjuste('ganancia') ? 'undo' : 'edit' }}</mat-icon>
+                @if (esAjuste('ganancia')) { <i>ajustado</i> }
+              </button>
+            </span>
+            <div class="cl-input-sufijo">
+              <input type="text" inputmode="decimal" [value]="calculo().ganancia"
+                     [readOnly]="!esAjuste('ganancia')"
+                     (input)="setDerivado('ganancia', $any($event.target).value)">
+              <em>Bs</em>
+            </div>
+            <small class="cl-hint">Disponible × {{ formatoPorcentaje(calculo().gananciaPorcentaje) }}</small>
+          </label>
+        </div>
+      </section>
+
+      <!-- Desglose -->
+      <section class="cl-resumen">
+        <div class="cl-resumen-cifra">
+          <span>Saldo libre</span>
+          <strong>{{ formatoBs(calculo().saldoLibre) }} Bs</strong>
+          @if (hayTasa()) {
+            <small>≈ {{ saldoLibreEnDivisa() }} {{ simboloDivisa() }}</small>
+          }
+        </div>
+
+        <dl class="cl-resumen-detalle">
+          <div><dt>Subtotal</dt><dd>{{ formatoBs(calculo().montoSubtotal) }} Bs</dd></div>
+          <div><dt>IVA {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</dt><dd>{{ formatoBs(calculo().montoIva) }} Bs</dd></div>
+          <div><dt>Total factura</dt><dd>{{ formatoBs(calculo().montoTotal) }} Bs</dd></div>
+          <div><dt>Depositado</dt><dd>{{ formatoBs(calculo().montoDepositado) }} Bs</dd></div>
+          <div><dt>Deducciones ({{ deducciones().length }})</dt><dd>− {{ formatoBs(calculo().subtotalDeducciones) }} Bs</dd></div>
+          <div><dt>Disponible</dt><dd>{{ formatoBs(calculo().saldoDisponible) }} Bs</dd></div>
+          <div><dt>Ganancia {{ formatoPorcentaje(calculo().gananciaPorcentaje) }}</dt><dd>− {{ formatoBs(calculo().ganancia) }} Bs</dd></div>
+        </dl>
+      </section>
+
+      <!-- Tasa de cambio -->
+      <section class="cl-card">
+        <h2 class="cl-card-titulo"><mat-icon>currency_exchange</mat-icon> Tasa de cambio</h2>
+
+        <div class="cl-tasa">
+          <label class="cl-campo">
+            <span>Divisa</span>
+            <select [value]="calculo().tasa.moneda" (change)="cambiarMoneda($any($event.target).value)">
+              @for (m of monedas; track m.valor) {
+                <option [value]="m.valor">{{ m.etiqueta }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="cl-campo">
+            <span>Bolívares por divisa</span>
+            <input type="text" inputmode="decimal" [value]="calculo().tasa.valor"
+                   (input)="setTasaValor($any($event.target).value)">
+            <small class="cl-hint">
+              @if (hayTasa()) {
+                1 {{ simboloDivisa() }} = {{ formatoBs(calculo().tasa.valor) }} Bs
+              } @else {
+                Sin tasa cargada: pulse «Consultar» o escríbala a mano.
+              }
+            </small>
+          </label>
+
+          <button mat-stroked-button type="button" class="cl-consultar" (click)="consultarTasa()"
+                  [disabled]="consultandoTasa()">
+            <mat-icon>refresh</mat-icon> {{ consultandoTasa() ? 'Consultando…' : 'Consultar' }}
+          </button>
+
+          <label class="cl-campo">
+            <span>Publicada</span>
+            <input type="text" [value]="calculo().tasa.fecha" readonly placeholder="—">
+            @if (calculo().tasa.fuente) {
+              <small class="cl-hint">
+                <a [href]="calculo().tasa.fuente" target="_blank" rel="noopener">Fuente oficial</a>
+              </small>
+            }
+          </label>
+        </div>
+
+        @if (hayTasa()) {
+          <div class="cl-equivalencias">
+            <div class="cl-equivalencia">
+              <span>Subtotal</span>
+              <strong>{{ subtotalEnDivisa() }} {{ simboloDivisa() }}</strong>
+            </div>
+            <div class="cl-equivalencia">
+              <span>Depositado</span>
+              <strong>{{ depositadoEnDivisa() }} {{ simboloDivisa() }}</strong>
+            </div>
+            <div class="cl-equivalencia">
+              <span>Saldo libre</span>
+              <strong>{{ saldoLibreEnDivisa() }} {{ simboloDivisa() }}</strong>
+            </div>
+          </div>
+        }
+      </section>
+    </aside>
+
+    </div><!-- /.cl-lienzo -->
+  }
+</div>

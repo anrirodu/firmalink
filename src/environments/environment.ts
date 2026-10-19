@@ -23,6 +23,8 @@ export const environment = {
     CONSULTAR_PRESUPUESTOS: '_SYS_CFirmaLinkPresupuestos',
     CONSULTAR_PRESUPUESTOS_CLIENTE: '_SYS_CFirmaLinkPresupuestosCliente',
     CONSULTAR_PRESUPUESTO: '_SYS_CFirmaLinkPresupuesto',
+    CONSULTAR_CALCULOS: '_SYS_CFirmaLinkCalculos',
+    CONSULTAR_CALCULO: '_SYS_CFirmaLinkCalculo',
   },
   driver: {
     // ID de la conexión registrada en `sys-drivers` (MGDBA → MongoDB local / BD code-epic).
@@ -36,5 +38,6 @@ export const environment = {
     CLIENTE: 'firmalink_clientes',
     FACTURA: 'firmalink_facturas',
     PRESUPUESTO: 'firmalink_presupuestos',
+    CALCULO: 'firmalink_calculos',
   },
 };

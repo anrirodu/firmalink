@@ -73,6 +73,17 @@ export const routes: Routes = [
           ),
       },
       {
+        // Calculadora de facturación. Herramienta interna: proyecta el neto de
+        // una factura cobrada por depósito y guarda el cálculo en
+        // `firmalink_calculos`. Aterriza en el listado, que monta el editor
+        // como modal (igual que facturas y presupuestos).
+        path: 'calculator',
+        loadComponent: () =>
+          import('./pages/calculator/list-calculator/list-calculator.component').then(
+            m => m.ListCalculatorComponent,
+          ),
+      },
+      {
         path: 'change-password',
         loadComponent: () =>
           import('./pages/cambiar-contrasena/cambiar-contrasena.component').then(m => m.CambiarContrasenaComponent),

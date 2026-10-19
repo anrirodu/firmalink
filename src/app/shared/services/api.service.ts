@@ -53,6 +53,30 @@ export interface AdjuntoCorreo {
   contentType?: string;
 }
 
+/** Operador de la divisa cuya tasa se consulta. */
+export type MonedaDivisa = 'dolar' | 'euro';
+
+/** Cuerpo de datos de `POST /v1/api/divisa`. */
+export interface DatosDivisa {
+  moneda: string;
+  simbolo: string;
+  /** Valor en bolívares, en formato venezolano: "881,06640000" */
+  valor: string;
+  /** Fecha publicada: "Lunes, 19 Octubre 2026" */
+  fecha: string;
+  /** Página oficial de la que proviene el valor */
+  url: string;
+  es_historico?: boolean;
+  timestamp?: string;
+}
+
+/** Respuesta de `POST /v1/api/divisa`. */
+export interface RespuestaDivisa {
+  success?: boolean;
+  data: DatosDivisa;
+  mensaje?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly URL = environment.API;
@@ -156,6 +180,17 @@ export class ApiService {
   ExecColeccion(xObjeto: any): Observable<any> {
     const url = this.URL + 'ccoleccion';
     return this.http.post<any>(url, xObjeto, this.httpOptions);
+  }
+
+  /**
+   * Tasa oficial de una divisa (BCV).
+   *
+   * El valor llega en formato venezolano ("881,06640000"): hay que pasarlo por
+   * `parsearNumero` antes de usarlo en cuentas.
+   */
+  Divisa(moneda: MonedaDivisa): Observable<RespuestaDivisa> {
+    const url = this.URL + 'divisa';
+    return this.http.post<RespuestaDivisa>(url, { moneda }, this.httpOptions);
   }
 
   /**

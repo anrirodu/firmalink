@@ -407,6 +407,87 @@
   }
 }
 
+/* ── Código interno + huella (badge con efecto verde) ──
+   Vive al tope (no dentro de .bl-campo): el badge se pinta dentro de la
+   tarjeta Hoja, lejos del grid de campos. */
+.bl-huella {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.bl-huella-codigo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: #8a97a3;
+  line-height: 1.3;
+
+  strong {
+    font-weight: 600;
+    color: #55606b;
+    letter-spacing: 0.01em;
+  }
+}
+
+.bl-huella-icono {
+  width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.95rem;
+  color: #a3aeb9;
+}
+
+/* Chip de huella: monoespaciado, verde suave y resplandor sutil */
+.bl-huella-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.4rem;
+  border-radius: 999px;
+  font-family: 'SFMono-Regular', ui-monospace, 'Menlo', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: #0f7a3d;
+  background: linear-gradient(135deg, #e8f7ee 0%, #d3f0e0 100%);
+  border: 1px solid #b6e3c9;
+  box-shadow: 0 0 0 1px rgba(15, 122, 61, 0.04), 0 1px 4px rgba(15, 122, 61, 0.12);
+  cursor: default;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+
+  /* Halo verde que respira */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+    opacity: 0.6;
+    animation: bl-huella-pulso 2.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  &:hover {
+    border-color: #8fd3ac;
+    box-shadow: 0 0 0 1px rgba(15, 122, 61, 0.08), 0 2px 8px rgba(15, 122, 61, 0.2);
+  }
+}
+
+.bl-huella-chip-icono {
+  width: 0.9rem;
+  height: 0.9rem;
+  font-size: 0.9rem;
+  color: #16a34a;
+}
+
+@keyframes bl-huella-pulso {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 0.85; }
+}
+
 .bl-campo-ancho {
   grid-column: 1 / -1;
 }
@@ -770,6 +851,29 @@
 
     .bl-hint { color: #7f8b98; }
   }
+
+  /* Huella (fuera de .bl-campo: el badge vive en la tarjeta Hoja) */
+  .bl-huella-codigo {
+    color: #7f8b98;
+
+    strong { color: #b9c4cf; }
+  }
+
+  .bl-huella-icono { color: #6b7684; }
+
+  .bl-huella-chip {
+    color: #6ee7a0;
+    background: linear-gradient(135deg, #0f2419 0%, #14301f 100%);
+    border-color: #22543a;
+
+    &::after {
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.45);
+    }
+
+    &:hover { border-color: #2f7a52; }
+  }
+
+  .bl-huella-chip-icono { color: #4ade80; }
 
   .bl-switch {
     color: #e8eef4;

@@ -1,0 +1,333 @@
+<!-- ============================================
+     LIST CALCULATOR — Cálculos de facturación
+     Listado, filtro por texto/divisa, consulta/edición en la calculadora,
+     copia de la huella y eliminación.
+     ============================================ -->
+
+<!-- Header -->
+<div class="page-header">
+  <div class="header-content">
+    <h1>Calculadora</h1>
+    <p>
+      Del monto total de la factura al saldo libre: IVA, subtotal, las deducciones
+      que usted elija y la tasa del día. Cada cálculo lleva su estatus y su huella SHA-256.
+    </p>
+  </div>
+  <div class="header-actions">
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="cargar()"
+      [disabled]="cargando()"
+      matTooltip="Volver a consultar el listado en el servidor"
+    >
+      <mat-icon>refresh</mat-icon> Actualizar
+    </button>
+    @if (Privilegio('Create')) {
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        (click)="nuevoCalculo()"
+        matTooltip="Abrir la calculadora en blanco"
+      >
+        <mat-icon>add_circle</mat-icon> Nuevo Cálculo
+      </button>
+    }
+  </div>
+</div>
+
+<!-- ============================================
+     SPEED DIAL (móvil y tablet) — a partir de 1024px .header-actions se
+     oculta y las acciones viven dentro de este botón flotante.
+     ============================================ -->
+<div class="lb-speeddial" [class.abierto]="accionesAbiertas()">
+  <div class="lb-speeddial-acciones" role="menu" aria-label="Acciones de la calculadora">
+    <button mat-mini-fab color="primary" type="button" (click)="cerrarAcciones(); cargar()"
+      [disabled]="cargando()"
+      matTooltip="Volver a consultar el listado en el servidor"
+      aria-label="Actualizar">
+      <mat-icon>refresh</mat-icon>
+    </button>
+    @if (Privilegio('Create')) {
+      <button mat-mini-fab color="primary" type="button" (click)="cerrarAcciones(); nuevoCalculo()"
+        matTooltip="Abrir la calculadora en blanco"
+        aria-label="Nuevo Cálculo">
+        <mat-icon>add_circle</mat-icon>
+      </button>
+    }
+  </div>
+
+  <button mat-fab color="primary" type="button" (click)="toggleAcciones()"
+    [attr.aria-expanded]="accionesAbiertas()" aria-haspopup="menu"
+    matTooltip="Acciones de la calculadora" aria-label="Acciones de la calculadora">
+    <mat-icon>{{ accionesAbiertas() ? 'close' : 'more_vert' }}</mat-icon>
+  </button>
+</div>
+
+<!-- Indicadores del listado -->
+<div class="lb-kpis">
+  @for (kpi of kpis(); track kpi.etiqueta) {
+    <div class="lb-kpi" [ngClass]="kpi.clase">
+      <mat-icon>{{ kpi.icono }}</mat-icon>
+      <div>
+        <span class="lb-kpi-valor">{{ kpi.texto ?? kpi.valor }}</span>
+        <span class="lb-kpi-etiqueta">{{ kpi.etiqueta }}</span>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Tabla de cálculos -->
+<mat-card class="table-card">
+  @if (cargando()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  <mat-card-header class="table-header">
+    <div class="header-left">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Buscar cálculo</mat-label>
+        <input
+          #searchInput
+          matInput
+          [value]="filtroTexto()"
+          (keyup)="onFiltroTexto(searchInput.value)"
+          placeholder="Nombre, código, fecha, usuario..."
+        />
+        <mat-icon matPrefix>search</mat-icon>
+        @if (filtroTexto()) {
+          <button matSuffix mat-icon-button aria-label="Limpiar" (click)="limpiarFiltros(searchInput)">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="divisa-field">
+        <mat-label>Divisa</mat-label>
+        <mat-select
+          [ngModel]="filtroDivisa()"
+          (ngModelChange)="onFiltroDivisa($event)"
+          panelClass="lb-divisa-panel"
+        >
+          <mat-option value="">Todas las divisas</mat-option>
+          @for (d of divisas; track d.valor) {
+            <mat-option [value]="d.valor">
+              <mat-icon>{{ d.icono }}</mat-icon> {{ d.etiqueta }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="header-right">
+      <span class="lb-conteo">
+        {{ filtradas().length }} de {{ filas().length }} cálculos
+      </span>
+    </div>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (Privilegio('Read')) {
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="dataSource" matSort class="data-table">
+
+        <!-- Cálculo -->
+        <ng-container matColumnDef="nombre">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Cálculo</th>
+          <td mat-cell *matCellDef="let row" class="cell-number">
+            <span class="lb-numero">{{ nombre(row) }}</span>
+            @if (row.codigo) {
+              <span class="lb-codigo">{{ row.codigo }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Fecha -->
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
+          <td mat-cell *matCellDef="let row" [matTooltip]="fechaAbsoluta(row)">
+            {{ hace(row) }}
+          </td>
+        </ng-container>
+
+        <!-- Total factura -->
+        <ng-container matColumnDef="factura">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="th-num">Total Bs</th>
+          <td mat-cell *matCellDef="let row" class="cell-importe"
+              [matTooltip]="'Subtotal ' + formatoBs(row.montoSubtotal) + ' Bs · IVA ' + formatoBs(row.montoIva) + ' Bs'">
+            {{ formatoBs(row.montoTotal) }}
+          </td>
+        </ng-container>
+
+        <!-- Deducciones -->
+        <ng-container matColumnDef="deducciones">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="th-num">Deducciones Bs</th>
+          <td mat-cell *matCellDef="let row" class="cell-importe cell-negativo"
+              [matTooltip]="detalleDeducciones(row)">
+            {{ formatoBs(row.subtotalDeducciones) }}
+          </td>
+        </ng-container>
+
+        <!-- Saldo libre -->
+        <ng-container matColumnDef="saldoLibre">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="th-num">Saldo libre Bs</th>
+          <td mat-cell *matCellDef="let row" class="cell-importe cell-libre"
+              [matTooltip]="'Disponible ' + formatoBs(row.saldoDisponible) + ' Bs · ganancia ' + formatoBs(row.ganancia) + ' Bs'">
+            {{ formatoBs(row.saldoLibre) }}
+          </td>
+        </ng-container>
+
+        <!-- Tasa -->
+        <ng-container matColumnDef="tasa">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Tasa</th>
+          <td mat-cell *matCellDef="let row" [matTooltip]="detalleTasa(row)">
+            <span class="lb-chip" [ngClass]="claseDivisa(row)">
+              <mat-icon>{{ iconoDivisa(row) }}</mat-icon>
+              {{ tasaTexto(row) }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Estatus -->
+        <ng-container matColumnDef="estatus">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Estatus</th>
+          <td mat-cell *matCellDef="let row">
+            <span
+              class="lb-estado"
+              [style.--lb-estado-color]="infoEstado(row.estado).color"
+            >
+              <mat-icon>{{ infoEstado(row.estado).icono }}</mat-icon>
+              {{ infoEstado(row.estado).etiqueta }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Acciones -->
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef class="th-acciones">Acciones</th>
+          <td mat-cell *matCellDef="let row" class="td-acciones">
+            <button
+              mat-icon-button
+              type="button"
+              [matMenuTriggerFor]="menuAcciones"
+              (click)="$event.stopPropagation()"
+              matTooltip="Acciones del cálculo"
+              aria-label="Acciones del cálculo"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #menuAcciones="matMenu">
+              <div class="lb-menu-titulo">{{ row.codigo || nombre(row) }}</div>
+              <mat-divider></mat-divider>
+
+              <!-- Abrir: la calculadora es de consulta libre; sólo exige
+                   `Update` si el cálculo va a modificarse. -->
+              @if (Privilegio('Update') || Privilegio('Read')) {
+                <button
+                  mat-menu-item
+                  type="button"
+                  (click)="editar(row)"
+                  matTooltip="Abrir este cálculo en la calculadora"
+                >
+                  <mat-icon>calculate</mat-icon>
+                  <span>Abrir en la calculadora</span>
+                </button>
+              }
+
+              @if (Privilegio('Update')) {
+                @for (estado of transiciones(row.estado); track estado) {
+                  @if (estado !== 'eliminado') {
+                    <button
+                      mat-menu-item
+                      type="button"
+                      (click)="cambiarEstado(row, estado)"
+                      matTooltip="Cambiar el estatus del cálculo"
+                    >
+                      <mat-icon>{{ infoEstado(estado).icono }}</mat-icon>
+                      <span>Marcar como {{ infoEstado(estado).etiqueta }}</span>
+                    </button>
+                  }
+                }
+              }
+
+              @if (Privilegio('Delete')) {
+                <mat-divider></mat-divider>
+
+                <!-- Borrado lógico: el registro se conserva para la traza -->
+                <button
+                  mat-menu-item
+                  type="button"
+                  class="lb-accion-eliminar"
+                  (click)="eliminar(row)"
+                  matTooltip="Borrar este cálculo del listado (borrado lógico)"
+                >
+                  <mat-icon>delete</mat-icon>
+                  <span>Borrar</span>
+                </button>
+              }
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns"
+          class="lb-fila"
+          (dblclick)="editar(row)"
+          matTooltip="Doble clic para abrirlo en la calculadora"
+          matTooltipPosition="left"
+        ></tr>
+
+        <!-- Sin resultados -->
+        <tr class="mat-row lb-vacio" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            @if (cargando()) {
+              <mat-icon class="lb-vacio-icono">hourglass_top</mat-icon>
+              <p>Consultando cálculos…</p>
+            } @else if (filas().length === 0) {
+              <mat-icon class="lb-vacio-icono">calculate</mat-icon>
+              <p>No hay cálculos guardados todavía.</p>
+              @if (Privilegio('Create')) {
+                <button mat-raised-button color="primary" type="button" (click)="nuevoCalculo()">
+                  <mat-icon>add_circle</mat-icon> Crear el primero
+                </button>
+              }
+            } @else {
+              <mat-icon class="lb-vacio-icono">search_off</mat-icon>
+              <p>Ningún cálculo coincide con el filtro aplicado.</p>
+              <button mat-stroked-button type="button" (click)="limpiarFiltros()">
+                <mat-icon>filter_alt_off</mat-icon> Quitar filtros
+              </button>
+            }
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator
+      [pageSizeOptions]="[10, 25, 50, 100]"
+      [pageSize]="25"
+      showFirstLastButtons
+      aria-label="Seleccionar página de cálculos"
+    ></mat-paginator>
+    } @else {
+      <!-- Sin privilegio Read: no se listan los registros, solo se avisa -->
+      <div class="lb-vacio lb-sin-lectura" role="status">
+        <mat-icon class="lb-vacio-icono">lock</mat-icon>
+        <p>No tiene permiso para consultar el listado de cálculos.</p>
+        <p class="lb-sin-lectura-nota">
+          Solicite el privilegio <strong>Read</strong> al administrador si necesita verlo.
+        </p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>
+
+<!-- Calculadora como MODAL de pantalla completa. Se monta por estado (no es
+     una ruta); al cerrarse el listado recarga la tabla. -->
+@if (editorAbierto()) {
+  <app-calculator (cerrar)="cerrarEditor()"></app-calculator>
+}

@@ -470,12 +470,18 @@
         </div>
 
         @if (factura().codigo) {
-          <p class="bl-hint">
-            Código interno {{ factura().codigo }}
+          <div class="bl-huella">
+            <span class="bl-huella-codigo">
+              <mat-icon class="bl-huella-icono">tag</mat-icon>
+              Código interno <strong>{{ factura().codigo }}</strong>
+            </span>
             @if (factura().huella) {
-              · huella {{ factura().huella?.slice(0, 16) }}…
+              <span class="bl-huella-chip" matTooltip="Huella digital del documento">
+                <mat-icon class="bl-huella-chip-icono">fingerprint</mat-icon>
+                {{ factura().huella?.slice(0, 16) }}…
+              </span>
             }
-          </p>
+          </div>
         }
       </section>
       </ng-template>

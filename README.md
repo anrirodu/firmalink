@@ -24,12 +24,13 @@ interesado por correo electrónico.
 12. [Reglas de negocio — Clientes](#reglas-de-negocio--clientes)
 13. [Reglas de negocio — Facturación](#reglas-de-negocio--facturación)
 14. [Reglas de negocio — Presupuestos](#reglas-de-negocio--presupuestos)
-15. [Impresión y exportación](#impresión-y-exportación)
-16. [Envío por correo](#envío-por-correo)
-17. [Tema visual y branding](#tema-visual-y-branding)
-18. [Integración con contenedor de escritorio](#integración-con-contenedor-de-escritorio)
-19. [Convenciones de desarrollo](#convenciones-de-desarrollo)
-20. [Créditos](#créditos)
+15. [Reglas de negocio — Calculadora](#reglas-de-negocio--calculadora)
+16. [Impresión y exportación](#impresión-y-exportación)
+17. [Envío por correo](#envío-por-correo)
+18. [Tema visual y branding](#tema-visual-y-branding)
+19. [Integración con contenedor de escritorio](#integración-con-contenedor-de-escritorio)
+20. [Convenciones de desarrollo](#convenciones-de-desarrollo)
+21. [Créditos](#créditos)
 
 ---
 
@@ -93,6 +94,8 @@ interesado por correo electrónico.
 | `/billing/new` | `pages/billing` | Editor de la factura: vista previa en vivo de la hoja 21,7 × 28 cm (alta y consulta) |
 | `/budgets` | `pages/budgets/list-budgets` | Listado de presupuestos: KPIs (cotizado, por vencer, vencidos), filtros, ciclo de vida (enviar/aprobar/rechazar/anular), huella SHA-256 y envío por correo en PDF |
 | `/budgets/new` | `pages/budgets` | Editor del presupuesto: vista previa en vivo de la hoja 21,7 × 28 cm, condiciones comerciales y validez (nuevo y consulta) |
+| `/calculator` | `pages/calculator/list-calculator` | Listado de cálculos de facturación: KPIs, filtros por texto y divisa, estatus (borrador/procesado/anulada) y editor en modal |
+| `/calculator/new` | `pages/calculator/new` | Editor de la calculadora: monto subtotal de la factura, IVA y total, deducciones libres, saldo libre y tasa del día (nuevo y consulta) |
 | `/change-password` | `pages/cambiar-contrasena` | Cambio de contraseña |
 | `/error` | `pages/miscellaneous/error` | Página de error |
 | `/not-authorized` | `pages/miscellaneous/not-authorized` | Acceso no autorizado |
@@ -273,6 +276,7 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `colecciones.ACUERDO` | `xxxxxxxx` | Colección de acuerdos |
 | `colecciones.CLIENTE` | `xxxxxxxx` | Colección de clientes |
 | `colecciones.FACTURA` | `firmalink_facturas` | Colección de facturas |
+| `colecciones.CALCULO` | `firmalink_calculos` | Colección de cálculos de la calculadora |
 | `colecciones.USER_TASK` | `xxxxxxx` | Tareas de usuario |
 
 > **Atención:** en `driver.PRINCIPAL` debe ir el **ID de la conexión** (`MGDBA`), **no** el tipo de
@@ -297,6 +301,8 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `CONSULTAR_PRESUPUESTOS` | `_SYS_CFirmaLinkPresupuestos` | Listado liviano de presupuestos (totales, condiciones y copia del cliente, sin renglones) |
 | `CONSULTAR_PRESUPUESTOS_CLIENTE` | `_SYS_CFirmaLinkPresupuestosCliente` | Presupuestos de un cliente (`cliente.codigo`) |
 | `CONSULTAR_PRESUPUESTO` | `_SYS_CFirmaLinkPresupuesto` | Detalle completo de un presupuesto (`codigo`) |
+| `CONSULTAR_CALCULOS` | `_SYS_CFirmaLinkCalculos` | Listado de cálculos de la calculadora (cifras, **deducciones** libres, resultados, estatus, tasa y huella) |
+| `CONSULTAR_CALCULO` | `_SYS_CFirmaLinkCalculo` | Detalle completo de un cálculo (`codigo`) |
 
 > Las tres funciones viven en la colección `apicore` de la base del sistema, con `driver: firmalink`,
 > `metodo: CONSULTAR`, `tipo: CONSULTA` y `estatus: true`. El servidor las resuelve con un `FindOne`
@@ -357,6 +363,13 @@ POST {Url}{API}ccoleccion
 El menú lateral proviene del backend, desde el documento del usuario (`Aplicacion[].Rol.Menu`).
 El frontend no define permisos; se limita a renderizar lo que el backend entrega y a navegar por
 `url` (comparando `router.url` con `'/' + url`).
+
+Entradas que declara el perfil *Administrador FirmaLink*: `acuerdos`, `clientes`, `billing`,
+`budgets` y `calculator`. La calculadora (`/calculator`) **no** es una ruta libre: como el resto,
+exige su entrada en el menú y sus privilegios —`Create` habilita «Nuevo Cálculo», `Read` el
+listado, `Update` «Abrir en la calculadora» y los cambios de estatus, y `Delete` «Borrar»—. El
+listado monta el editor como modal, así que no basta con `Read` para guardar: sin `Create`/`Update`
+los botones no aparecen.
 
 ---
 
@@ -725,6 +738,113 @@ cliente, y menú de acciones por fila:
 > "Presupuestos" (`budgets`) ya existe en el menú del perfil *Administrador FirmaLink*, dentro de
 > *Finanzas*. Si el listado avisa que no pudo consultar es el backend caído, no las funciones: el editor
 > **no pierde el trabajo** (borrador local) pero no guarda en la base.
+
+---
+
+## Reglas de negocio — Calculadora
+
+La calculadora **no es un documento legal**: es una **simulación** interna para proyectar el neto que
+queda de una factura cobrada por depósito bancario. Por eso no lleva numeración de control ni emisor;
+solo un nombre, sus cifras y una **huella SHA-256** que detecta alteraciones. Comparte con la factura
+la aritmética de bolívares y fechas (`parsearNumero`, `redondear`, `formatoBs`, `fechaTextoEmision`).
+
+El recorrido va **de arriba abajo**, como se hace la cuenta a mano:
+
+1. **El monto subtotal de la factura** (la base, sin IVA) y la alícuota → el IVA y el total salen de ahí.
+2. **Las deducciones**, que el usuario agrega a su gusto (retención de IVA, honorarios, timbre…).
+3. **El monto depositado**: el banco abona el **total menos las deducciones**.
+4. **El saldo disponible**, la ganancia objetivo y el **saldo libre**.
+
+| Concepto | Fórmula |
+|----------|---------|
+| IVA | `subtotal × alícuota / 100` (16 % por defecto) |
+| Total factura | `subtotal + IVA` |
+| Depositado | `total − deducciones` (salvo que se escriba a mano) |
+| Saldo disponible | `depositado` (ya viene neto de deducciones) |
+| Ganancia | `saldoDisponible × gananciaPorcentaje / 100` (10 % por defecto) |
+| Saldo libre | `saldoDisponible − ganancia` |
+
+### Deducciones libres
+
+A diferencia de la factura —donde IGTF y retenciones están fijadas por la ley—, aquí las deducciones
+las pone el usuario: **las que quiera**, cada una con su nombre. Cada deducción se define por:
+
+- **Tipo**: `porcentaje` (de una base) o `monto` (cifra fija en Bs).
+- **Base** (solo en porcentaje): `depositado`, `iva`, `subtotal` o `total`.
+
+| Deducción de fábrica | Tipo | Valor |
+|----------------------|------|-------|
+| Retención de IVA | 75 % del `iva` | `IVA_RETENCION_DEFAULT` |
+| Honorarios profesionales (PJD) | 5 % del `subtotal` | `HONORARIOS_DEFAULT` |
+| Timbre Fiscal | 0,1 % del `subtotal` | `TIMBRE_FISCAL_DEFAULT` |
+| Responsabilidad Social | 3 % del `subtotal` | `RESPONSABILIDAD_SOCIAL_DEFAULT` |
+| Negro Primero | 3 % del `depositado` | `NEGRO_PRIMERO_DEFAULT` |
+
+- `PRESETS_DEDUCCION` ofrece los atajos (retención de IVA, honorarios, timbre, responsabilidad social,
+  Negro Primero y «monto fijo») para añadir filas con un clic; `deduccionesIniciales()` trae las cuatro
+  retenciones de fábrica en un cálculo nuevo.
+- La cadena respeta la resolución previa de cada eslabón: **una deducción sobre el IVA usa el IVA ya
+  resuelto** —aunque alguien lo haya ajustado a mano—, no el que daría la fórmula por su cuenta.
+- Las deducciones se resuelven en dos tiempos: primero las que no dependen del depósito (IVA, subtotal,
+  total, monto fijo), luego el depósito, y al final las que se aplican sobre él (p. ej. Negro Primero).
+- Si el subtotal de deducciones supera el total, el depósito (y el saldo disponible) puede quedar en
+  negativo y el editor lo avisa.
+
+### Cifras derivadas y ajustes
+
+Las cifras que salen de una fórmula se **autocalculan**. Si el documento real no cuadra con la
+fórmula, el usuario desbloquea la casilla (el **lápiz**) y escribe su cifra: queda marcada como
+**ajuste** (chip «ajustado») hasta que la devuelva a la fórmula con el botón de deshacer.
+
+- Ajustables: `montoIva`, `montoTotal` y `ganancia` (más el **monto depositado**, con
+  `depositadoManual`).
+- **Las deducciones de monto fijo no admiten ajuste**: su cifra *es* el valor. Solo las de porcentaje
+  pueden llevar el monto escrito a mano.
+- Al reabrir un cálculo guardado, `detectarAjustes()` compara con la fórmula y vuelve a marcar las
+  diferencias.
+
+### Estatus y guardado
+
+No hay numeración de control ni congelamiento de totales como en la factura: lo que cierra un cálculo
+es su **estatus**.
+
+| Estatus | Editable | Transiciones | Notas |
+|---------|----------|--------------|-------|
+| `borrador` | Sí | `procesado`, `anulada`, `eliminado` | Es lo que se guarda mientras se escribe |
+| `procesado` | No | `borrador`, `anulada`, `eliminado` | Cifras cerradas: el editor retira el botón «Procesar» |
+| `anulada` | No | `procesado`, `eliminado` | Se descarta sin borrarlo; queda visible para la traza |
+| `eliminado` | No | — (terminal) | Borrado lógico: sale del listado, se conserva en la base |
+
+- **Procesar** (botón en el editor, o acción del listado) cierra el cálculo; `fijarEstado()` valida la
+  transición antes de escribir el `$set`.
+- El **código interno** `CALC-000001` (`formatearCodigoCalculo`) se asigna la primera vez y ya no
+  cambia: es el vínculo estable del registro. El guardado es un *upsert* filtrado por `codigo`
+  (`ExecColeccion`), el mismo esquema que los demás documentos.
+- La **huella** se recalcula en cada guardado sobre el canónico de `CalculoService.huella()`: nombre,
+  fecha, cifras fuente, **deducciones** (`nombre|tipo|valor|base|monto`, sin los `id` de fila) y
+  resultados.
+- El borrador se respalda en `localStorage` y el listado se cachea en `firmalink:calculos:list`.
+
+### El listado (`/calculator`)
+
+KPIs (Cálculos, **Facturado**, **Deducciones**, **Saldo libre**, **Anuladas** y **Con tasa**), filtros
+por texto y divisa, y menú de acciones por fila. Los importes (Facturado, Deducciones, Saldo libre)
+suman **solo los cálculos procesados**; «Cálculos» cuenta todo el listado y «Anuladas» las descartadas.
+
+| Acción | Disponible cuando | Detalle |
+|--------|-------------------|---------|
+| Abrir en la calculadora | siempre | Monta el editor-modal (la calculadora es de consulta libre) |
+| Marcar como Procesado / Anulada / Borrador | `Update` | Llama a `fijarEstado`; se ofrecen solo las transiciones válidas |
+| Borrar | `Delete` | Borrado lógico (`estatus: 'eliminado'`) |
+| Doble clic en la fila | siempre | Abre el cálculo en la calculadora |
+
+- El **estatus** se pinta como chip de color (`.lb-estado`): borrador ámbar, procesado azul, anulada
+  rojo y borrado gris; el listado **no** muestra la columna *Huella* (queda en el editor).
+- Las columnas de importe (Total, Deducciones, Saldo libre) muestran **solo el monto**; el desglose
+  (IVA/subtotal, deducciones, disponible/ganancia) va en el *tooltip* de la celda.
+- El editor-modal se monta por estado (no es ruta) y, al cerrarse, el listado recarga la tabla.
+- El fichero de verificación aritmética del modelo es
+  `/var/folders/gp/nxkwmywj0_n9zdkpt1hwtdrm0000gn/T/opencode/check-calculo.ts` (se corre con `bun run`).
 
 ---
 

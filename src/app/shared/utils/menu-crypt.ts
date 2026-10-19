@@ -62,7 +62,13 @@ export function normalizarRuta(url: string | undefined | null): string {
     .toLowerCase();
 }
 
-/** Rutas que no dependen del menú: entrar, cambiar la contraseña y el panel. */
+/**
+ * Rutas que no dependen del menú: entrar, cambiar la contraseña y el panel.
+ *
+ * La calculadora **no** está aquí: como cualquier otra pantalla, su acceso lo
+ * declara el menú del perfil (`Calculadora → calculator`, con sus privilegios
+ * Create/Read/Update/Delete) y el guard la exige.
+ */
 export const RUTAS_LIBRES = ['login', 'dashboard', 'change-password'];
 
 /**
