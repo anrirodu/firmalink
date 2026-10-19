@@ -47,29 +47,35 @@
     <button mat-stroked-button type="button" (click)="irAlListado()" matTooltip="Ver todos los acuerdos registrados">
       <mat-icon>folder_open</mat-icon> Acuerdos
     </button>
-    <button mat-stroked-button type="button" (click)="limpiarHoja()"
-      [disabled]="cerrado"
-      [matTooltip]="cerrado ? motivoBloqueoActual : 'Borrar toda la información que aparece en la hoja'">
-      <mat-icon>delete_sweep</mat-icon> Limpiar hoja
-    </button>
-    <button mat-stroked-button type="button" (click)="restablecer()"
-      [disabled]="cerrado"
-      [matTooltip]="cerrado ? motivoBloqueoActual : 'Colocar la información por defecto del acuerdo'">
-      <mat-icon>restart_alt</mat-icon> Por defecto
-    </button>
+    @if (puedeGuardar) {
+      <button mat-stroked-button type="button" (click)="limpiarHoja()"
+        [disabled]="cerrado"
+        [matTooltip]="cerrado ? motivoBloqueoActual : 'Borrar toda la información que aparece en la hoja'">
+        <mat-icon>delete_sweep</mat-icon> Limpiar hoja
+      </button>
+      <button mat-stroked-button type="button" (click)="restablecer()"
+        [disabled]="cerrado"
+        [matTooltip]="cerrado ? motivoBloqueoActual : 'Colocar la información por defecto del acuerdo'">
+        <mat-icon>restart_alt</mat-icon> Por defecto
+      </button>
+    }
     <button mat-stroked-button type="button" (click)="imprimir()" matTooltip="Imprimir / Exportar a PDF">
       <mat-icon>print</mat-icon> Imprimir
     </button>
-    <button mat-stroked-button type="button" (click)="enviarPorCorreo()"
-      [disabled]="!puedeEnviarPorCorreo"
-      [matTooltip]="notaEnviarPorCorreo">
-      <mat-icon>mail</mat-icon> Enviar
-    </button>
-    <button mat-raised-button color="primary" type="button" (click)="guardar()"
-      [disabled]="cerrado && !editado"
-      [matTooltip]="cerrado && !editado ? motivoBloqueoActual : 'Guardar borrador del acuerdo'">
-      <mat-icon>save</mat-icon> Guardar Acuerdo
-    </button>
+    @if (Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="enviarPorCorreo()"
+        [disabled]="!puedeEnviarPorCorreo"
+        [matTooltip]="notaEnviarPorCorreo">
+        <mat-icon>mail</mat-icon> Enviar
+      </button>
+    }
+    @if (puedeGuardar) {
+      <button mat-raised-button color="primary" type="button" (click)="guardar()"
+        [disabled]="cerrado && !editado"
+        [matTooltip]="cerrado && !editado ? motivoBloqueoActual : 'Guardar borrador del acuerdo'">
+        <mat-icon>save</mat-icon> Guardar Acuerdo
+      </button>
+    }
   </div>
 </div>
 
@@ -84,33 +90,39 @@
       matTooltip="Ver todos los acuerdos registrados" aria-label="Acuerdos">
       <mat-icon>folder_open</mat-icon>
     </button>
-    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); limpiarHoja()"
-      [disabled]="cerrado"
-      [matTooltip]="cerrado ? motivoBloqueoActual : 'Borrar toda la información que aparece en la hoja'"
-      aria-label="Limpiar hoja">
-      <mat-icon>delete_sweep</mat-icon>
-    </button>
-    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); restablecer()"
-      [disabled]="cerrado"
-      [matTooltip]="cerrado ? motivoBloqueoActual : 'Colocar la información por defecto del acuerdo'"
-      aria-label="Por defecto">
-      <mat-icon>restart_alt</mat-icon>
-    </button>
+    @if (puedeGuardar) {
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); limpiarHoja()"
+        [disabled]="cerrado"
+        [matTooltip]="cerrado ? motivoBloqueoActual : 'Borrar toda la información que aparece en la hoja'"
+        aria-label="Limpiar hoja">
+        <mat-icon>delete_sweep</mat-icon>
+      </button>
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); restablecer()"
+        [disabled]="cerrado"
+        [matTooltip]="cerrado ? motivoBloqueoActual : 'Colocar la información por defecto del acuerdo'"
+        aria-label="Por defecto">
+        <mat-icon>restart_alt</mat-icon>
+      </button>
+    }
     <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); imprimir()"
       matTooltip="Imprimir / Exportar a PDF" aria-label="Imprimir">
       <mat-icon>print</mat-icon>
     </button>
-    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); enviarPorCorreo()"
-      [disabled]="!puedeEnviarPorCorreo"
-      [matTooltip]="notaEnviarPorCorreo" aria-label="Enviar por correo">
-      <mat-icon>mail</mat-icon>
-    </button>
-    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); guardar()"
-      [disabled]="cerrado && !editado"
-      [matTooltip]="cerrado && !editado ? motivoBloqueoActual : 'Guardar borrador del acuerdo'"
-      aria-label="Guardar acuerdo">
-      <mat-icon>save</mat-icon>
-    </button>
+    @if (Privilegio('Update')) {
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); enviarPorCorreo()"
+        [disabled]="!puedeEnviarPorCorreo"
+        [matTooltip]="notaEnviarPorCorreo" aria-label="Enviar por correo">
+        <mat-icon>mail</mat-icon>
+      </button>
+    }
+    @if (puedeGuardar) {
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); guardar()"
+        [disabled]="cerrado && !editado"
+        [matTooltip]="cerrado && !editado ? motivoBloqueoActual : 'Guardar borrador del acuerdo'"
+        aria-label="Guardar acuerdo">
+        <mat-icon>save</mat-icon>
+      </button>
+    }
   </div>
 
   <button mat-fab color="primary" type="button" (click)="toggleAcciones()"

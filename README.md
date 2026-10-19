@@ -23,12 +23,13 @@ interesado por correo electrónico.
 11. [Reglas de negocio — Acuerdos](#reglas-de-negocio--acuerdos)
 12. [Reglas de negocio — Clientes](#reglas-de-negocio--clientes)
 13. [Reglas de negocio — Facturación](#reglas-de-negocio--facturación)
-14. [Impresión y exportación](#impresión-y-exportación)
-15. [Envío por correo](#envío-por-correo)
-16. [Tema visual y branding](#tema-visual-y-branding)
-17. [Integración con contenedor de escritorio](#integración-con-contenedor-de-escritorio)
-18. [Convenciones de desarrollo](#convenciones-de-desarrollo)
-19. [Créditos](#créditos)
+14. [Reglas de negocio — Presupuestos](#reglas-de-negocio--presupuestos)
+15. [Impresión y exportación](#impresión-y-exportación)
+16. [Envío por correo](#envío-por-correo)
+17. [Tema visual y branding](#tema-visual-y-branding)
+18. [Integración con contenedor de escritorio](#integración-con-contenedor-de-escritorio)
+19. [Convenciones de desarrollo](#convenciones-de-desarrollo)
+20. [Créditos](#créditos)
 
 ---
 
@@ -67,6 +68,9 @@ interesado por correo electrónico.
 - **Facturación digital** sobre la hoja autorizada de 21,7 × 28 cm, con vista previa en vivo, el
   formato de la plantilla (cabecera, renglones, totales e importe en letras, firma y sello) y el
   trato fiscal del cliente: exención de IVA, IGTF de divisas y retenciones de IVA e ISLR.
+- **Presupuestos** (documento comercial, **no fiscal**) sobre la misma hoja de 21,7 × 28 cm, con
+  condiciones comerciales, validez que vence sola (`vencido`) y el ciclo
+  borrador → enviado → aprobado/rechazado → anulado, con la respuesta del cliente registrada.
 - **Autenticación** por JWT con interceptor de firma **HMAC**, guardas de ruta y cierre de sesión por
   inactividad.
 - **Tema claro / oscuro** persistente.
@@ -87,6 +91,8 @@ interesado por correo electrónico.
 | `/customers` | `pages/customers` | Clientes: listado con KPIs por categoría, filtros y ficha completa en modal |
 | `/billing` | `pages/billing/list-billing` | Listado de facturas generadas: KPIs, filtros, emisión/anulación, huella SHA-256 y envío por correo en PDF |
 | `/billing/new` | `pages/billing` | Editor de la factura: vista previa en vivo de la hoja 21,7 × 28 cm (alta y consulta) |
+| `/budgets` | `pages/budgets/list-budgets` | Listado de presupuestos: KPIs (cotizado, por vencer, vencidos), filtros, ciclo de vida (enviar/aprobar/rechazar/anular), huella SHA-256 y envío por correo en PDF |
+| `/budgets/new` | `pages/budgets` | Editor del presupuesto: vista previa en vivo de la hoja 21,7 × 28 cm, condiciones comerciales y validez (nuevo y consulta) |
 | `/change-password` | `pages/cambiar-contrasena` | Cambio de contraseña |
 | `/error` | `pages/miscellaneous/error` | Página de error |
 | `/not-authorized` | `pages/miscellaneous/not-authorized` | Acceso no autorizado |
@@ -288,6 +294,18 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `CONSULTAR_FACTURAS` | `_SYS_CFirmaLinkFacturas` | Listado de facturas (renglones, totales y copia del cliente) |
 | `CONSULTAR_FACTURAS_CLIENTE` | `_SYS_CFirmaLinkFacturasCliente` | Facturas de un cliente (`cliente.codigo`) |
 | `CONSULTAR_FACTURA` | `_SYS_CFirmaLinkFactura` | Detalle completo de una factura (`codigo`) |
+| `CONSULTAR_PRESUPUESTOS` | `_SYS_CFirmaLinkPresupuestos` | Listado liviano de presupuestos (totales, condiciones y copia del cliente, sin renglones) |
+| `CONSULTAR_PRESUPUESTOS_CLIENTE` | `_SYS_CFirmaLinkPresupuestosCliente` | Presupuestos de un cliente (`cliente.codigo`) |
+| `CONSULTAR_PRESUPUESTO` | `_SYS_CFirmaLinkPresupuesto` | Detalle completo de un presupuesto (`codigo`) |
+
+> Las tres funciones viven en la colección `apicore` de la base del sistema, con `driver: firmalink`,
+> `metodo: CONSULTAR`, `tipo: CONSULTA` y `estatus: true`. El servidor las resuelve con un `FindOne`
+> sobre `apicore` en **cada** petición (`core/model/relacional.go`, `leerValores`), así que darlas de
+> alta o editarlas **no exige reiniciar**: basta con que el usuario vuelva a entrar para que el listado
+> las vea. Los datos, en cambio, van a la base `firmalink` (driver `firmalink` →
+> `basedatos: firmalink` en `sys-drivers`), no a la del sistema. Ver
+> [Reglas de negocio — Presupuestos](#reglas-de-negocio--presupuestos) y
+> [Menú dinámico](#menú-dinámico).
 
 ### Proxy de desarrollo (`src/proxy.conf.json`)
 
@@ -348,7 +366,14 @@ El frontend no define permisos; se limita a renderizar lo que el backend entrega
 - **Firma HMAC** (`auth.interceptor.ts`) en métodos `POST`/`PUT`/`DELETE` que llevan cuerpo,
   mediante las cabeceras `Web-API-key`, `X-Signature` y `X-Timestamp`. Los `GET` o peticiones sin
   cuerpo solo envían `Authorization`. La cabecera `X-Skip-Interceptor` permite omitir la firma.
-- **Guardas de ruta**: `authGuard` protege el layout autenticado.
+- **Control de acceso por menú** (`auth-guard.guard.ts` + `shared/utils/menu-crypt.ts`): el guard
+  exige token válido y que la **ruta exacta** de la pantalla esté declarada en el menú del usuario
+  (`sessionStorage['menu']`), comparando también la huella (`sessionStorage['crypt']`). Si el menú no
+  coincide con su huella, la sesión se cierra con aviso; si la ruta no está en el menú, se va a
+  `/not-authorized`. Se registra como `canActivate` **y** `canActivateChild` sobre la ruta del layout:
+  `canActivate` solo corre al activar el layout (entrada o recarga), y como el sidebar navega con
+  `router.navigate`, sin `canActivateChild` una navegación entre pantallas no pasaría por el guard.
+  Rutas libres (no dependen del menú): `/login`, `/dashboard`, `/change-password`.
 - **Guarda `cambiosSinGuardarGuard`**: evita salir del editor con cambios sin guardar.
 - **Guarda `salirDeClientesGuard`**: pide confirmación al salir de `/customers` si la ficha de un
   cliente tiene cambios sin guardar. A diferencia del editor, no respalda un borrador local: la ficha
@@ -614,6 +639,95 @@ filtros por texto, estado y cliente, y menú de acciones por fila:
 
 ---
 
+## Reglas de negocio — Presupuestos
+
+Un presupuesto es el documento **comercial** que se cotiza **antes** de facturar: dice qué se ofrece,
+por cuánto y **bajo qué condiciones**, y el cliente lo aprueba o lo rechaza. No es un documento
+fiscal, y esa diferencia manda en todo el módulo.
+
+| | Factura | Presupuesto |
+|---|---|---|
+| Naturaleza | Fiscal (SENIAT) | Comercial |
+| Numeración de control | Sí, en rango autorizado | **No** |
+| IGTF / retenciones | Sí | **No** |
+| Vencimiento | No aplica | Validez en días → se muestra `vencido` |
+| Cierre | `emitida` | `enviado` → **respuesta del cliente** |
+
+- La hoja lleva la nota **"DOCUMENTO NO FISCAL — NO CONSTITUYE FACTURA"** y un bloque de
+  **aceptación del cliente** (nombre, firma y fecha), además de la firma y el sello del emisor.
+- El emisor es **BUNKER TECHNOLOGIES SOLUTIONS, C.A** y su identidad se arma desde `EMISOR_DEFAULT`
+  (`factura.model.ts`): un cambio de teléfono o correo vale para los dos documentos.
+- Las **condiciones comerciales** viajan con el documento: validez (días), forma de pago, tiempo de
+  entrega, garantía, lugar y alcance. `validezDias` (30 por defecto) **es la que recalcula
+  `fechaValidez`** desde la emisión.
+- **Descuento comercial** en porcentaje: se aplica sobre el subtotal, **antes** del IVA
+  (`subtotal → descuento → base imponible → IVA → total`).
+
+### Estados
+
+| Estado | Editable | Transiciones |
+|--------|----------|--------------|
+| `borrador` | Sí | `enviado`, `eliminado` |
+| `enviado` | No (congelado) | `aprobado`, `rechazado`, `anulado` |
+| `aprobado` | No | `anulado` |
+| `rechazado` | No | `anulado` |
+| `anulado` | No | — (terminal) |
+| `eliminado` | No | — (terminal, borrado lógico) |
+| `vencido` | — | **Derivado**: `enviado` cuya `fechaValidez` ya pasó. No se guarda |
+
+- **Enviar** es el paso que cierra el documento: congela `totales` y estampa la **huella SHA-256**
+  de lo que salió al cliente (número, cliente, renglones, IVA, descuento y validez).
+- **Aprobar / Rechazar** registran la respuesta del cliente: `aprobadoPor` (quién aceptó) o
+  `motivoRechazo`, más `fechaRespuesta`. Un presupuesto **anulado** o **eliminado** no se factura.
+- Solo un **borrador** se elimina. Un presupuesto que ya salió al cliente se **anula**: pudo quedar en
+  manos de terceros y su rastro se conserva.
+
+### Numeración
+
+- **Código interno** `PRE-000001` (`formatearCodigoPresupuesto`): el vínculo estable del documento,
+  el mismo esquema que clientes, acuerdos y facturas. Índice único por `codigo`.
+- **Número de presupuesto** de 7 dígitos (`formatearNumeroPresupuesto`, `0000007`). Correlativo y no
+  reutilizable: los eliminados siguen contando.
+- El borrador se respalda en `localStorage` y el listado se cachea en `firmalink:presupuestos:list`,
+  que entra en pantalla al instante y se revalida contra el backend.
+- Un documento por `codigo`: el guardado es un *upsert* filtrado por `codigo` (`ExecColeccion`), el
+  mismo esquema que clientes, acuerdos y facturas. La colección no lleva índices propios (solo `_id`),
+  igual que el resto de las colecciones de FirmaLink; los campos por los que se consulta son `codigo`,
+  `cliente.codigo`, `estado` y `fechaEmision`.
+
+### El listado (`/budgets`)
+
+KPIs (Presupuestos, Aprobados, Por vencer, Vencidos y **Cotizado** en Bs), filtros por texto, estado y
+cliente, y menú de acciones por fila:
+
+| Acción | Disponible cuando | Detalle |
+|--------|-------------------|---------|
+| Editar | `borrador` | Navega a `/budgets/new` con `presupuestos.marcarParaEditar(codigo)`; si está cerrado, el *tooltip* explica el motivo (`motivoBloqueo`) |
+| Ver hoja / Imprimir | siempre | Relee el presupuesto, rasteriza la hoja y abre la ventana de impresión |
+| Enviar por correo (PDF) | `enviado` | Genera el PDF, lo adjunta y prellena el correo del cliente (ver [Envío por correo](#envío-por-correo)) |
+| Enviar al cliente | `borrador` | Valida, confirma y guarda `estado: 'enviado'`: congela totales y huella |
+| Aprobar | `enviado` | Pide quién aprobó y guarda `estado: 'aprobado'` + `aprobadoPor` |
+| Rechazar | `enviado` | Pide el motivo y guarda `estado: 'rechazado'` + `motivoRechazo` |
+| Anular | `enviado`, `aprobado` o `rechazado` | Estado terminal, vía `cambiarEstado(codigo, 'anulado', estado)` |
+| Eliminar | `borrador` | Borrado lógico (`estado: 'eliminado'`) |
+| Copiar huella | presupuestos con huella | Copia el SHA-256 completo al portapapeles |
+
+- La columna **Validez** se pinta en ámbar cuando vence en 7 días o menos y en púrpura cuando ya
+  venció: es el dato que apura la decisión del cliente.
+- Se mantienen el lenguaje visual del módulo de facturas (huella verde `.lb-huella`, avatar de
+  iniciales, *speed dial* por debajo de 1024 px) y el modo oscuro.
+
+> **Backend en marcha**: las tres funciones `_SYS_CFirmaLinkPresupuesto*` están dadas de alta en
+> `apicore` y la colección `firmalink_presupuestos` quedó sembrada con seis ejemplos (PRE-000001 a
+> PRE-000006) que cubren los estados del ciclo de vida —incluido uno **vencido** (enviado cuya validez
+> pasó) y uno **por vencer**—, con el cliente `CLI-000001` y el emisor BUNKER. La huella de cada
+> ejemplo se verificó recalculándola con el mismo canónico de `PresupuestoService.huella()`. La entrada
+> "Presupuestos" (`budgets`) ya existe en el menú del perfil *Administrador FirmaLink*, dentro de
+> *Finanzas*. Si el listado avisa que no pudo consultar es el backend caído, no las funciones: el editor
+> **no pierde el trabajo** (borrador local) pero no guarda en la base.
+
+---
+
 ## Impresión y exportación
 
 **Acuerdos.** La impresión se realiza con un **iframe oculto** y reglas `@page` (`size: letter
@@ -627,6 +741,12 @@ documento completo con sus estilos y espera a que carguen las imágenes antes de
 así la hoja sale sola, sin la barra lateral ni el panel de la aplicación, y con el papel que declara
 `@page` (21,7 × 28 cm). Desde el diálogo del sistema se obtiene el **PDF** con *Guardar como PDF*;
 no se usa `PdfService`, que está atado al acuerdo.
+
+**Presupuestos.** Reutilizan **exactamente la misma hoja y el mismo motor** (`CSS_FACTURA`/
+`HOJA_FACTURA`, 21,7 × 28 cm): `imprimirPresupuesto()` para la ventana de impresión y
+`generarPdfPresupuesto()` para el adjunto del correo. Al compartir formato, comparten también el
+paginado y los topes de páginas: el arreglo del *píxel de sobra* de más abajo vale para los dos, y solo
+se mantiene una definición de la hoja.
 
 Para el **correo**, el PDF se genera en el navegador (`factura-pdf.ts`): la misma hoja se rasteriza
 con `html2canvas` a 192 ppp y se compone en un jsPDF de 21,7 × 28 cm, con paginado geométrico si la
@@ -646,8 +766,8 @@ factura desborda una página. Topes de seguridad: 8 páginas incrustadas y un pr
 
 ## Envío por correo
 
-Tanto el **acuerdo** como la **factura** se pueden remitir por correo (la factura solo cuando está
-**emitida**).
+Tanto el **acuerdo**, la **factura** (solo cuando está **emitida**) como el **presupuesto** (solo
+cuando está **enviado** al cliente) se pueden remitir por correo.
 
 ### Acuerdos
 
@@ -669,6 +789,19 @@ Tanto el **acuerdo** como la **factura** se pueden remitir por correo (la factur
    (`cliente.correo`, hoy `correoFacturacion`); el envío es idempotente por clave
    `${codigo}:${huella}:${Date.now()}`.
 3. Errores `noHabilitado` (503) y `rechazoProveedor` (422) se reportan con opción de reintentar.
+
+### Presupuestos
+
+1. Se genera el PDF de la hoja (mismo motor y mismo paginado que la factura, ver
+   [Impresión y exportación](#impresión-y-exportación)) y se arma el cuerpo con
+   `construirCorreoPresupuesto()` (`presupuesto-correo.ts`): asunto
+   `Presupuesto <numero> — <cliente>`, número, fecha, **válida hasta**, renglones, totales,
+   **condiciones comerciales**, la nota **DOCUMENTO NO FISCAL — NO CONSTITUYE FACTURA** y la hoja
+   incrustada como `cid:`; el PDF viaja como adjunto.
+2. `pedirDestinatariosCorreoPresupuesto()` prellena los destinatarios con el correo del cliente
+   (`cliente.correo`) y valida el formato de cada dirección antes de enviar.
+3. El correo se puede **responder para aprobar**: el cuerpo lo indica expresamente, y la respuesta se
+   registra en el listado con la acción **Aprobar** (que pide quién aceptó).
 
 Errores contemplados: `503` (servicio de correo no habilitado), `422` (rechazo del proveedor),
 `400`, `403`, `413` (adjuntos demasiado grandes) y `429` (demasiadas peticiones).

@@ -1,0 +1,414 @@
+<!-- ============================================
+     LIST BUDGETS — Presupuestos generados
+     Listado, filtro por texto/estado/cliente, envío al cliente,
+     respuesta (aprobar/rechazar), anulación, envío por correo
+     con la hoja en PDF y consulta/edición.
+     ============================================ -->
+
+<!-- Header -->
+<div class="page-header">
+  <div class="header-content">
+    <h1>Presupuestos</h1>
+  </div>
+  <div class="header-actions">
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="cargar(clienteConsultado)"
+      [disabled]="cargando"
+      matTooltip="Volver a consultar el listado en el servidor"
+    >
+      <mat-icon>refresh</mat-icon> Actualizar
+    </button>
+    @if (Privilegio('Create')) {
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        (click)="nuevaPresupuesto()"
+        matTooltip="Redactar un presupuesto nuevo"
+      >
+        <mat-icon>add_circle</mat-icon> Nuevo Presupuesto
+      </button>
+    }
+  </div>
+</div>
+
+<!-- ============================================
+     SPEED DIAL (móvil y tablet) — a partir de 1024px .header-actions se
+     oculta y las acciones viven dentro de este botón flotante.
+     ============================================ -->
+<div class="lb-speeddial" [class.abierto]="accionesAbiertas">
+  <div class="lb-speeddial-acciones" role="menu" aria-label="Acciones de presupuestos">
+    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas = false; cargar(clienteConsultado)"
+      [disabled]="cargando"
+      matTooltip="Volver a consultar el listado en el servidor"
+      aria-label="Actualizar">
+      <mat-icon>refresh</mat-icon>
+    </button>
+    @if (Privilegio('Create')) {
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas = false; nuevaPresupuesto()"
+        matTooltip="Redactar un presupuesto nuevo"
+        aria-label="Nuevo Presupuesto">
+        <mat-icon>add_circle</mat-icon>
+      </button>
+    }
+  </div>
+
+  <button mat-fab color="primary" type="button" (click)="toggleAcciones()"
+    [attr.aria-expanded]="accionesAbiertas" aria-haspopup="menu"
+    matTooltip="Acciones de presupuestos" aria-label="Acciones de presupuestos">
+    <mat-icon>{{ accionesAbiertas ? 'close' : 'more_vert' }}</mat-icon>
+  </button>
+</div>
+
+<!-- Indicadores por estado -->
+<div class="lb-kpis">
+  @for (kpi of kpis; track kpi.etiqueta) {
+    <div class="lb-kpi" [ngClass]="kpi.clase">
+      <mat-icon>{{ kpi.icono }}</mat-icon>
+      <div>
+        <span class="lb-kpi-valor">{{ kpi.texto ?? kpi.valor }}</span>
+        <span class="lb-kpi-etiqueta">{{ kpi.etiqueta }}</span>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Tabla de presupuestos -->
+<mat-card class="table-card">
+  @if (cargando) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  <mat-card-header class="table-header">
+    <div class="header-left">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Buscar presupuesto</mat-label>
+        <input
+          #searchInput
+          matInput
+          (keyup)="onFiltroTexto(searchInput.value)"
+          placeholder="Número, cliente, RIF, periodo..."
+        />
+        <mat-icon matPrefix>search</mat-icon>
+        @if (filtroTexto) {
+          <button matSuffix mat-icon-button aria-label="Limpiar" (click)="limpiarFiltros(searchInput)">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="estado-field">
+        <mat-label>Estado</mat-label>
+        <mat-select
+          [ngModel]="filtroEstado"
+          (ngModelChange)="onFiltroEstado($event)"
+          panelClass="lb-estado-panel"
+        >
+          <mat-option value="">Todos los estados</mat-option>
+          @for (e of estados; track e.valor) {
+            <mat-option [value]="e.valor">
+              <mat-icon>{{ e.icono }}</mat-icon> {{ e.etiqueta }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="cliente-field">
+        <mat-label>Cliente</mat-label>
+        <mat-select
+          [ngModel]="filtroCliente"
+          (ngModelChange)="onFiltroCliente($event)"
+          panelClass="lb-cliente-panel"
+        >
+          <mat-option value="">Todos los clientes</mat-option>
+          @for (c of clientesEnLista; track c.codigo) {
+            <mat-option [value]="c.codigo">{{ c.nombre }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="header-right">
+      <span class="lb-conteo">
+        {{ dataSource.filteredData.length }} de {{ dataSource.data.length }} presupuestos
+      </span>
+    </div>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (Privilegio('Read')) {
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="dataSource" matSort class="data-table">
+
+        <!-- Número -->
+        <ng-container matColumnDef="numero">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>N° Presupuesto</th>
+          <td mat-cell *matCellDef="let row" class="cell-number">
+            <span class="lb-numero">{{ row.numero }}</span>
+            @if (row.codigo) {
+              <span class="lb-codigo">{{ row.codigo }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Emisión -->
+        <ng-container matColumnDef="fechaEmision">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
+          <td mat-cell *matCellDef="let row" [matTooltip]="fechaAbsoluta(row)">
+            {{ hace(row) }}
+          </td>
+        </ng-container>
+
+        <!-- Cliente -->
+        <ng-container matColumnDef="cliente">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
+          <td mat-cell *matCellDef="let row">
+            @if (row.cliente; as cli) {
+              <div class="lb-cliente" [matTooltip]="detalleCliente(row)">
+                <span class="lb-cliente-avatar">{{ inicialesCliente(row) }}</span>
+                <div class="lb-cliente-texto">
+                  <span class="lb-cliente-nombre">{{ cli.nombre }}</span>
+                  <span class="lb-cliente-ident">{{ cli.rif || cli.identificacion }}</span>
+                </div>
+              </div>
+            } @else {
+              <span class="lb-sin-dato" [matTooltip]="detalleCliente(row)">Sin cliente</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Validez -->
+        <ng-container matColumnDef="validez">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Validez</th>
+          <td mat-cell *matCellDef="let row" [ngClass]="claseValidez(row)" [matTooltip]="notaValidez(row)">
+            {{ validezTexto(row) || '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Estado -->
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="lb-chip" [ngClass]="claseEstado(estadoDe(row))">
+              <mat-icon>{{ iconoEstado(estadoDe(row)) }}</mat-icon>
+              {{ etiquetaEstado(estadoDe(row)) }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Total -->
+        <ng-container matColumnDef="total">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="th-num">Total Bs</th>
+          <td mat-cell *matCellDef="let row" class="cell-importe">
+            {{ totalTexto(row) }}
+          </td>
+        </ng-container>
+
+        <!-- Huella -->
+        <ng-container matColumnDef="huella">
+          <th mat-header-cell *matHeaderCellDef>Huella SHA-256</th>
+          <td mat-cell *matCellDef="let row">
+            @if (row.huella) {
+              <button
+                type="button"
+                class="lb-huella"
+                (click)="copiarHuella(row); $event.stopPropagation()"
+                [matTooltip]="row.huella + ' — Clic para copiar'"
+              >
+                <mat-icon>fingerprint</mat-icon>
+                <code>{{ huellaCorta(row) }}…</code>
+              </button>
+            } @else {
+              <span class="lb-sin-dato">Sin huella</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Acciones -->
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef class="th-acciones">Acciones</th>
+          <td mat-cell *matCellDef="let row" class="td-acciones">
+            <button
+              mat-icon-button
+              type="button"
+              [matMenuTriggerFor]="menuAcciones"
+              (click)="$event.stopPropagation()"
+              matTooltip="Acciones del presupuesto"
+              aria-label="Acciones del presupuesto"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #menuAcciones="matMenu">
+              <div class="lb-menu-titulo">{{ row.numero }}</div>
+              <mat-divider></mat-divider>
+
+              <!-- Editar: solo borradores; el resto está cerrado -->
+              @if (Privilegio('Update')) {
+                <button
+                  mat-menu-item
+                  type="button"
+                  [disabled]="!editable(row)"
+                  (click)="editar(row)"
+                  [matTooltip]="notaBloqueo(row)"
+                >
+                  <mat-icon>edit</mat-icon>
+                  <span>Editar</span>
+                </button>
+              }
+
+              <button
+                mat-menu-item
+                type="button"
+                (click)="imprimir(row)"
+                matTooltip="Ver la hoja completa (imprimir o guardar como PDF)"
+              >
+                <mat-icon>print</mat-icon>
+                <span>Ver hoja / Imprimir</span>
+              </button>
+
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="!puedeEnviarCorreo(row)"
+                (click)="enviarCorreo(row)"
+                [matTooltip]="notaEnviarCorreo(row)"
+              >
+                <mat-icon>mail</mat-icon>
+                <span>Enviar por correo (PDF)</span>
+              </button>
+
+              <mat-divider></mat-divider>
+
+              <!-- Enviar: solo borradores, congela montos y validez -->
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="!puedeEnviar(row)"
+                (click)="enviar(row)"
+                matTooltip="Enviar al cliente: congela montos y validez, y el presupuesto deja de editarse"
+              >
+                <mat-icon>send</mat-icon>
+                <span>Enviar al cliente</span>
+              </button>
+
+              <!-- Respuesta del cliente: solo presupuestos enviados -->
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="!puedeResponder(row)"
+                (click)="aprobar(row)"
+                matTooltip="Registrar la aprobación del cliente"
+              >
+                <mat-icon>verified</mat-icon>
+                <span>Aprobar</span>
+              </button>
+
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="!puedeResponder(row)"
+                (click)="rechazar(row)"
+                matTooltip="Registrar el rechazo del cliente, con su motivo"
+              >
+                <mat-icon>thumb_down</mat-icon>
+                <span>Rechazar</span>
+              </button>
+
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="!puedeAnular(row)"
+                (click)="anular(row)"
+                matTooltip="Anular un presupuesto enviado, aprobado o rechazado"
+              >
+                <mat-icon>block</mat-icon>
+                <span>Anular</span>
+              </button>
+
+              <mat-divider></mat-divider>
+
+              <!-- Borrado lógico: solo borradores; lo enviado se anula -->
+              @if (Privilegio('Delete')) {
+                <button
+                  mat-menu-item
+                  type="button"
+                  class="lb-accion-eliminar"
+                  [disabled]="!sePuedeEliminar(row)"
+                  (click)="eliminar(row)"
+                  [matTooltip]="notaEliminar(row)"
+                >
+                  <mat-icon>delete</mat-icon>
+                  <span>Eliminar</span>
+                </button>
+              }
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns"
+          class="lb-fila"
+          [class.lb-fila-cerrada]="!editable(row)"
+          (dblclick)="editar(row)"
+          [matTooltip]="notaBloqueo(row)"
+          matTooltipPosition="left"
+        ></tr>
+
+        <!-- Sin resultados -->
+        <tr class="mat-row lb-vacio" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            @if (cargando) {
+              <mat-icon class="lb-vacio-icono">hourglass_top</mat-icon>
+              <p>Consultando presupuestos…</p>
+            } @else if (dataSource.data.length === 0) {
+              <mat-icon class="lb-vacio-icono">receipt_long</mat-icon>
+              @if (clienteConsultado) {
+                <p>
+                  {{ nombreClientePedido || clienteConsultado }} no tiene presupuestos registrados.
+                </p>
+                <button mat-stroked-button type="button" (click)="limpiarFiltros()">
+                  <mat-icon>filter_alt_off</mat-icon> Ver todos los presupuestos
+                </button>
+              } @else {
+                <p>No hay presupuestos generados todavía.</p>
+                @if (Privilegio('Create')) {
+                  <button mat-raised-button color="primary" type="button" (click)="nuevaPresupuesto()">
+                    <mat-icon>add_circle</mat-icon> Crear el primero
+                  </button>
+                }
+              }
+            } @else {
+              <mat-icon class="lb-vacio-icono">search_off</mat-icon>
+              <p>Ningún presupuesto coincide con el filtro aplicado.</p>
+              <button mat-stroked-button type="button" (click)="limpiarFiltros()">
+                <mat-icon>filter_alt_off</mat-icon> Quitar filtros
+              </button>
+            }
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator
+      [pageSizeOptions]="[10, 25, 50, 100]"
+      [pageSize]="25"
+      showFirstLastButtons
+      aria-label="Seleccionar página de presupuestos"
+    ></mat-paginator>
+    } @else {
+      <!-- Sin privilegio Read: no se listan los registros, solo se avisa -->
+      <div class="lb-vacio lb-sin-lectura" role="status">
+        <mat-icon class="lb-vacio-icono">lock</mat-icon>
+        <p>No tiene permiso para consultar el listado de presupuestos.</p>
+        <p class="lb-sin-lectura-nota">
+          Solicite el privilegio <strong>Read</strong> al administrador si necesita verlo.
+        </p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

@@ -45,6 +45,7 @@ import { ClienteService } from './cliente.service';
 import { CustomerFormComponent, SolicitudAbrirCliente } from './customer-form/customer-form.component';
 import { PantallaConFormulario } from './salir-de-clientes.guard';
 import { NotificacionService } from '../../shared/services/notificacion.service';
+import { PrivilegiosService } from '../../shared/services/privilegios.service';
 import { escaparHtml } from '../../shared/utils/escapar-html';
 
 interface Kpi {
@@ -205,7 +206,16 @@ export class CustomersComponent implements OnInit, AfterViewInit, OnDestroy, Pan
   private readonly servicio = inject(ClienteService);
   private readonly notificar = inject(NotificacionService);
   private readonly router = inject(Router);
+  private readonly privilegios = inject(PrivilegiosService);
   private readonly formulario = viewChild(CustomerFormComponent);
+
+  /**
+   * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
+   * listado de clientes? La plantilla lo usa para mostrar sólo lo permitido.
+   */
+  Privilegio(metodo: string): boolean {
+    return this.privilegios.tiene(metodo);
+  }
 
   /** Escape cierra el speed dial (fase de captura, igual que en acuerdos). */
   private readonly alPulsarEscape = (evento: KeyboardEvent): void => {

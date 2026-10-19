@@ -399,7 +399,7 @@ export function calcularTotales(f: Factura): TotalesFactura {
 }
 
 /** Céntimos, para que un subtotal con decimales no arrastre ruido binario. */
-function redondear(n: number): number {
+export function redondear(n: number): number {
   return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 }
 

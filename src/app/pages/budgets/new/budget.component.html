@@ -1,0 +1,600 @@
+<div class="bl-page">
+
+  <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
+  <header class="page-header">
+    <div class="header-content">
+      <h1>Presupuestos</h1>
+      <p>
+        Presupuesto <strong>{{ formatearNumeroPresupuesto(presupuesto().numero) }}</strong>
+        · Emisión: {{ presupuesto().fechaTexto }}
+        · Válido hasta: {{ fechaValidezCorta(presupuesto()) }}
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <span class="bl-estado" [style.--bl-estado-color]="estadoInfo().color">
+        <mat-icon>{{ estadoInfo().icono }}</mat-icon>
+        {{ estadoInfo().etiqueta }}
+      </span>
+
+      @if (!readonly_() && Privilegio('Update')) {
+        <button mat-stroked-button type="button" (click)="guardar(false)" [disabled]="guardando()">
+          <mat-icon>save</mat-icon> Guardar borrador
+        </button>
+      }
+      @if (!readonly_() && estadoMostrado() === 'borrador' && Privilegio('Update')) {
+        <button mat-stroked-button type="button" (click)="guardar(true)" [disabled]="guardando()">
+          <mat-icon>send</mat-icon> Enviar al cliente
+        </button>
+      }
+      @if (presupuesto().estado === 'enviado' && Privilegio('Update')) {
+        <button mat-stroked-button type="button" (click)="responder('aprobado')">
+          <mat-icon>verified</mat-icon> Aprobar
+        </button>
+        <button mat-stroked-button type="button" (click)="responder('rechazado')">
+          <mat-icon>thumb_down</mat-icon> Rechazar
+        </button>
+      }
+      @if ((presupuesto().estado === 'enviado'
+           || presupuesto().estado === 'aprobado'
+           || presupuesto().estado === 'rechazado') && Privilegio('Update')) {
+        <button mat-stroked-button type="button" (click)="anular()">
+          <mat-icon>block</mat-icon> Anular
+        </button>
+      }
+      @if (presupuesto().estado === 'borrador' && Privilegio('Delete')) {
+        <button mat-stroked-button type="button" (click)="eliminar()">
+          <mat-icon>delete_outline</mat-icon> Eliminar
+        </button>
+      }
+      <button mat-icon-button type="button" (click)="imprimir()" [disabled]="cargando()"
+              matTooltip="Imprimir el presupuesto">
+        <mat-icon>print</mat-icon>
+      </button>
+      @if (Privilegio('Create')) {
+        <button mat-icon-button type="button" (click)="nueva()"
+                matTooltip="Presupuesto nuevo">
+          <mat-icon>note_add</mat-icon>
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (bloqueo()) {
+    <div class="bl-aviso bl-aviso-bloqueo">
+      <mat-icon>lock</mat-icon>
+      <div>{{ bloqueo() }}</div>
+    </div>
+  }
+
+  @if (problemas().length > 0 && !readonly_()) {
+    <div class="bl-aviso bl-aviso-datos">
+      <mat-icon>error_outline</mat-icon>
+      <div>
+        <strong>Para enviar el presupuesto falta:</strong>
+        <ul>
+          @for (p of problemas(); track p.campo + p.mensaje) {
+            <li>{{ p.mensaje }}</li>
+          }
+        </ul>
+      </div>
+    </div>
+  }
+
+  <p class="bl-no-fiscal">
+    <mat-icon>info</mat-icon>
+    Documento comercial: no es una factura fiscal.
+  </p>
+
+  <div class="bl-layout">
+
+    <!-- ── Panel de datos ─────────────────────────────────────────────── -->
+    <aside class="bl-panel">
+
+            <ng-template #tplCliente let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Cliente -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>person</mat-icon> Cliente
+        </h2>
+
+        @if (!presupuesto().cliente) {
+          <mat-form-field class="bl-buscador" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Buscar cliente</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput type="text" [formControl]="buscarCliente"
+                   placeholder="Nombre, RIF o código"
+                   [matAutocomplete]="autoClientes"
+                   [attr.disabled]="readonly_() ? '' : null">
+            <mat-autocomplete #autoClientes="matAutocomplete"
+                              [displayWith]="nombreCliente"
+                              (optionSelected)="elegirCliente($event.option.value)">
+              @for (c of clientesFiltrados(); track c.codigo) {
+                <mat-option [value]="c">
+                  <div class="bl-opcion">
+                    <span class="bl-opcion-nombre">{{ nombreCliente(c) }}</span>
+                    <span class="bl-opcion-meta">
+                      {{ c.rif || c.identificacion }} · {{ c.codigo }}
+                    </span>
+                  </div>
+                </mat-option>
+              }
+              @if (clientesFiltrados().length === 0) {
+                <mat-option disabled>Sin clientes que coincidan</mat-option>
+              }
+            </mat-autocomplete>
+          </mat-form-field>
+        } @else {
+          <div class="bl-cliente">
+            <div class="bl-cliente-avatar">{{ presupuesto().cliente?.nombre?.charAt(0) }}</div>
+            <div class="bl-cliente-datos">
+              <strong>{{ presupuesto().cliente?.nombre }}</strong>
+              <span>{{ presupuesto().cliente?.rif || presupuesto().cliente?.identificacion }}</span>
+              <span class="bl-cliente-linea">
+                <mat-icon>place</mat-icon> {{ presupuesto().cliente?.direccion }}
+              </span>
+              @if (presupuesto().cliente?.telefono) {
+                <span class="bl-cliente-linea">
+                  <mat-icon>call</mat-icon> {{ presupuesto().cliente?.telefono }}
+                </span>
+              }
+            </div>
+          </div>
+
+          <div class="bl-cliente-acciones">
+            <button mat-button type="button" (click)="refrescarCliente()"
+                    [disabled]="readonly_()"
+                    matTooltip="Volver a copiar los datos de la ficha del cliente">
+              <mat-icon>sync</mat-icon> Actualizar datos
+            </button>
+            <button mat-button type="button" (click)="quitarCliente()"
+                    [disabled]="readonly_()"
+                    matTooltip="Quitar el cliente del presupuesto">
+              <mat-icon>close</mat-icon> Quitar
+            </button>
+          </div>
+
+          @if (notasCliente(presupuesto().cliente).length > 0) {
+            <ul class="bl-notas">
+              @for (n of notasCliente(presupuesto().cliente); track n.titulo) {
+                <li [class]="'bl-nota bl-nota-' + n.tono">
+                  <mat-icon>{{ n.icono }}</mat-icon>
+                  <div>
+                    <strong>{{ n.titulo }}</strong>
+                    <span>{{ n.detalle }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        }
+      </section>
+      </ng-template>
+
+      <ng-template #tplDatos let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Datos del presupuesto -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>badge</mat-icon> Datos del presupuesto
+        </h2>
+
+        <div class="bl-grid">
+          <label class="bl-campo">
+            <span>N° Presupuesto</span>
+            <input type="text" inputmode="numeric" [value]="presupuesto().numero"
+                   (input)="set('numero', formatearNumeroPresupuesto($any($event.target).value))"
+                   [attr.readonly]="readonly_() ? '' : null">
+          </label>
+
+          <label class="bl-campo">
+            <span>Fecha de emisión</span>
+            <input type="date" [value]="fechaParaInput(presupuesto())"
+                   (change)="setFecha($any($event.target).value)"
+                   [attr.disabled]="readonly_() ? '' : null">
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Fecha impresa</span>
+            <input type="text" [value]="presupuesto().fechaTexto"
+                   (input)="setFechaTexto($any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null"
+                   matTooltip="Como sale en la hoja: ciudad, día, mes y año">
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Mes cotizado</span>
+            <input type="text" [value]="presupuesto().mes"
+                   (input)="set('mes', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+          </label>
+        </div>
+      </section>
+      </ng-template>
+
+      <ng-template #tplCondiciones let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Condiciones comerciales -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>handshake</mat-icon> Condiciones comerciales
+        </h2>
+
+        <div class="bl-grid">
+          <label class="bl-campo">
+            <span>Validez (días)</span>
+            <input type="text" inputmode="numeric" [value]="presupuesto().condiciones.validezDias"
+                   (input)="setValidezDias($any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+          </label>
+
+          <label class="bl-campo">
+            <span>Válido hasta</span>
+            <input type="text" [value]="fechaValidezCorta(presupuesto())" readonly>
+            <small class="bl-hint">Se recalcula desde la fecha de emisión.</small>
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Forma de pago</span>
+            <input type="text" [value]="presupuesto().condiciones.formaPago"
+                   (input)="setCondicion('formaPago', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null"
+                   placeholder="Contado contra entrega, 50 % anticipo y 50 % contra entrega…">
+          </label>
+
+          <label class="bl-campo">
+            <span>Tiempo de entrega</span>
+            <input type="text" [value]="presupuesto().condiciones.tiempoEntrega"
+                   (input)="setCondicion('tiempoEntrega', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null"
+                   placeholder="15 días hábiles">
+          </label>
+
+          <label class="bl-campo">
+            <span>Garantía</span>
+            <input type="text" [value]="presupuesto().condiciones.garantia"
+                   (input)="setCondicion('garantia', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null"
+                   placeholder="30 días sobre defectos de fabricación">
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Lugar de entrega</span>
+            <input type="text" [value]="presupuesto().condiciones.lugar"
+                   (input)="setCondicion('lugar', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null"
+                   placeholder="Caracas, Distrito Capital">
+          </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Alcance del trabajo</span>
+            <textarea rows="3" [value]="presupuesto().condiciones.alcance"
+                      (input)="setCondicion('alcance', $any($event.target).value)"
+                      [attr.readonly]="readonly_() ? '' : null"
+                      placeholder="Qué incluye el trabajo y sus exclusiones"></textarea>
+          </label>
+        </div>
+      </section>
+      </ng-template>
+
+      <ng-template #tplImpuestos let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Impuestos y descuento comercial -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>percent</mat-icon> Impuestos y descuento
+        </h2>
+
+        <div class="bl-grid">
+          <label class="bl-campo">
+            <span>IVA (%)</span>
+            <input type="text" inputmode="decimal" [value]="presupuesto().alicuotaIva"
+                   (input)="setNumero('alicuotaIva', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+            @if (clienteExentoIva()) {
+              <small class="bl-hint">Cliente exento: el presupuesto sale sin IVA.</small>
+            } @else {
+              <small class="bl-hint">Alícuota efectiva: {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}.</small>
+            }
+          </label>
+
+          <label class="bl-campo">
+            <span>Descuento comercial (%)</span>
+            <input type="text" inputmode="decimal" [value]="presupuesto().descuentoPorcentaje"
+                   (input)="setNumero('descuentoPorcentaje', $any($event.target).value)"
+                   [attr.readonly]="readonly_() ? '' : null">
+            <small class="bl-hint">
+              @if (descuento() > 0) {
+                Se descuentan {{ formatoBs(descuento()) }} Bs antes de calcular el IVA.
+              } @else {
+                Se aplica sobre el subtotal antes de calcular el IVA.
+              }
+            </small>
+          </label>
+        </div>
+      </section>
+      </ng-template>
+
+      <ng-template #tplRenglones let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Renglones -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>list_alt</mat-icon> Renglones
+          <span class="bl-contador">{{ presupuesto().items.length }}</span>
+        </h2>
+
+        @if (presupuesto().items.length === 0) {
+          <p class="bl-vacio">
+            El presupuesto no tiene renglones. Agregue el primero con <strong>+ Agregar renglón</strong>.
+          </p>
+        } @else {
+          <div class="bl-items">
+            @for (it of presupuesto().items; track $index; let i = $index) {
+              <div class="bl-item">
+                <label class="bl-item-desc">
+                  <span class="bl-item-num">{{ i + 1 }}</span>
+                  <textarea rows="2" [value]="it.descripcion"
+                            placeholder="Descripción del producto o servicio"
+                            (input)="editarItem(i, 'descripcion', $any($event.target).value)"
+                            [attr.readonly]="readonly_() ? '' : null"></textarea>
+                </label>
+                <div class="bl-item-cifras">
+                  <label class="bl-campo bl-campo-corto">
+                    <span>Cantidad</span>
+                    <input type="text" inputmode="decimal" [value]="it.cantidad"
+                           (input)="editarItem(i, 'cantidad', $any($event.target).value)"
+                           [attr.readonly]="readonly_() ? '' : null">
+                  </label>
+                  <label class="bl-campo bl-campo-corto">
+                    <span>Precio (Bs)</span>
+                    <input type="text" inputmode="decimal" [value]="it.precio"
+                           (input)="editarItem(i, 'precio', $any($event.target).value)"
+                           [attr.readonly]="readonly_() ? '' : null">
+                  </label>
+                  <div class="bl-item-total">
+                    <span>Total</span>
+                    <strong>{{ formatoBs(totalItem(i)) }}</strong>
+                  </div>
+                  <button mat-icon-button type="button" class="bl-item-quitar"
+                          (click)="quitarItem(i)" [disabled]="readonly_()"
+                          matTooltip="Quitar el renglón">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="bl-card-acciones">
+          <button mat-stroked-button type="button" (click)="agregarItem()" [disabled]="readonly_()">
+            <mat-icon>add</mat-icon> Agregar renglón
+          </button>
+          <button mat-button type="button" (click)="limpiarItems()"
+                  [disabled]="readonly_() || presupuesto().items.length === 0">
+            <mat-icon>playlist_remove</mat-icon> Quitar todos
+          </button>
+        </div>
+      </section>
+      </ng-template>
+
+      <ng-template #tplResumen let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Resumen -->
+      <section class="bl-card bl-resumen">
+        <h2 class="bl-card-titulo">
+          <mat-icon>functions</mat-icon> Resumen
+        </h2>
+
+        <dl class="bl-totales">
+          <div><dt>Subtotal</dt><dd>{{ formatoBs(totales().subtotal) }}</dd></div>
+          @if (descuento() > 0) {
+            <div class="bl-retencion">
+              <dt>Descuento {{ formatoPorcentaje(presupuesto().descuentoPorcentaje) }}</dt>
+              <dd>- {{ formatoBs(descuento()) }}</dd>
+            </div>
+          }
+          <div><dt>Base imponible</dt><dd>{{ formatoBs(totales().baseImponible) }}</dd></div>
+          <div><dt>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}</dt>
+            <dd>{{ formatoBs(totales().montoIva) }}</dd></div>
+          <div class="bl-total"><dt>Total Bs</dt><dd>{{ formatoBs(totales().total) }}</dd></div>
+        </dl>
+      </section>
+      </ng-template>
+
+      <ng-template #tplHoja let-datos let-ref="dialogRef">
+        @if (datos) {
+          <div class="bl-seccion-cabecera">
+            <strong>{{ datos.titulo }}</strong>
+            <button mat-icon-button type="button" (click)="ref.close()" matTooltip="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+<!-- Hoja -->
+      <section class="bl-card">
+        <h2 class="bl-card-titulo">
+          <mat-icon>description</mat-icon> Hoja
+        </h2>
+
+        <div class="bl-interruptores">
+          <button mat-stroked-button type="button" (click)="alternar('mostrarCabeceraPie')"
+                  [class.activo]="presupuesto().mostrarCabeceraPie" [disabled]="readonly_()"
+                  matTooltip="Mostrar u ocultar la cabecera (logo, empresa) y el pie del emisor">
+            <mat-icon>{{ presupuesto().mostrarCabeceraPie ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+            Cabecera y pie
+          </button>
+          <button mat-stroked-button type="button" (click)="alternar('mostrarFirmaSello')"
+                  [class.activo]="presupuesto().mostrarFirmaSello" [disabled]="readonly_()"
+                  matTooltip="Mostrar u ocultar la firma y el sello">
+            <mat-icon>{{ presupuesto().mostrarFirmaSello ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+            Firma y sello
+          </button>
+          <button mat-stroked-button type="button" (click)="alternar('mostrarMarcaAgua')"
+                  [class.activo]="presupuesto().mostrarMarcaAgua" [disabled]="readonly_()"
+                  matTooltip="Mostrar u ocultar la marca de agua">
+            <mat-icon>{{ presupuesto().mostrarMarcaAgua ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+            Marca de agua
+          </button>
+        </div>
+
+        @if (presupuesto().codigo) {
+          <p class="bl-hint">
+            Código interno {{ presupuesto().codigo }}
+            @if (presupuesto().huella) {
+              · huella {{ presupuesto().huella?.slice(0, 16) }}…
+            }
+          </p>
+        }
+      </section>
+      </ng-template>
+
+
+      @if (!esCompacta()) {
+        <ng-container *ngTemplateOutlet="tplCliente"></ng-container>
+        <ng-container *ngTemplateOutlet="tplDatos"></ng-container>
+        <ng-container *ngTemplateOutlet="tplCondiciones"></ng-container>
+        <ng-container *ngTemplateOutlet="tplImpuestos"></ng-container>
+        <ng-container *ngTemplateOutlet="tplRenglones"></ng-container>
+        <ng-container *ngTemplateOutlet="tplResumen"></ng-container>
+        <ng-container *ngTemplateOutlet="tplHoja"></ng-container>
+      } @else {
+        <div class="bl-secciones">
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Cliente', tplCliente)">
+            <mat-icon>person</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Cliente</strong>
+              <small>{{ presupuesto().cliente?.nombre ?? 'Sin cliente asignado' }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Datos del presupuesto', tplDatos)">
+            <mat-icon>badge</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Datos del presupuesto</strong>
+              <small>PRESUPUESTO {{ presupuesto().numero }} · emisión {{ presupuesto().fechaTexto }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Condiciones comerciales', tplCondiciones)">
+            <mat-icon>handshake</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Condiciones comerciales</strong>
+              <small>Validez {{ presupuesto().condiciones.validezDias }} días · {{ presupuesto().condiciones.formaPago }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Impuestos y descuento', tplImpuestos)">
+            <mat-icon>percent</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Impuestos y descuento</strong>
+              <small>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}@if (presupuesto().descuentoPorcentaje > 0) { · Desc. {{ formatoPorcentaje(presupuesto().descuentoPorcentaje) }} }</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Renglones', tplRenglones)">
+            <mat-icon>list_alt</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Renglones</strong>
+              <small>{{ presupuesto().items.length }} {{ presupuesto().items.length === 1 ? 'renglón' : 'renglones' }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Resumen', tplResumen)">
+            <mat-icon>functions</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Resumen</strong>
+              <small>Total {{ formatoBs(totales().total) }}</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Hoja', tplHoja)">
+            <mat-icon>description</mat-icon>
+            <span class="bl-seccion-texto">
+              <strong>Hoja</strong>
+              <small>Cabecera y pie · firma y sello · marca de agua</small>
+            </span>
+            <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
+          </button>
+        </div>
+      }
+    </aside>
+
+    <!-- ── Vista previa de la hoja ────────────────────────────────────── -->
+    <section class="bl-vista" [class]="'bl-escala-' + (escala() * 100).toFixed(0)">
+      <div class="bl-vista-barra">
+        <span class="bl-vista-titulo">
+          <mat-icon>visibility</mat-icon>
+          Vista previa
+        </span>
+        <span class="bl-vista-meta">
+          Hoja 21,7 × 28 cm · escala {{ escala() * 100 | number:'1.0-0' }} %
+        </span>
+        <button mat-icon-button type="button" (click)="cambiarEscala()"
+                matTooltip="Cambiar la escala de la vista previa">
+          <mat-icon>zoom_in</mat-icon>
+        </button>
+        <button mat-icon-button type="button" (click)="imprimir()"
+                matTooltip="Imprimir el presupuesto">
+          <mat-icon>print</mat-icon>
+        </button>
+      </div>
+
+      @if (cargando()) {
+        <div class="bl-cargando">Preparando la hoja…</div>
+      } @else {
+        <div class="fx-lienzo" [innerHTML]="hoja()"></div>
+      }
+    </section>
+  </div>
+</div>

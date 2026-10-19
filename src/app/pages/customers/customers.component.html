@@ -22,15 +22,17 @@
     >
       <mat-icon>refresh</mat-icon> Actualizar
     </button>
-    <button
-      mat-raised-button
-      color="primary"
-      type="button"
-      (click)="nuevoCliente()"
-      matTooltip="Registrar un cliente nuevo"
-    >
-      <mat-icon>person_add</mat-icon> Nuevo Cliente
-    </button>
+    @if (Privilegio('Create')) {
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        (click)="nuevoCliente()"
+        matTooltip="Registrar un cliente nuevo"
+      >
+        <mat-icon>person_add</mat-icon> Nuevo Cliente
+      </button>
+    }
   </div>
 </div>
 
@@ -51,16 +53,18 @@
     >
       <mat-icon>refresh</mat-icon>
     </button>
-    <button
-      mat-mini-fab
-      color="primary"
-      type="button"
-      (click)="accionesAbiertas.set(false); nuevoCliente()"
-      matTooltip="Registrar un cliente nuevo"
-      aria-label="Nuevo Cliente"
-    >
-      <mat-icon>person_add</mat-icon>
-    </button>
+    @if (Privilegio('Create')) {
+      <button
+        mat-mini-fab
+        color="primary"
+        type="button"
+        (click)="accionesAbiertas.set(false); nuevoCliente()"
+        matTooltip="Registrar un cliente nuevo"
+        aria-label="Nuevo Cliente"
+      >
+        <mat-icon>person_add</mat-icon>
+      </button>
+    }
   </div>
 
   <button
@@ -170,6 +174,7 @@
   </mat-card-header>
 
   <mat-card-content>
+    @if (Privilegio('Read')) {
     <div class="table-wrapper">
       <table mat-table [dataSource]="dataSource" matSort class="data-table">
         <!-- Código -->
@@ -288,10 +293,12 @@
               <div class="cu-menu-titulo">{{ row.codigo }}</div>
               <mat-divider></mat-divider>
 
-              <button mat-menu-item type="button" (click)="editar(row)">
-                <mat-icon>edit</mat-icon>
-                <span>Ver / editar ficha</span>
-              </button>
+              @if (Privilegio('Update')) {
+                <button mat-menu-item type="button" (click)="editar(row)">
+                  <mat-icon>edit</mat-icon>
+                  <span>Ver / editar ficha</span>
+                </button>
+              }
               <button mat-menu-item type="button" (click)="copiarDocumento(row)">
                 <mat-icon>content_copy</mat-icon>
                 <span>Copiar {{ row.rif ? 'RIF' : 'documento' }}</span>
@@ -301,29 +308,33 @@
                 <span>Ver acuerdos del cliente</span>
               </button>
 
-              <mat-divider></mat-divider>
-              <div class="cu-menu-titulo">Cambiar estado</div>
-              @for (e of estados; track e.valor) {
-                <button
-                  mat-menu-item
-                  type="button"
-                  [disabled]="row.estado === e.valor"
-                  (click)="cambiarEstado(row, e.valor)"
-                >
-                  <mat-icon>{{ e.icono }}</mat-icon>
-                  <span>{{ e.etiqueta }}</span>
-                  @if (row.estado === e.valor) {
-                    <mat-icon class="cu-menu-actual">check</mat-icon>
-                  }
-                </button>
+              @if (Privilegio('Update')) {
+                <mat-divider></mat-divider>
+                <div class="cu-menu-titulo">Cambiar estado</div>
+                @for (e of estados; track e.valor) {
+                  <button
+                    mat-menu-item
+                    type="button"
+                    [disabled]="row.estado === e.valor"
+                    (click)="cambiarEstado(row, e.valor)"
+                  >
+                    <mat-icon>{{ e.icono }}</mat-icon>
+                    <span>{{ e.etiqueta }}</span>
+                    @if (row.estado === e.valor) {
+                      <mat-icon class="cu-menu-actual">check</mat-icon>
+                    }
+                  </button>
+                }
               }
 
-              <mat-divider></mat-divider>
-              <!-- Borrado lógico: el backend no admite borrados físicos -->
-              <button mat-menu-item type="button" class="cu-accion-eliminar" (click)="eliminar(row)">
-                <mat-icon>delete</mat-icon>
-                <span>Eliminar</span>
-              </button>
+              @if (Privilegio('Delete')) {
+                <mat-divider></mat-divider>
+                <!-- Borrado lógico: el backend no admite borrados físicos -->
+                <button mat-menu-item type="button" class="cu-accion-eliminar" (click)="eliminar(row)">
+                  <mat-icon>delete</mat-icon>
+                  <span>Eliminar</span>
+                </button>
+              }
             </mat-menu>
           </td>
         </ng-container>
@@ -367,6 +378,16 @@
       showFirstLastButtons
       aria-label="Seleccionar página de clientes"
     ></mat-paginator>
+    } @else {
+      <!-- Sin privilegio Read: no se listan los registros, solo se avisa -->
+      <div class="cu-vacio cu-sin-lectura" role="status">
+        <mat-icon class="cu-vacio-icono">lock</mat-icon>
+        <p>No tiene permiso para consultar el listado de clientes.</p>
+        <p class="cu-sin-lectura-nota">
+          Solicite el privilegio <strong>Read</strong> al administrador si necesita verlo.
+        </p>
+      </div>
+    }
   </mat-card-content>
 </mat-card>
 

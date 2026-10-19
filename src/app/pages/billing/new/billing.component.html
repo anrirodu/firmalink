@@ -24,24 +24,25 @@
       </button>
 
       <mat-menu #accionesMenu="matMenu" class="bl-acciones-menu">
-        <button mat-menu-item type="button" (click)="nueva()">
-          <mat-icon>note_add</mat-icon> <span>Nueva</span>
-        </button>
+        @if (Privilegio('Create')) {
+          <button mat-menu-item type="button" (click)="nueva()">
+            <mat-icon>note_add</mat-icon> <span>Nueva</span>
+          </button>
+        }
         <button mat-menu-item type="button" (click)="imprimir()" [disabled]="cargando()">
           <mat-icon>print</mat-icon> <span>Imprimir</span>
         </button>
-        @if (readonly_()) {
-          @if (factura().estado === 'emitida') {
-            <button mat-menu-item type="button" (click)="anular()">
-              <mat-icon>block</mat-icon> <span>Anular</span>
-            </button>
-          }
-        } @else {
+        @if (!documentoCerrado() && Privilegio('Update')) {
           <button mat-menu-item type="button" (click)="guardar(false)" [disabled]="guardando()">
             <mat-icon>save</mat-icon> <span>Guardar</span>
           </button>
           <button mat-menu-item type="button" (click)="guardar(true)" [disabled]="guardando()">
             <mat-icon>receipt_long</mat-icon> <span>Emitir</span>
+          </button>
+        }
+        @if (documentoCerrado() && factura().estado === 'emitida' && Privilegio('Update')) {
+          <button mat-menu-item type="button" (click)="anular()">
+            <mat-icon>block</mat-icon> <span>Anular</span>
           </button>
         }
       </mat-menu>
@@ -539,7 +540,7 @@
         </div>
       }
 
-      @if (factura().codigo && !readonly_()) {
+      @if (factura().codigo && !documentoCerrado() && Privilegio('Delete')) {
         <section class="bl-card bl-card-peligro">
           <button mat-button type="button" (click)="eliminar()"
                   matTooltip="Sacar la factura del listado (queda en la base para la trazabilidad)">

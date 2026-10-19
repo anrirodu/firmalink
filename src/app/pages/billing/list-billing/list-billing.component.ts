@@ -34,6 +34,7 @@ import { construirCorreoFactura } from '../factura-correo';
 import { pedirDestinatariosCorreoFactura } from '../enviar-correo-factura.dialog';
 import { cargarLogoCorreo } from '../../agreements/acuerdo-pdf';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
+import { PrivilegiosService } from '../../../shared/services/privilegios.service';
 import { CorreoError, CorreoService } from '../../../shared/services/correo.service';
 
 /**
@@ -158,7 +159,16 @@ export class ListBillingComponent implements OnInit, OnDestroy {
     private correo: CorreoService,
     private router: Router,
     private notificar: NotificacionService,
+    private privilegios: PrivilegiosService,
   ) {}
+
+  /**
+   * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
+   * listado de facturas? La plantilla lo usa para mostrar sólo lo permitido.
+   */
+  Privilegio(metodo: string): boolean {
+    return this.privilegios.tiene(metodo);
+  }
 
   ngOnInit(): void {
     document.addEventListener('keydown', this.alPulsarEscape, true);

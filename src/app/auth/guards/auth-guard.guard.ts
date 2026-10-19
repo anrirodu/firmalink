@@ -1,32 +1,41 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import Swal from 'sweetalert2';
-import { Sha256Service } from '../../shared/utils/sha256.service';
 import { environment } from '../../../environments/environment';
+import { decidirAcceso } from '../../shared/utils/menu-crypt';
 
 /**
- * AuthGuardGuard — Misma lógica que consola
+ * AuthGuardGuard — control de acceso de la sesión (misma lógica que consola)
  *
  * 1. Verificar que exista token en sessionStorage
  * 2. Decodificar JWT y validar estructura
  * 3. Verificar que la aplicación del token coincida con environment.ID
- * 4. Verificar integridad del menú (crypt === MD5(menu))
- * 5. Verificar que la URL solicitada esté en el menú del usuario
- * 6. URLs whitelisted siempre permitidas
- * 7. Redirige a /error, /not-authorized y /login según el caso
+ * 4. Delegar en `decidirAcceso` (shared/utils/menu-crypt): la ruta tiene que
+ *    estar declarada en el menú del usuario y el menú tiene que coincidir con
+ *    su huella `crypt`
+ * 5. Redirige a /login, /error o /not-authorized según el caso
+ *
+ * La política vive en `menu-crypt.ts`, no aquí: el guard solo traduce la
+ * decisión en navegación y en mensajes.
+ *
+ * IMPORTANTE: este guard se registra como `canActivate` **y** `canActivateChild`
+ * en la ruta del layout (ver app.routes.ts). `canActivate` solo corre cuando la
+ * ruta del layout se activa (entrada o recarga); las pantallas son hijas y el
+ * sidebar navega con `router.navigate`, así que sin `canActivateChild` una
+ * navegación entre pantallas no pasaría por aquí y se podría abrir una ruta
+ * que no está en el menú.
  */
 export const authGuardGuard: CanActivateFn = (
   route: ActivatedRouteSnapshot,
   state: RouterStateSnapshot,
 ) => {
   const router = inject(Router);
-  const sha256 = inject(Sha256Service);
 
   const token = sessionStorage.getItem('token');
 
   // 1. Sin token → /login
   if (!token) {
-    sessionError(router);
+    cerrarSesion(router);
     return false;
   }
 
@@ -38,7 +47,7 @@ export const authGuardGuard: CanActivateFn = (
     payload = JSON.parse(atob(parts[1]));
   } catch (error) {
     console.error('AuthGuard: Token inválido', error);
-    sessionError(router);
+    cerrarSesion(router);
     return false;
   }
 
@@ -58,80 +67,60 @@ export const authGuardGuard: CanActivateFn = (
     return false;
   }
 
-  // 3. Verificar integridad del menú
-  const menuStr = sessionStorage.getItem('menu');
-  const cryptStored = sessionStorage.getItem('crypt');
+  // 3-4. Integridad del menú y autorización de la ruta
+  const decision = decidirAcceso(
+    state.url,
+    sessionStorage.getItem('menu'),
+    sessionStorage.getItem('crypt'),
+  );
 
-  if (menuStr && cryptStored) {
-    // Usar hash simple (mismo que md5Hash en auth.service)
-    let hash = 0;
-    for (let i = 0; i < menuStr.length; i++) {
-      const char = menuStr.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    const cryptActual = Math.abs(hash).toString(16).padStart(8, '0');
-
-    if (cryptActual !== cryptStored) {
-      console.error('AuthGuard: Menú corrupto');
-      sessionStorage.clear();
-      router.navigate(['/login']).then(() => window.location.reload());
-      return false;
-    }
-  }
-
-  // 4. URLs siempre permitidas
-  const whitelistedUrls = ['/login', '/dashboard', '/change-password'];
-  if (whitelistedUrls.includes(state.url)) {
-    return true;
-  }
-
-  // 5. Verificar que la URL esté en el menú del usuario
-  if (menuStr) {
-    try {
-      const menu = JSON.parse(menuStr);
-      let autorizado = false;
-
-      for (const item of menu) {
-        // Verificar URL principal
-        if (item.url && state.url.indexOf(item.url) === 1) {
-          autorizado = true;
-          break;
-        }
-        // Verificar submenús
-        if (item.SubMenu) {
-          for (const sub of item.SubMenu) {
-            if (sub.url && state.url.indexOf(sub.url) === 1) {
-              autorizado = true;
-              break;
-            }
-          }
-        }
-        if (autorizado) break;
-      }
-
-      if (!autorizado) {
-        // No autorizado → redirige a /not-authorized (como consola)
-        msj();
-        router.navigate(['/not-authorized']);
-        return false;
-      }
-
+  switch (decision) {
+    case 'libre':
+    case 'autorizado':
       return true;
-    } catch (e) {
-      console.error('AuthGuard: Error parseando menú', e);
-      sessionStorage.clear();
-      router.navigate(['/login']).then(() => window.location.reload());
-      return false;
-    }
-  }
 
-  return true;
+    case 'alterado':
+      sesionAlterada(router);
+      return false;
+
+    default:
+      // 'restringido': el menú es válido pero esa pantalla no es del usuario.
+      // Se devuelve un UrlTree (no `navigate` + `false`) para que la redirección
+      // sea parte del mismo resultado de navegación y no compita con la que está
+      // en curso —el guard corre en cada hijo (canActivateChild)—.
+      msj();
+      return router.createUrlTree(['/not-authorized']);
+  }
 };
 
-function sessionError(router: Router): void {
+/**
+ * Cierre normal: sin token o con un token que no se puede leer. No lleva aviso
+ * porque es el camino esperado de una sesión que expiró.
+ */
+function cerrarSesion(router: Router): void {
   sessionStorage.clear();
   router.navigate(['/login']).then(() => window.location.reload());
+}
+
+/**
+ * El menú no está firmado o no coincide con su huella: la sesión se cierra y se
+ * avisa. El aviso se muestra antes de recargar, porque la recarga se lleva por
+ * delante cualquier mensaje que esté en pantalla.
+ */
+function sesionAlterada(router: Router): void {
+  console.error('AuthGuard: El menú de la sesión no coincide con su huella');
+  sessionStorage.clear();
+  Swal.fire({
+    title: 'Sesión cerrada',
+    text: 'El menú de su sesión fue modificado. Por seguridad, inicie sesión de nuevo.',
+    icon: 'error',
+    showCancelButton: false,
+    confirmButtonColor: '#3085d6',
+    confirmButtonText: 'Entendido',
+    allowEscapeKey: false,
+  }).then(() => {
+    router.navigate(['/login']).then(() => window.location.reload());
+  });
 }
 
 function msj(): void {

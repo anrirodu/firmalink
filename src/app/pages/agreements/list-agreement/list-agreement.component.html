@@ -19,15 +19,17 @@
     >
       <mat-icon>refresh</mat-icon> Actualizar
     </button>
-    <button
-      mat-raised-button
-      color="primary"
-      type="button"
-      (click)="nuevoAcuerdo()"
-      matTooltip="Redactar un acuerdo nuevo"
-    >
-      <mat-icon>add_circle</mat-icon> Nuevo Acuerdo
-    </button>
+    @if (Privilegio('Create')) {
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        (click)="nuevoAcuerdo()"
+        matTooltip="Redactar un acuerdo nuevo"
+      >
+        <mat-icon>add_circle</mat-icon> Nuevo Acuerdo
+      </button>
+    }
   </div>
 </div>
 
@@ -44,11 +46,13 @@
       aria-label="Actualizar">
       <mat-icon>refresh</mat-icon>
     </button>
-    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); nuevoAcuerdo()"
-      matTooltip="Redactar un acuerdo nuevo"
-      aria-label="Nuevo Acuerdo">
-      <mat-icon>add_circle</mat-icon>
-    </button>
+    @if (Privilegio('Create')) {
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas.set(false); nuevoAcuerdo()"
+        matTooltip="Redactar un acuerdo nuevo"
+        aria-label="Nuevo Acuerdo">
+        <mat-icon>add_circle</mat-icon>
+      </button>
+    }
   </div>
 
   <button mat-fab color="primary" type="button" (click)="toggleAcciones()"
@@ -134,7 +138,8 @@
   </mat-card-header>
 
   <mat-card-content>
-    <div class="table-wrapper">
+    @if (Privilegio('Read')) {
+    <div class="table-wrapper">>
       <table mat-table [dataSource]="dataSource" matSort class="data-table">
 
         <!-- Código -->
@@ -228,16 +233,18 @@
               <mat-divider></mat-divider>
 
               <!-- Continuar edición: bloqueado si el acuerdo está firmado o anulado -->
-              <button
-                mat-menu-item
-                type="button"
-                [disabled]="!editable(row)"
-                (click)="editar(row)"
-                [matTooltip]="notaBloqueo(row)"
-              >
-                <mat-icon>{{ editable(row) ? 'edit' : 'lock' }}</mat-icon>
-                <span>Continuar edición</span>
-              </button>
+              @if (Privilegio('Update')) {
+                <button
+                  mat-menu-item
+                  type="button"
+                  [disabled]="!editable(row)"
+                  (click)="editar(row)"
+                  [matTooltip]="notaBloqueo(row)"
+                >
+                  <mat-icon>{{ editable(row) ? 'edit' : 'lock' }}</mat-icon>
+                  <span>Continuar edición</span>
+                </button>
+              }
 
               <button
                 mat-menu-item
@@ -250,36 +257,40 @@
                 <span>Enviar por correo</span>
               </button>
 
-              <mat-divider></mat-divider>
+              @if (Privilegio('Delete')) {
+                <mat-divider></mat-divider>
 
-              <!-- Borrado lógico: el backend no admite borrados físicos -->
-              <button
-                mat-menu-item
-                type="button"
-                class="la-accion-eliminar"
-                [disabled]="!sePuedeEliminar(row)"
-                (click)="eliminar(row)"
-                [matTooltip]="notaEliminar(row)"
-              >
-                <mat-icon>delete</mat-icon>
-                <span>Eliminar</span>
-              </button>
-
-              <mat-divider></mat-divider>
-              <div class="la-menu-titulo">Cambiar estado</div>
-              @for (e of estados; track e.valor) {
+                <!-- Borrado lógico: el backend no admite borrados físicos -->
                 <button
                   mat-menu-item
                   type="button"
-                  [disabled]="!puedeCambiarA(row, e.valor)"
-                  (click)="cambiarEstado(row, e.valor)"
+                  class="la-accion-eliminar"
+                  [disabled]="!sePuedeEliminar(row)"
+                  (click)="eliminar(row)"
+                  [matTooltip]="notaEliminar(row)"
                 >
-                  <mat-icon>{{ e.icono }}</mat-icon>
-                  <span>{{ e.etiqueta }}</span>
-                  @if (row.estado === e.valor) {
-                    <mat-icon class="la-menu-actual">check</mat-icon>
-                  }
+                  <mat-icon>delete</mat-icon>
+                  <span>Eliminar</span>
                 </button>
+              }
+
+              @if (Privilegio('Update')) {
+                <mat-divider></mat-divider>
+                <div class="la-menu-titulo">Cambiar estado</div>
+                @for (e of estados; track e.valor) {
+                  <button
+                    mat-menu-item
+                    type="button"
+                    [disabled]="!puedeCambiarA(row, e.valor)"
+                    (click)="cambiarEstado(row, e.valor)"
+                  >
+                    <mat-icon>{{ e.icono }}</mat-icon>
+                    <span>{{ e.etiqueta }}</span>
+                    @if (row.estado === e.valor) {
+                      <mat-icon class="la-menu-actual">check</mat-icon>
+                    }
+                  </button>
+                }
               }
             </mat-menu>
           </td>
@@ -313,9 +324,11 @@
                 </button>
               } @else {
                 <p>No hay acuerdos registrados todavía.</p>
-                <button mat-raised-button color="primary" type="button" (click)="nuevoAcuerdo()">
-                  <mat-icon>add_circle</mat-icon> Redactar el primero
-                </button>
+                @if (Privilegio('Create')) {
+                  <button mat-raised-button color="primary" type="button" (click)="nuevoAcuerdo()">
+                    <mat-icon>add_circle</mat-icon> Redactar el primero
+                  </button>
+                }
               }
             } @else {
               <mat-icon class="la-vacio-icono">search_off</mat-icon>
@@ -335,5 +348,15 @@
       showFirstLastButtons
       aria-label="Seleccionar página de acuerdos"
     ></mat-paginator>
+    } @else {
+      <!-- Sin privilegio Read: no se listan los registros, solo se avisa -->
+      <div class="la-vacio la-sin-lectura" role="status">
+        <mat-icon class="la-vacio-icono">lock</mat-icon>
+        <p>No tiene permiso para consultar el listado de acuerdos.</p>
+        <p class="la-sin-lectura-nota">
+          Solicite el privilegio <strong>Read</strong> al administrador si necesita verlo.
+        </p>
+      </div>
+    }
   </mat-card-content>
 </mat-card>

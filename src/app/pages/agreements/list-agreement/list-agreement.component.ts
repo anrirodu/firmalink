@@ -25,6 +25,7 @@ import {
 } from '../new-agreement/acuerdo.model';
 import { AcuerdoService } from '../new-agreement/acuerdo.service';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
+import { PrivilegiosService } from '../../../shared/services/privilegios.service';
 import { CorreoError, CorreoService } from '../../../shared/services/correo.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { construirCorreoAcuerdo } from '../acuerdo-correo';
@@ -150,7 +151,16 @@ export class ListAgreementComponent implements OnInit, OnDestroy {
     private router: Router,
     private notificar: NotificacionService,
     private pdf: PdfService,
+    private privilegios: PrivilegiosService,
   ) {}
+
+  /**
+   * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
+   * listado de acuerdos? La plantilla lo usa para mostrar sólo lo permitido.
+   */
+  Privilegio(metodo: string): boolean {
+    return this.privilegios.tiene(metodo);
+  }
 
   ngOnInit(): void {
     document.addEventListener('keydown', this.alPulsarEscape, true);

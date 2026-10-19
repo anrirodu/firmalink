@@ -15,9 +15,17 @@ export const routes: Routes = [
       import('./auth/login/login.component').then(m => m.LoginComponent),
   },
   {
-    // Layout compartido: sidebar + topbar + footer fijos alrededor del router-outlet
+    // Layout compartido: sidebar + topbar + footer fijos alrededor del router-outlet.
+    //
+    // `canActivate` sólo se ejecuta cuando la ruta del layout se activa (primera
+    // entrada o recarga completa). Para que el control de acceso se evalúe en
+    // **cada** navegación entre pantallas —el sidebar usa router.navigate, no
+    // recarga— hace falta `canActivateChild`, que corre en cada hijo que se
+    // activa. Con sólo `canActivate`, entrar de /budgets a /budgets/new pasaría
+    // sin revisar el menú.
     path: '',
     canActivate: [authGuardGuard],
+    canActivateChild: [authGuardGuard],
     loadComponent: () =>
       import('./layout/app-layout/app-layout.component').then(m => m.AppLayoutComponent),
     children: [
@@ -70,6 +78,24 @@ export const routes: Routes = [
         canDeactivate: [cambiosSinGuardarGuard],
         loadComponent: () =>
           import('./pages/billing/new/billing.component').then(m => m.BillingComponent),
+      },
+      {
+        // Presupuestos. Documento comercial (no fiscal) que se cotiza antes de
+        // facturar: aterriza en el listado y ofrece el ciclo completo
+        // borrador → enviado → aprobado/rechazado → anulado.
+        path: 'budgets',
+        loadComponent: () =>
+          import('./pages/budgets/list-budgets/list-budgets.component').then(
+            m => m.ListBudgetsComponent,
+          ),
+      },
+      {
+        // Editor de presupuestos (nuevo o en consulta). `cambiosSinGuardarGuard`
+        // evita perder un presupuesto a medio escribir.
+        path: 'budgets/new',
+        canDeactivate: [cambiosSinGuardarGuard],
+        loadComponent: () =>
+          import('./pages/budgets/new/budget.component').then(m => m.BudgetsComponent),
       },
       {
         path: 'change-password',

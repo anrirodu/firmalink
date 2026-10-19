@@ -46,6 +46,7 @@ import { AuthService } from '../../../auth/services/auth.service';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
 import { CorreoError, CorreoService } from '../../../shared/services/correo.service';
 import { PdfService } from '../../../shared/services/pdf.service';
+import { PrivilegiosService } from '../../../shared/services/privilegios.service';
 import { construirCorreoAcuerdo } from '../acuerdo-correo';
 import { cargarLogoCorreo, generarPdfAcuerdo } from '../acuerdo-pdf';
 import type { PdfAcuerdoGenerado } from '../acuerdo-pdf';
@@ -503,7 +504,27 @@ export class NewAgreementComponent implements AfterViewInit, OnDestroy, PuedeSal
     private auth: AuthService,
     private notificar: NotificacionService,
     private pdf: PdfService,
+    private privilegios: PrivilegiosService,
   ) {}
+
+  /**
+   * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
+   * editor de acuerdos? Manda sobre los botones de escritura; el servidor vuelve
+   * a validarlo.
+   */
+  Privilegio(metodo: string): boolean {
+    return this.privilegios.tiene(metodo);
+  }
+
+  /** ¿El acuerdo todavía no existe? Se guarda con `Create`; si ya tiene código, con `Update`. */
+  get esNuevo(): boolean {
+    return !(this.campos['codigo'] ?? '').trim();
+  }
+
+  /** ¿Se puede guardar este acuerdo? Un nuevo pide `Create`; uno existente, `Update`. */
+  get puedeGuardar(): boolean {
+    return this.esNuevo ? this.Privilegio('Create') : this.Privilegio('Update');
+  }
 
   ngAfterViewInit(): void {
     document.addEventListener('keydown', this.alPulsarEscape, true);

@@ -6,7 +6,7 @@ export const environment = {
   Hash: ':cdd2b41298c1bf1108de6df5eca512ec.sse',
   version: 'FirmaLink 1.0.0',
   fecha: '2026-08-25',
-  buildDate: '18/10/2026 10:17:24 a. m.',
+  buildDate: '19/10/2026 01:51:37 p. m.',
   functions: {
     CONSULTAR_USUARIO_PERFIL: '_SYS_CUsuarioPerfil',
     CONSULTAR_LOGIN_USUARIO: '_SYS_CUserPanelLogin',
@@ -20,11 +20,14 @@ export const environment = {
     CONSULTAR_FACTURAS: '_SYS_CFirmaLinkFacturas',
     CONSULTAR_FACTURAS_CLIENTE: '_SYS_CFirmaLinkFacturasCliente',
     CONSULTAR_FACTURA: '_SYS_CFirmaLinkFactura',
+    CONSULTAR_PRESUPUESTOS: '_SYS_CFirmaLinkPresupuestos',
+    CONSULTAR_PRESUPUESTOS_CLIENTE: '_SYS_CFirmaLinkPresupuestosCliente',
+    CONSULTAR_PRESUPUESTO: '_SYS_CFirmaLinkPresupuesto',
   },
   driver: {
     // ID de la conexión registrada en `sys-drivers` (MGDBA → MongoDB local / BD code-epic).
     // No usar el tipo de driver ("mongodb"): el backend resuelve la conexión por su ID.
-    PRINCIPAL: 'MGDBA',
+    PRINCIPAL: 'firmalink',
     DATA_BASE: 'code-epic',
   },
   colecciones: {
@@ -32,5 +35,6 @@ export const environment = {
     ACUERDO: 'firmalink_acuerdos',
     CLIENTE: 'firmalink_clientes',
     FACTURA: 'firmalink_facturas',
+    PRESUPUESTO: 'firmalink_presupuestos',
   },
 };

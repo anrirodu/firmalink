@@ -19,15 +19,17 @@
     >
       <mat-icon>refresh</mat-icon> Actualizar
     </button>
-    <button
-      mat-raised-button
-      color="primary"
-      type="button"
-      (click)="nuevaFactura()"
-      matTooltip="Redactar una factura nueva"
-    >
-      <mat-icon>add_circle</mat-icon> Nueva Factura
-    </button>
+    @if (Privilegio('Create')) {
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        (click)="nuevaFactura()"
+        matTooltip="Redactar una factura nueva"
+      >
+        <mat-icon>add_circle</mat-icon> Nueva Factura
+      </button>
+    }
   </div>
 </div>
 
@@ -43,11 +45,13 @@
       aria-label="Actualizar">
       <mat-icon>refresh</mat-icon>
     </button>
-    <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas = false; nuevaFactura()"
-      matTooltip="Redactar una factura nueva"
-      aria-label="Nueva Factura">
-      <mat-icon>add_circle</mat-icon>
-    </button>
+    @if (Privilegio('Create')) {
+      <button mat-mini-fab color="primary" type="button" (click)="accionesAbiertas = false; nuevaFactura()"
+        matTooltip="Redactar una factura nueva"
+        aria-label="Nueva Factura">
+        <mat-icon>add_circle</mat-icon>
+      </button>
+    }
   </div>
 
   <button mat-fab color="primary" type="button" (click)="toggleAcciones()"
@@ -133,7 +137,8 @@
   </mat-card-header>
 
   <mat-card-content>
-    <div class="table-wrapper">
+    @if (Privilegio('Read')) {
+    <div class="table-wrapper">>
       <table mat-table [dataSource]="dataSource" matSort class="data-table">
 
         <!-- Número -->
@@ -239,16 +244,20 @@
               <div class="lb-menu-titulo">{{ row.numero }}</div>
               <mat-divider></mat-divider>
 
-              <!-- Abrir: una emitida o anulada se abre en modo consulta -->
-              <button
-                mat-menu-item
-                type="button"
-                (click)="editar(row)"
-                [matTooltip]="notaBloqueo(row)"
-              >
-                <mat-icon>{{ editable(row) ? 'edit' : 'visibility' }}</mat-icon>
-                <span>{{ editable(row) ? 'Editar' : 'Ver factura' }}</span>
-              </button>
+              <!-- Abrir: una emitida o anulada se abre en modo consulta. Sólo
+                   exige `Update` cuando la factura es editable; verla (sólo
+                   lectura) no requiere permiso de escritura. -->
+              @if (!editable(row) || Privilegio('Update')) {
+                <button
+                  mat-menu-item
+                  type="button"
+                  (click)="editar(row)"
+                  [matTooltip]="notaBloqueo(row)"
+                >
+                  <mat-icon>{{ editable(row) ? 'edit' : 'visibility' }}</mat-icon>
+                  <span>{{ editable(row) ? 'Editar' : 'Ver factura' }}</span>
+                </button>
+              }
 
               <button
                 mat-menu-item
@@ -274,42 +283,46 @@
               <mat-divider></mat-divider>
 
               <!-- Emitir: solo borradores, congela totales y huella -->
-              <button
-                mat-menu-item
-                type="button"
-                [disabled]="!puedeEmitir(row)"
-                (click)="emitir(row)"
-                matTooltip="Emitir: congela totales y huella, y la factura deja de editarse"
-              >
-                <mat-icon>task_alt</mat-icon>
-                <span>Emitir</span>
-              </button>
+              @if (Privilegio('Update')) {
+                <button
+                  mat-menu-item
+                  type="button"
+                  [disabled]="!puedeEmitir(row)"
+                  (click)="emitir(row)"
+                  matTooltip="Emitir: congela totales y huella, y la factura deja de editarse"
+                >
+                  <mat-icon>task_alt</mat-icon>
+                  <span>Emitir</span>
+                </button>
 
-              <button
-                mat-menu-item
-                type="button"
-                [disabled]="!puedeAnular(row)"
-                (click)="anular(row)"
-                matTooltip="Anular una factura emitida (estado terminal)"
-              >
-                <mat-icon>block</mat-icon>
-                <span>Anular</span>
-              </button>
+                <button
+                  mat-menu-item
+                  type="button"
+                  [disabled]="!puedeAnular(row)"
+                  (click)="anular(row)"
+                  matTooltip="Anular una factura emitida (estado terminal)"
+                >
+                  <mat-icon>block</mat-icon>
+                  <span>Anular</span>
+                </button>
+              }
 
-              <mat-divider></mat-divider>
+              @if (Privilegio('Delete')) {
+                <mat-divider></mat-divider>
 
-              <!-- Borrado lógico: una emitida no se elimina, se anula -->
-              <button
-                mat-menu-item
-                type="button"
-                class="lb-accion-eliminar"
-                [disabled]="!sePuedeEliminar(row)"
-                (click)="eliminar(row)"
-                [matTooltip]="notaEliminar(row)"
-              >
-                <mat-icon>delete</mat-icon>
-                <span>Eliminar</span>
-              </button>
+                <!-- Borrado lógico: una emitida no se elimina, se anula -->
+                <button
+                  mat-menu-item
+                  type="button"
+                  class="lb-accion-eliminar"
+                  [disabled]="!sePuedeEliminar(row)"
+                  (click)="eliminar(row)"
+                  [matTooltip]="notaEliminar(row)"
+                >
+                  <mat-icon>delete</mat-icon>
+                  <span>Eliminar</span>
+                </button>
+              }
             </mat-menu>
           </td>
         </ng-container>
@@ -364,5 +377,15 @@
       showFirstLastButtons
       aria-label="Seleccionar página de facturas"
     ></mat-paginator>
+    } @else {
+      <!-- Sin privilegio Read: no se listan los registros, solo se avisa -->
+      <div class="lb-vacio lb-sin-lectura" role="status">
+        <mat-icon class="lb-vacio-icono">lock</mat-icon>
+        <p>No tiene permiso para consultar el listado de facturas.</p>
+        <p class="lb-sin-lectura-nota">
+          Solicite el privilegio <strong>Read</strong> al administrador si necesita verlo.
+        </p>
+      </div>
+    }
   </mat-card-content>
 </mat-card>

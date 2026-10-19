@@ -7,6 +7,7 @@ import { lastValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
 import { ApiService } from '../../shared/services/api.service';
 import { Sha256Service } from '../../shared/utils/sha256.service';
+import { huellaMenu } from '../../shared/utils/menu-crypt';
 import { MenuService } from '../../shared/services/menu.service';
 import {
   IToken,
@@ -233,8 +234,9 @@ export class AuthService {
             // Generar userId (uuidv4) y guardarlo en localStorage, como consola
             this.getUserId();
 
-            // Generar crypt (hash MD5 del menú) como en consola
-            const crypt = this.md5Hash(menuJson);
+            // Huella del menú: el guard recalcula lo mismo en cada navegación y
+            // cierra la sesión si no coincide (ver shared/utils/menu-crypt.ts)
+            const crypt = huellaMenu(menuJson);
             sessionStorage.setItem('crypt', crypt);
 
             this.menuService.loadMenu();
@@ -579,21 +581,5 @@ export class AuthService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Hash MD5 simple (misma lógica que ts-md5 en consola)
-   */
-  private md5Hash(message: string): string {
-    // Usar SubtleCrypto con SHA-256 como alternativa a MD5
-    // En consola usan ts-md5, aquí usamos SHA-256 que es más seguro
-    // Si se necesita MD5 exacto, instalar ts-md5
-    let hash = 0;
-    for (let i = 0; i < message.length; i++) {
-      const char = message.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(16).padStart(8, '0');
   }
 }

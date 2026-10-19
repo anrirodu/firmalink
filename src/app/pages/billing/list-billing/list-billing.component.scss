@@ -522,6 +522,31 @@
   }
 }
 
+/* Sin privilegio Read: la tabla desaparece y queda solo el aviso */
+.lb-sin-lectura {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #757575;
+
+  .lb-vacio-icono {
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    margin: 0.25rem 0;
+    font-size: 0.95rem;
+  }
+
+  .lb-sin-lectura-nota {
+    font-size: 0.85rem;
+    color: #9e9e9e;
+  }
+}
+
 mat-paginator {
   background: transparent;
   border-top: 1px solid #f0f0f0;

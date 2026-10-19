@@ -230,6 +230,79 @@ export const CSS_FACTURA = `
 /* Elementos que los botones de la barra pueden ocultar */
 .fx-oculto { display: none !important; }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PRESUPUESTO
+   La hoja es la misma (21,7 × 28 cm, mismos márgenes y misma tabla de
+   renglones): lo que cambia es lo que un presupuesto añade a una factura.
+   Estas reglas viven aquí —y no en un archivo aparte— para que exista una
+   sola definición de la hoja y el formato no pueda divergir.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* N° del documento en la cabecera: el presupuesto no tiene N° de Control,
+   así que su número ocupa el mismo lugar y con el mismo énfasis. */
+.fx-doc-num { font-weight: 700; color: #cc0000; }
+
+/* ── Condiciones comerciales ─────────────────────────────────────────────── */
+.fx-condiciones {
+  margin-top: 1cm;
+  padding: 2mm 3mm;
+  border: 1px solid #000;
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+.fx-condiciones-titulo {
+  margin-bottom: 1.5mm;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.fx-cond-linea + .fx-cond-linea { margin-top: 0.6mm; }
+.fx-cond-etiqueta { font-weight: 600; }
+
+/* ── Firma del emisor y aceptación del cliente ───────────────────────────── */
+.fx-firmas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1cm;
+  margin-top: 0.6cm;
+}
+
+.fx-firma-col {
+  position: relative;
+  text-align: center;
+  line-height: 0;
+}
+
+.fx-firma-col .fx-img-firma { height: 3.6cm; width: auto; }
+.fx-firma-col .fx-img-sello {
+  position: absolute;
+  top: 0.1cm;
+  right: 0.4cm;
+  height: 4.2cm;
+  width: auto;
+}
+
+.fx-firma-linea {
+  margin-top: 0.4cm;
+  border-top: 1px solid #000;
+  line-height: 1.35;
+}
+
+/* La columna del cliente no lleva imagen: la línea deja el hueco de la firma
+   manuscrita, que es lo que el cliente firma y devuelve. */
+.fx-firma-col.fx-sin-imagen .fx-firma-linea { margin-top: 4.2cm; }
+
+.fx-firma-pie { font-size: 8px; line-height: 1.35; }
+
+/* ── Nota de documento no fiscal ─────────────────────────────────────────── */
+.fx-no-fiscal {
+  margin-top: 2mm;
+  color: #cc0000;
+  font-weight: 700;
+}
+
 /* ── Impresión ───────────────────────────────────────────────────────────── */
 @page {
   size: ${HOJA_FACTURA.anchoCm}cm ${HOJA_FACTURA.altoCm}cm;

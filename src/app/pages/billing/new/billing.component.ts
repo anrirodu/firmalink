@@ -20,6 +20,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import Swal from 'sweetalert2';
 import { NotificacionService } from '../../../shared/services/notificacion.service';
+import { PrivilegiosService } from '../../../shared/services/privilegios.service';
 import { PuedeSalir } from '../../../shared/guards/cambios-sin-guardar.guard';
 import { inyectarEstilosFactura, retirarEstilosFactura } from '../../../shared/impresion/factura-estilos';
 import { ClienteService } from '../../customers/cliente.service';
@@ -94,8 +95,17 @@ export class BillingComponent implements OnInit, OnDestroy, PuedeSalir {
    */
   readonly esCompacta = signal(false);
 
-  /** Una factura emitida o anulada es un documento cerrado: no se edita. */
-  readonly readonly_ = computed(() => !esEditable(this.factura().estado));
+  /**
+   * El editor es de sólo lectura si la factura está cerrada (emitida o anulada)
+   * o si la sesión no trae el privilegio `Update`. Un usuario de sólo lectura
+   * —`Read`— ve la pantalla completa, pero sin campos ni botones de escritura.
+   */
+  readonly readonly_ = computed(
+    () => !esEditable(this.factura().estado) || !this.privilegios.tiene('Update'),
+  );
+
+  /** El documento está cerrado por su estado, al margen de los permisos. */
+  readonly documentoCerrado = computed(() => !esEditable(this.factura().estado));
 
   /** Clientes para el buscador de la ficha. */
   readonly clientes = signal<Cliente[]>([]);
@@ -139,7 +149,17 @@ export class BillingComponent implements OnInit, OnDestroy, PuedeSalir {
     private sanitizer: DomSanitizer,
     private breakpoints: BreakpointObserver,
     private dialog: MatDialog,
+    private privilegios: PrivilegiosService,
   ) {}
+
+  /**
+   * ¿La sesión trae este privilegio (`Create`/`Read`/`Update`/`Delete`) para el
+   * editor de facturas? Manda sobre los botones de escritura; el servidor vuelve
+   * a validarlo.
+   */
+  Privilegio(metodo: string): boolean {
+    return this.privilegios.tiene(metodo);
+  }
 
   async ngOnInit(): Promise<void> {
     // La hoja se pinta con `[innerHTML]`, que no hereda los estilos del
