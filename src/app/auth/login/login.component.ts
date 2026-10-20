@@ -1,7 +1,7 @@
 import { Component, signal, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
@@ -42,6 +42,7 @@ const DURACION_ALTO = 320;
     MatProgressSpinnerModule,
     IsotipoAnimadoComponent,
     AccesoBienvenidaComponent,
+    RouterLink,
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',

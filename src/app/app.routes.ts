@@ -14,6 +14,25 @@ export const routes: Routes = [
       import('./auth/login/login.component').then(m => m.LoginComponent),
   },
   {
+    // Recuperación de contraseña — pre-auth: valida el correo contra la
+    // colección `usuario` y envía el enlace de restablecimiento (15 minutos).
+    path: 'forgot-password',
+    loadComponent: () =>
+      import('./auth/forgot-password/forgot-password.component').then(
+        m => m.ForgotPasswordComponent,
+      ),
+  },
+  {
+    // Recuperación de contraseña — pre-auth: el token de la URL se valida
+    // contra `firmalink_password_resets` (no usado + dentro de la vigencia)
+    // antes de mostrar el formulario de clave nueva.
+    path: 'recover-password/:token',
+    loadComponent: () =>
+      import('./auth/recover-password/recover-password.component').then(
+        m => m.RecoverPasswordComponent,
+      ),
+  },
+  {
     // Layout compartido: sidebar + topbar + footer fijos alrededor del router-outlet.
     //
     // `canActivate` sólo se ejecuta cuando la ruta del layout se activa (primera

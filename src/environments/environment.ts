@@ -2,6 +2,12 @@ export const environment = {
   production: false,
   Url: 'https://localhost',
   API: '/v1/api/',
+  // Rutas anónimas de Sandra: `/v1/xapi/` (sin JWT; integridad HMAC por el
+  // interceptor) y `/devel/api/` (sin JWT, superficie de desarrollo montada
+  // siempre: fnx, crud, ccoleccion). El flujo de recuperación de contraseña
+  // pre-autenticación vive exclusivamente sobre estas dos bases.
+  XAPI: '/v1/xapi/',
+  DEVEL: '/devel/api/',
   ID: 'firmalink',
   Hash: ':cdd2b41298c1bf1108de6df5eca512ec.sse',
   version: 'FirmaLink 1.0.0',
@@ -10,8 +16,14 @@ export const environment = {
   functions: {
     CONSULTAR_USUARIO_PERFIL: '_SYS_CUsuarioPerfil',
     CONSULTAR_LOGIN_USUARIO: '_SYS_CUserPanelLogin',
+    // Consulta apicore por `usuario.correo` (recuperación de contraseña):
+    // devuelve únicamente `login` y `correo`.
+    CONSULTAR_USUARIO_POR_CORREO: '_SYS_CFirmaLinkUsuarioPorCorreo',
     ACTUALIZAR_CLAVE_USUARIO: '_SYS_UUserPanel',
     ACTUALIZAR_TOTP: '_SYS_UUserTOTP',
+    // Función nativa `email.enviar` (model.RegisterNativa) invocada vía
+    // /devel/api/fnx; requiere su documento en la colección Mongo `sys-function`.
+    ENVIAR_CORREO_FNX: 'email.enviar',
     CONSULTAR_ACUERDOS: '_SYS_CFirmaLinkAcuerdos',
     CONSULTAR_ACUERDOS_CLIENTE: '_SYS_CFirmaLinkAcuerdosCliente',
     CONSULTAR_ACUERDO: '_SYS_CFirmaLinkAcuerdo',
@@ -39,5 +51,9 @@ export const environment = {
     FACTURA: 'firmalink_facturas',
     PRESUPUESTO: 'firmalink_presupuestos',
     CALCULO: 'firmalink_calculos',
+    // Usuario base de FirmaLink (campo `correo` validado en la recuperación)
+    USUARIO: 'usuario',
+    // Tokens de recuperación de contraseña (un documento vigente por login)
+    PASSWORD_RESET: 'firmalink_password_resets',
   },
 };

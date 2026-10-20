@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --host 0.0.0.0 --port 4210",
+    "start": "ng serve --host 0.0.0.0 --port 4210 --proxy-config ./src/proxy.conf.json",
     "build": "node update-build-date.js && ng build",
     "build:prod": "node update-build-date.js && ng build --configuration production",
     "update-build-date": "node update-build-date.js",

@@ -182,6 +182,44 @@ export class ApiService {
     return this.http.post<any>(url, xObjeto, this.httpOptions);
   }
 
+  // ─────────────────────────── Superficie anónima ───────────────────────────
+  // Las rutas siguientes NO requieren JWT. Se usan en el flujo de recuperación
+  // de contraseña, que ocurre ANTES de autenticarse. El interceptor añade igual
+  // la firma HMAC (Web-API-key / X-Signature / X-Timestamp) por uniformidad.
+
+  /**
+   * CRUD anónimo: `POST /devel/api/crud:{funcion}` — ejecuta funciones apicore
+   * (`_SYS_*`) sin sesión. Cuerpo: `{ funcion, parametros }`. Devuelve
+   * directamente las filas del driver (`[{...}]`).
+   */
+  EjecutarAnonimo(xAPI: IAPICore): Observable<any> {
+    const url = environment.DEVEL + 'crud:' + xAPI.funcion;
+    return this.http.post<any>(url, xAPI, this.httpOptions);
+  }
+
+  /**
+   * Colección anónima: `POST /v1/xapi/ccoleccion` — upsert / insert sobre
+   * cualquier colección sin sesión. Cuerpo: `{ coleccion, donde, objeto,
+   * upsert, driver }` (`donde` es un string con el filtro en JSON). Devuelve
+   * el `UpdateResult` de Mongo: `{ matchedCount, modifiedCount, upsertedCount,
+   * upsertedID }`.
+   */
+  ColeccionAnonima(xObjeto: any): Observable<any> {
+    const url = environment.XAPI + 'ccoleccion';
+    return this.http.post<any>(url, xObjeto, this.httpOptions);
+  }
+
+  /**
+   * Funciones nativas anónimas: `POST /devel/api/fnx` — invoca una función
+   * registrada (p.ej. `email.enviar`) con pares clave/valor como argumentos.
+   * Requiere el documento correspondiente en la colección Mongo `funciones`
+   * (`{ nombre, lenguaje: 'NATIVA', codigo: '<nombre-registrada>' }`).
+   */
+  FnxAnonima(peticion: Record<string, any>): Observable<any> {
+    const url = environment.DEVEL + 'fnx';
+    return this.http.post<any>(url, peticion, this.httpOptions);
+  }
+
   /**
    * Tasa oficial de una divisa (BCV).
    *
