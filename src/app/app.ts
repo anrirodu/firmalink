@@ -34,10 +34,6 @@ export class App {
   private async mostrarAlertaActualizacion(): Promise<void> {
     this.alertaEnCurso = true;
 
-    // Marcar esta versión como avisada en la sesión: si el usuario pospone,
-    // no se vuelve a molestar hasta que cargue una versión distinta.
-    this.versionService.confirmarAviso();
-
     const resultado = await Swal.fire({
       icon: 'info',
       title: 'Actualización disponible',
@@ -62,7 +58,9 @@ export class App {
     });
 
     if (resultado.isConfirmed) {
-      await Swal.fire({
+      // Mostrar el modal de progreso SIN await: el modal no tiene botón de
+      // cierre, así que su promesa nunca resolvería y bloquearía la limpieza.
+      void Swal.fire({
         title: 'Actualizando…',
         html: 'Limpiando caché y recargando la aplicación.',
         allowOutsideClick: false,
@@ -76,7 +74,9 @@ export class App {
       return;
     }
 
-    // El usuario pospuso: liberar el candado para futuras alertas.
+    // El usuario pospuso: silenciar temporalmente (30 min) solo esta versión.
+    // Si aparece una versión más nueva, volverá a avisar de inmediato.
+    this.versionService.posponer();
     this.alertaEnCurso = false;
   }
 }
