@@ -111,9 +111,13 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private loginEnCurso = false;
+
   onLogin(): void {
+    if (this.loginEnCurso) return;
     if (!this.email() || !this.password()) return;
 
+    this.loginEnCurso = true;
     this.isLoading.set(true);
 
     this.authService.getLogin(this.email(), this.password()).subscribe({
@@ -137,35 +141,48 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
             next: (xdata) => {
               if (xdata.msj === 'Ok') {
                 // Sin sesión activa previa → iniciar sesión
-                this.authService.iniciarSesion(itk.token).then(() => {
-                  this.ingresarConBienvenida(itk.token);
-                }).catch((e) => {
-                  this.manejarErrorAcceso(e);
-                });
+            this.authService.iniciarSesion(itk.token).then(() => {
+              this.loginEnCurso = false;
+              this.ingresarConBienvenida(itk.token);
+            }).catch((e) => {
+              this.loginEnCurso = false;
+              this.manejarErrorAcceso(e);
+            });
               } else if (xdata.tipo === 99) {
                 // Ya hay una sesión activa y multi-sesión no permitida
+                this.loginEnCurso = false;
+                this.isLoading.set(false);
                 this.mostrarError(xdata.msj);
                 this.limpiarCampos();
               } else {
+                this.loginEnCurso = false;
+                this.isLoading.set(false);
                 this.mostrarError('Error al validar la sesión');
               }
             },
             error: () => {
               // Si falla el chequeo, no bloquear el login (best effort)
               this.authService.iniciarSesion(itk.token).then(() => {
+                this.loginEnCurso = false;
                 this.ingresarConBienvenida(itk.token);
               }).catch((e) => {
+                this.loginEnCurso = false;
                 this.manejarErrorAcceso(e);
               });
+            },
+            complete: () => {
+              this.isLoading.set(false);
             },
           });
         }
       },
       error: (er) => {
+        this.loginEnCurso = false;
         this.isLoading.set(false);
         const msg = er.error?.msj || 'Error al acceder al sistema';
         this.mostrarError(msg);
       },
+      complete: () => {},
     });
   }
 
@@ -252,20 +269,24 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
           // Paso 2: Verificar múltiples sesiones
           this.authService.verificarSesion().subscribe({
             next: (xdata) => {
-              this.loading.set(false);
               if (xdata.msj === 'Ok') {
                 // Paso 3: Iniciar sesión (con el efecto de éxito antes de entrar)
                 this.finalizarConEfecto(this.authService.iniciarSesion(this.tempAuthToken()));
               } else if (xdata.tipo === 99) {
+                this.loading.set(false);
                 this.handleOtpError(xdata.msj);
                 this.goBackToLogin();
               } else {
+                this.loading.set(false);
                 this.handleOtpError('Error al validar el código');
               }
             },
             error: () => {
               this.loading.set(false);
               this.handleOtpError('Error de conexión');
+            },
+            complete: () => {
+              this.loading.set(false);
             },
           });
         } else {
@@ -282,6 +303,9 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
         } else {
           this.handleOtpError('Error al validar el código');
         }
+      },
+      complete: () => {
+        this.loading.set(false);
       },
     });
   }

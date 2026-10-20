@@ -1,8 +1,8 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, from, switchMap, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { Observable, from, switchMap, of, shareReplay } from 'rxjs';
+import { map, catchError, take } from 'rxjs/operators';
 import { lastValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
 import { ApiService } from '../../shared/services/api.service';
@@ -134,13 +134,26 @@ export class AuthService {
     return this.apiService.Validar_TOTP(codigo, this.tempAuthToken);
   }
 
+  private multiplesesionCache = new Map<string, Observable<any>>();
+
   /**
    * Paso 3: Verificar múltiples sesiones
    * Si no se recibe token, usa el tempAuthToken (flujo TOTP).
+   * Se cachea por token con shareReplay(1) para evitar doble llamada.
    */
   verificarSesion(token?: string): Observable<any> {
     const tk = token || this.tempAuthToken;
-    return this.apiService.MultipleSesion(tk);
+    if (!tk) {
+      return this.apiService.MultipleSesion(tk);
+    }
+    if (this.multiplesesionCache.has(tk)) {
+      return this.multiplesesionCache.get(tk)!;
+    }
+    const obs = this.apiService.MultipleSesion(tk).pipe(
+      shareReplay(1),
+    );
+    this.multiplesesionCache.set(tk, obs);
+    return obs;
   }
 
   /**
