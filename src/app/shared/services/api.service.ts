@@ -205,7 +205,7 @@ export class ApiService {
    * upsertedID }`.
    */
   ColeccionAnonima(xObjeto: any): Observable<any> {
-    const url = environment.XAPI + 'ccoleccion';
+    const url = environment.DEVEL + 'ccoleccion';
     return this.http.post<any>(url, xObjeto, this.httpOptions);
   }
 
