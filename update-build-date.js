@@ -33,6 +33,21 @@ function updateBuildDate() {
   const envPath = path.join(__dirname, 'src', 'environments', 'environment.prod.ts');
 
   updateEnvironmentFile(envPath, buildDate);
+
+  // Publicar la versión como archivo estático servible (sin caché) para que el
+  // cliente pueda detectar despliegues nuevos comparando con su `buildDate`.
+  const versionPath = path.join(__dirname, 'public', 'version.json');
+  writeVersionFile(versionPath, buildDate);
+}
+
+function writeVersionFile(versionPath, buildDate) {
+  try {
+    const payload = JSON.stringify({ buildDate }, null, 2) + '\n';
+    fs.writeFileSync(versionPath, payload, 'utf8');
+    console.log(`✅ version.json UPDATED: ${buildDate}`);
+  } catch (error) {
+    console.error(`❌ Error writing ${versionPath}:`, error.message);
+  }
 }
 
 function updateEnvironmentFile(envPath, buildDate) {
