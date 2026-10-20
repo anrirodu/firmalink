@@ -33,38 +33,45 @@
     </div>
 
     <div class="header-actions">
-      @if (cambiado()) {
+      @if (cambiado() && !soloLectura()) {
         <span class="cl-pendiente">
           <mat-icon inline>edit_note</mat-icon> Sin guardar
         </span>
       }
 
-      <button mat-stroked-button type="button" (click)="recalcularTodo()" [disabled]="!hayAjustes()"
-              matTooltip="Devuelve a la fórmula las cifras que escribió a mano">
-        <mat-icon>restart_alt</mat-icon> Volver a la fórmula
-      </button>
+      @if (soloLectura()) {
+        <span class="cl-estado-chip cl-estado-chip-grande" [style.color]="infoEstado(calculo().estado).color">
+          <mat-icon inline>{{ infoEstado(calculo().estado).icono }}</mat-icon>
+          {{ infoEstado(calculo().estado).etiqueta }}
+        </span>
 
-      @if (calculo().codigo) {
-        <button mat-stroked-button type="button" (click)="eliminar()">
-          <mat-icon>delete_outline</mat-icon> Eliminar
+        @if (puedeCambiarA('anulada')) {
+          <button mat-stroked-button type="button" (click)="anular()" [disabled]="guardando()"
+                  matTooltip="Descarta el cálculo sin borrarlo: queda en el listado para la traza">
+            <mat-icon>block</mat-icon> Anular
+          </button>
+        }
+      } @else {
+        <button mat-stroked-button type="button" (click)="recalcularTodo()" [disabled]="!hayAjustes()"
+                matTooltip="Devuelve a la fórmula las cifras que escribió a mano">
+          <mat-icon>restart_alt</mat-icon> Volver a la fórmula
         </button>
-      }
 
-      @if (calculo().estado === 'borrador') {
         <button mat-stroked-button color="primary" type="button" (click)="procesar()" [disabled]="guardando()"
                 matTooltip="Cerrar el cálculo: sus cifras ya no admiten ediciones">
           <mat-icon>task_alt</mat-icon> Procesar
         </button>
-      } @else {
-        <span class="cl-estado-chip" [style.color]="infoEstado(calculo().estado).color">
-          <mat-icon inline>{{ infoEstado(calculo().estado).icono }}</mat-icon>
-          {{ infoEstado(calculo().estado).etiqueta }}
-        </span>
+
+        <button mat-flat-button color="primary" type="button" (click)="guardar()" [disabled]="guardando()">
+          <mat-icon>save</mat-icon> {{ guardando() ? 'Guardando…' : 'Guardar' }}
+        </button>
       }
 
-      <button mat-flat-button color="primary" type="button" (click)="guardar()" [disabled]="guardando()">
-        <mat-icon>save</mat-icon> {{ guardando() ? 'Guardando…' : 'Guardar' }}
-      </button>
+      @if (calculo().codigo) {
+        <button mat-stroked-button type="button" (click)="eliminar()" [disabled]="guardando()">
+          <mat-icon>delete_outline</mat-icon> Eliminar
+        </button>
+      }
 
       <button mat-icon-button type="button" (click)="nuevo()" [disabled]="guardando()"
               matTooltip="Empezar un cálculo nuevo">
@@ -72,6 +79,16 @@
       </button>
     </div>
   </header>
+
+  @if (soloLectura() && !cargando()) {
+    <div class="cl-bloqueo">
+      <mat-icon>lock</mat-icon>
+      <div>
+        <strong>Solo lectura</strong>
+        {{ motivoBloqueo() }}
+      </div>
+    </div>
+  }
 
   @if (cargando()) {
     <div class="cl-cargando">
@@ -90,7 +107,7 @@
       <div class="cl-grid">
         <label class="cl-campo cl-campo-ancho">
           <span>Nombre del cálculo</span>
-          <input type="text" [value]="calculo().nombre"
+          <input type="text" [value]="calculo().nombre" [readOnly]="soloLectura()"
                  (input)="setNombre($any($event.target).value)"
                  placeholder="Ej.: Contrato Suministros 2026 · lote 3">
           <small class="cl-hint">Con este nombre se reconoce el cálculo en el listado.</small>
@@ -105,7 +122,7 @@
           <span>Estatus</span>
           <select [value]="calculo().estado" (change)="setEstado($any($event.target).value)">
             @for (e of estados; track e) {
-              <option [value]="e">{{ infoEstado(e).etiqueta }}</option>
+              <option [value]="e" [disabled]="e !== calculo().estado && !puedeCambiarA(e)">{{ infoEstado(e).etiqueta }}</option>
             }
           </select>
           <small class="cl-hint">«Procesado» cierra el cálculo; «Anulada» lo descarta sin borrarlo.</small>

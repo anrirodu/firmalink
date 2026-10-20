@@ -23,16 +23,19 @@ import {
   claveDeduccion,
   detalleDeduccion,
   equivalenteDivisa,
+  esCalculoEditable,
   etiquetaBase,
   formulaDeduccion,
   formatoBs,
   formatoPorcentaje,
   infoEstadoCalculo,
+  motivoBloqueoCalculo,
   nombreCalculo,
   nombreDeduccion,
   nuevaDeduccion,
   parsearNumero,
   recalcular,
+  transicionesCalculo,
   validarCalculo,
 } from '../calculo.model';
 import { CalculoService } from '../calculo.service';
@@ -50,17 +53,21 @@ type CifraFuente = 'montoSubtotal' | 'ivaPorcentaje' | 'gananciaPorcentaje';
  *
  * El recorrido va de arriba abajo, como se hace la cuenta a mano:
  *
- *   1. el **monto total de la factura** y la alícuota → el IVA y el subtotal se
+ *   1. el **monto subtotal de la factura** y la alícuota → el IVA y el total se
  *      calculan solos;
- *   2. el **monto depositado** (por defecto, el subtotal);
- *   3. las **deducciones**, que el usuario agrega a su gusto: cada una en
+ *   2. las **deducciones**, que el usuario agrega a su gusto: cada una en
  *      porcentaje sobre la base que elija, o en monto fijo;
+ *   3. el **monto depositado** (por defecto, el total menos las deducciones);
  *   4. el **saldo disponible**, la ganancia objetivo y el **saldo libre**.
  *
  * Las cifras que salen de una fórmula se autocalculan. Si el documento real no
  * cuadra con la fórmula, el usuario desbloquea la casilla (el lápiz) y escribe
  * su cifra: queda marcada como ajuste hasta que la devuelva a la fórmula con el
  * botón de deshacer.
+ *
+ * Un cálculo **procesado** (o anulado/borrado) se abre en **solo lectura**: sus
+ * cifras quedaron cerradas y no admiten ediciones; solo se puede cambiar de
+ * estatus (a anulada, por ejemplo) o eliminarlo.
  */
 @Component({
   selector: 'app-calculator',
@@ -97,6 +104,16 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** ¿Hay alguna cifra fuera de la fórmula? */
   readonly hayAjustes = computed(() => this.ajustes().length > 0 || this.depositadoManual());
+
+  /**
+   * ¿El cálculo se abre solo para consulta? Un procesado, anulado o borrado ya
+   * no admite ediciones: sus cifras quedaron cerradas. Solo se puede cambiar de
+   * estatus o eliminarlo.
+   */
+  readonly soloLectura = computed(() => !esCalculoEditable(this.calculo().estado));
+
+  /** Por qué no se puede editar (vacío si sí se puede). */
+  readonly motivoBloqueo = computed(() => motivoBloqueoCalculo(this.calculo().estado));
 
   /** Las deducciones superan el depósito: el saldo disponible queda en negativo. */
   readonly excedido = computed(
@@ -201,6 +218,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Escribe una cifra de la que cuelga el resto del desglose. */
   setFuente(campo: CifraFuente, texto: string): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, [campo]: parsearNumero(texto) }));
     this.recalcular();
     this.cambiado.set(true);
@@ -208,6 +226,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Monto depositado: al escribirlo deja de seguir a la fórmula (total − deducciones). */
   setDepositado(texto: string): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, montoDepositado: parsearNumero(texto) }));
     this.depositadoManual.set(true);
     this.recalcular();
@@ -216,6 +235,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Vuelve a dejar el depósito en automático (total − deducciones). */
   usarDepositoAutomatico(): void {
+    if (this.soloLectura()) return;
     this.depositadoManual.set(false);
     this.soltarAjuste('montoDepositado', false);
     this.recalcular();
@@ -224,23 +244,50 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Nombre con el que se reconoce el cálculo en el listado. */
   setNombre(texto: string): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, nombre: texto }));
     this.cambiado.set(true);
   }
 
   /** Fecha que se imprime en el cálculo. */
   setFechaTexto(texto: string): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, fechaTexto: texto }));
     this.cambiado.set(true);
   }
 
-  /** Estatus del cálculo (borrador / procesado / anulada). */
+  /**
+   * Estatus del cálculo (borrador / procesado / anulada).
+   *
+   * Es la única edición que sigue viva con el cálculo cerrado: un procesado se
+   * puede anular y un anulado se puede eliminar. Se respetan las transiciones
+   * válidas del modelo.
+   */
   setEstado(estado: string): void {
     const valor = (ESTADOS_CALCULO as string[]).includes(estado)
       ? (estado as CalculoEstado)
       : 'borrador';
+    if (!transicionesCalculo(this.calculo().estado).includes(valor)) return;
     this.calculo.update((c) => ({ ...c, estado: valor }));
     this.cambiado.set(true);
+  }
+
+  /** ¿El estatus actual admite pasar a este otro? (Ver `transicionesCalculo`). */
+  puedeCambiarA(estado: CalculoEstado): boolean {
+    return transicionesCalculo(this.calculo().estado).includes(estado);
+  }
+
+  /**
+   * Anula el cálculo con el editor abierto.
+   *
+   * A diferencia de «Eliminar» (que lo saca del listado), anular conserva el
+   * cálculo a la vista para la traza. No pide confirmación porque es reversible:
+   * desde el listado se puede devolver a procesado.
+   */
+  async anular(): Promise<void> {
+    if (!this.puedeCambiarA('anulada')) return;
+    this.calculo.update((c) => ({ ...c, estado: 'anulada' }));
+    await this.guardar();
   }
 
   // ═══════════════════════════════════════════
@@ -254,6 +301,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Desbloquea una cifra derivada para escribirla a mano. */
   ajustar(clave: string): void {
+    if (this.soloLectura()) return;
     if (!this.ajustes().includes(clave)) {
       this.ajustes.update((a) => [...a, clave]);
     }
@@ -276,6 +324,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Lápiz / deshacer de una cifra derivada. */
   alternarAjuste(clave: string): void {
+    if (this.soloLectura()) return;
     if (this.esAjuste(clave)) {
       this.soltarAjuste(clave);
       return;
@@ -285,6 +334,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Escribe una cifra derivada que estaba desbloqueada. */
   setDerivado(campo: CifraAjustable, texto: string): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, [campo]: parsearNumero(texto) }));
     this.recalcular();
     this.cambiado.set(true);
@@ -292,6 +342,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Devuelve todas las cifras a la fórmula del modelo. */
   recalcularTodo(): void {
+    if (this.soloLectura()) return;
     this.ajustes.set([]);
     this.depositadoManual.set(false);
     this.recalcular();
@@ -344,6 +395,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Agrega una deducción en blanco (o con los datos de un atajo). */
   agregarDeduccion(datos: Partial<Deduccion> = {}): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, deducciones: [...(c.deducciones ?? []), nuevaDeduccion(datos)] }));
     this.recalcular();
     this.cambiado.set(true);
@@ -358,6 +410,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Quita una deducción del cálculo. */
   quitarDeduccion(d: Deduccion): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({
       ...c,
       deducciones: (c.deducciones ?? []).filter((x) => x.id !== d.id),
@@ -407,6 +460,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   /** Lápiz / deshacer del monto de una deducción. */
   alternarAjusteDeduccion(d: Deduccion): void {
+    if (this.soloLectura()) return;
     if (this.esAjusteDeduccion(d)) {
       this.soltarAjuste(claveDeduccion(d.id));
       return;
@@ -415,6 +469,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   }
 
   private conDeduccion(id: string, cambios: (d: Deduccion) => Deduccion): void {
+    if (this.soloLectura()) return;
     this.calculo.update((c) => ({
       ...c,
       deducciones: (c.deducciones ?? []).map((d) => (d.id === id ? cambios(d) : d)),
