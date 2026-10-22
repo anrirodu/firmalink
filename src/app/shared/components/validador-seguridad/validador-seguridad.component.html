@@ -1,0 +1,58 @@
+<!-- ═══ Validador de Seguridad Nativo (Sandra Server Core) ═══ -->
+<div
+  class="validador-seguridad"
+  [class.validador-cargando]="estado() === 'cargando'"
+  [class.validador-exito]="estado() === 'exito'"
+  [class.validador-error]="estado() === 'error'"
+  (click)="pulsar()"
+  (keydown.enter)="pulsar()"
+  (keydown.space)="pulsar(); $event.preventDefault()"
+  role="button"
+  tabindex="0"
+  aria-live="polite"
+  [attr.aria-label]="
+    estado() === 'exito'
+      ? 'Seguridad verificada'
+      : 'Verificación de seguridad, pulse para validar'
+  "
+>
+  <div class="validador-checkbox">
+    @if (estado() === 'cargando') {
+      <span class="captcha-spinner" role="status">
+        <span class="sr-only"></span>
+      </span>
+    } @else if (estado() === 'exito') {
+      <mat-icon class="check-icono">check</mat-icon>
+    } @else {
+      <span class="checkbox-box"></span>
+    }
+  </div>
+
+  <div class="validador-info">
+    <span class="validador-texto">
+      @switch (estado()) {
+        @case ('exito') {
+          @if (modo === 'verificar' && verificado()) {
+            Verificación de seguridad completada
+          } @else {
+            Entorno seguro verificado
+          }
+        }
+        @case ('cargando') {
+          Validando sesión segura...
+        }
+        @case ('error') {
+          Verificación no disponible · reintentar
+        }
+        @default {
+          Verificación de seguridad (Soy humano)
+        }
+      }
+    </span>
+    <span class="validador-marca">{{ marca }}</span>
+  </div>
+
+  <div class="validador-icono">
+    <mat-icon [class.icono-activo]="estado() === 'exito'">shield</mat-icon>
+  </div>
+</div>

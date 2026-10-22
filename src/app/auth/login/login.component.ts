@@ -1,4 +1,11 @@
-import { Component, signal, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  signal,
+  ElementRef,
+  ViewChild,
+  AfterViewInit,
+  OnDestroy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -13,6 +20,9 @@ import { AuthService } from '../services/auth.service';
 import { TokenPayload } from '../interfaces/auth.interfaces';
 import { IsotipoAnimadoComponent } from '../../shared/components/isotipo-animado/isotipo-animado.component';
 import { AccesoBienvenidaComponent } from '../../shared/components/acceso-bienvenida/acceso-bienvenida.component';
+import {
+  ValidadorSeguridadComponent,
+} from '../../shared/components/validador-seguridad/validador-seguridad.component';
 import { environment } from '../../../environments/environment';
 
 /**
@@ -42,6 +52,7 @@ const DURACION_ALTO = 320;
     MatProgressSpinnerModule,
     IsotipoAnimadoComponent,
     AccesoBienvenidaComponent,
+    ValidadorSeguridadComponent,
     RouterLink,
   ],
   templateUrl: './login.component.html',
@@ -50,6 +61,22 @@ const DURACION_ALTO = 320;
 export class LoginComponent implements AfterViewInit, OnDestroy {
   @ViewChild('otp0') otp0Ref!: ElementRef<HTMLInputElement>;
   @ViewChild('tarjeta') tarjetaRef!: ElementRef<HTMLElement>;
+  /**
+   * Validador de seguridad (captcha PoW) del formulario de acceso: la
+   * solución viaja al endpoint de acceso, que la valida y consume, así que el
+   * componente sólo resuelve el reto (modo `resolver`).
+   *
+   * Vive en el panel de login, que se destruye al pasar a la verificación de
+   * dos pasos.
+   */
+  @ViewChild('validadorLogin') validadorLogin!: ValidadorSeguridadComponent;
+
+  /**
+   * Validador de seguridad de la verificación de dos pasos (TOTP): aquí la
+   * solución se valida en el servidor (`captcha/verify`) antes de enviar el
+   * código, y cada intento consume un reto nuevo.
+   */
+  @ViewChild('validadorTotp') validadorTotp!: ValidadorSeguridadComponent;
 
   email = signal('');
   password = signal('');
@@ -76,6 +103,12 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
   // las dos animaciones retrasaría el ingreso sin aportar nada.
   accesoDirecto = signal(false);
   nombreBienvenida = signal('');
+
+  // ══════════════ VERIFICACIÓN DE SEGURIDAD (CAPTCHA PoW) ══════════════
+  // El servidor emite un reto (salt + challenge) y el cliente resuelve el
+  // Proof-of-Work en el navegador. La solución se consume en el servidor
+  // (anti-replay): cada intento de acceso necesita un reto nuevo.
+  // La lógica vive en el componente compartido `app-validador-seguridad`.
 
   private navegando = false;
 
@@ -111,16 +144,57 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * `true` mientras el validador del acceso resuelve el reto: el botón de
+   * acceso espera a que haya una solución lista.
+   */
+  get validadorResolviendo(): boolean {
+    return this.validadorLogin?.estado() === 'cargando';
+  }
+
+  /**
+   * `true` mientras el validador de la verificación de dos pasos resuelve o
+   * valida el reto.
+   */
+  get validadorTotpResolviendo(): boolean {
+    return this.validadorTotp?.estado() === 'cargando';
+  }
+
   private loginEnCurso = false;
 
-  onLogin(): void {
+  /** Intentos de código TOTP: a partir del segundo se consume un reto nuevo. */
+  private totpIntentos = 0;
+
+  async onLogin(): Promise<void> {
     if (this.loginEnCurso) return;
     if (!this.email() || !this.password()) return;
 
     this.loginEnCurso = true;
+
+    // La solución del captcha se consume en el servidor: si no hay una
+    // vigente (o el servidor la rechazó) se resuelve un reto nuevo.
+    const captcha = await this.validadorLogin?.asegurar();
+
+    if (!captcha) {
+      this.loginEnCurso = false;
+
+      if (environment.production) {
+        this.mostrarError(
+          'No se pudo completar la verificación de seguridad. Revise su conexión e intente nuevamente.',
+        );
+        return;
+      }
+
+      // En desarrollo se permite el acceso sin verificación (servidor sin
+      // el módulo de captcha o reto no disponible).
+      console.warn(
+        '[LoginComponent] Acceso sin verificación de seguridad (modo desarrollo)',
+      );
+    }
+
     this.isLoading.set(true);
 
-    this.authService.getLogin(this.email(), this.password()).subscribe({
+    this.authService.getLogin(this.email(), this.password(), captcha ?? undefined).subscribe({
       next: (itk) => {
         this.isLoading.set(false);
 
@@ -132,7 +206,12 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
           this.authService.setTempAuthToken(itk.token); // Guardar en el servicio para validarTotp
           this.success.set(false);
           this.cambiarPanel(
-            () => this.showTotp.set(true),
+            () => {
+              // Panel de verificación de dos pasos: el contador de intentos
+              // vuelve a cero (el primer intento reusa el reto ya resuelto).
+              this.totpIntentos = 0;
+              this.showTotp.set(true);
+            },
             () => this.otp0Ref?.nativeElement?.focus(),
           );
         } else {
@@ -179,11 +258,44 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
       error: (er) => {
         this.loginEnCurso = false;
         this.isLoading.set(false);
+
+        // El servidor consumió el reto: el siguiente intento necesita otro.
+        this.invalidarCaptcha();
+
         const msg = er.error?.msj || 'Error al acceder al sistema';
+
+        if (this.esErrorCaptcha(msg)) {
+          this.mostrarError(
+            'La verificación de seguridad expiró o no fue válida. Intente nuevamente.',
+          );
+          return;
+        }
+
         this.mostrarError(msg);
       },
       complete: () => {},
     });
+  }
+
+  /**
+   * Descarta la solución vigente del captcha (el servidor ya la consumió) y
+   * resuelve un reto nuevo para el siguiente intento.
+   */
+  private invalidarCaptcha(): void {
+    this.validadorLogin?.invalidar();
+  }
+
+  /**
+   * Detecta los errores del servidor relacionados con el captcha / PoW.
+   */
+  private esErrorCaptcha(msg: string): boolean {
+    const m = String(msg || '').toLowerCase();
+    return (
+      m.includes('captcha') ||
+      m.includes('pow') ||
+      m.includes('verificación de seguridad') ||
+      m.includes('validación de seguridad')
+    );
   }
 
   onKeydown(event: KeyboardEvent): void {
@@ -253,11 +365,31 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  verificarTotp(): void {
+  async verificarTotp(): Promise<void> {
     const otpCode = this.otp().join('');
     if (otpCode.length !== 6 || this.loading()) return;
 
     this.loading.set(true);
+
+    // Verificación de seguridad (captcha PoW): el servidor valida la solución
+    // del reto y la consume, así que un mismo reto no sirve para dos intentos.
+    // El primer intento reusa el reto que se resolvió al abrir el panel; cada
+    // reintento consume uno nuevo, de modo que el código TOTP no se puede
+    // fuerza-brutar con reintentos seguidos.
+    const verificado =
+      this.totpIntentos === 0
+        ? await this.validadorTotp?.asegurar()
+        : await this.validadorTotp?.renovar();
+
+    this.totpIntentos++;
+
+    if (!verificado) {
+      this.loading.set(false);
+      this.mostrarError(
+        'No se pudo completar la verificación de seguridad. Revise su conexión e intente nuevamente.',
+      );
+      return;
+    }
 
     // Paso 1: Validar TOTP
     this.authService.validarTotp(otpCode).subscribe({
@@ -337,6 +469,10 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     this.tempAuthToken.set('');
     this.isOtpInvalid.set(false);
     this.otp.set(['', '', '', '', '', '']);
+    this.totpIntentos = 0;
+
+    // El reto se consumió en el intento de acceso: hay que resolver otro.
+    this.invalidarCaptcha();
 
     this.cambiarPanel(() => this.showTotp.set(false));
   }
@@ -424,6 +560,9 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
   limpiarCampos(): void {
     this.password.set('');
     this.tempAuthToken.set('');
+
+    // El servidor consumió el reto en el intento: se pide uno nuevo.
+    this.invalidarCaptcha();
   }
 
   /**

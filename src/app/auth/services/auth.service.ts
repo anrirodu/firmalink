@@ -5,7 +5,7 @@ import { Observable, from, switchMap, of, shareReplay } from 'rxjs';
 import { map, catchError, take } from 'rxjs/operators';
 import { lastValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
-import { ApiService } from '../../shared/services/api.service';
+import { ApiService, ICaptchaLogin } from '../../shared/services/api.service';
 import { Sha256Service } from '../../shared/utils/sha256.service';
 import { huellaMenu } from '../../shared/utils/menu-crypt';
 import { MenuService } from '../../shared/services/menu.service';
@@ -55,8 +55,15 @@ export class AuthService {
    * Paso 1: Login con usuario y contraseña.
    * Retorna un Observable con el token JWT.
    * Si el usuario tiene TOTP activo, el token contendrá un tempAuthToken.
+   *
+   * `captcha` es la solución del Proof-of-Work: cuando viene, el acceso se
+   * hace por el login "web", que la valida en el servidor.
    */
-  getLogin(usuario: string, clave: string): Observable<IToken> {
+  getLogin(
+    usuario: string,
+    clave: string,
+    captcha?: ICaptchaLogin,
+  ): Observable<IToken> {
     const netInfo = sessionStorage.getItem('net_info');
     let deviceContext = '';
 
@@ -84,7 +91,7 @@ export class AuthService {
 
     return from(cryptoPromise).pipe(
       switchMap((ctx) =>
-        this.apiService.login(usuario, clave, ctx || undefined)
+        this.apiService.login(usuario, clave, ctx || undefined, captcha)
       ),
     );
   }

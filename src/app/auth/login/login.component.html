@@ -138,6 +138,9 @@
                 </button>
               </mat-form-field>
 
+              <!-- ═══ Validador de Seguridad Nativo (Sandra Server Core) ═══ -->
+              <app-validador-seguridad #validadorLogin modo="resolver" />
+
               <!-- Forgot password -->
               <div class="form-options">
                 <label class="remember-me">
@@ -153,7 +156,7 @@
                 color="primary"
                 class="login-btn full-width"
                 type="submit"
-                [disabled]="isLoading() || !email() || !password()"
+                [disabled]="isLoading() || !email() || !password() || validadorResolviendo"
               >
                 @if (isLoading()) {
                   <ng-container>
@@ -243,6 +246,11 @@
                 <p class="error-text">Código incorrecto. Inténtalo de nuevo.</p>
               }
             </div>
+
+            <!-- ═══ Validador de Seguridad Nativo (Sandra Server Core) ═══ -->
+            <!-- La solución del reto se valida en el servidor y se consume: cada
+                 intento de código TOTP necesita un reto nuevo. -->
+            <app-validador-seguridad #validadorTotp />
 
             <!-- Loading -->
             @if (loading()) {

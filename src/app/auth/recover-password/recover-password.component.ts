@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -11,6 +11,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { timeout } from 'rxjs';
 import { IsotipoAnimadoComponent } from '../../shared/components/isotipo-animado/isotipo-animado.component';
+import {
+  EstadoValidador,
+  ValidadorSeguridadComponent,
+} from '../../shared/components/validador-seguridad/validador-seguridad.component';
 import { PasswordResetService, EstadoToken } from '../services/password-reset.service';
 
 /** Misma expresión de complejidad que el cambio de contraseña autenticado. */
@@ -25,6 +29,10 @@ const CLAVE_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%
  * (8-16, mayúscula, minúscula, número, especial @$!%*?&) con el mismo medidor
  * de fuerza; al confirmar, el token se consume de forma atómica y se actualiza
  * `usuario.clave` (SHA-256) desde PasswordResetService.
+ *
+ * Antes de guardar la clave nueva exige la verificación de seguridad (captcha
+ * PoW de Sandra Server Core): el servidor valida la solución del reto, que se
+ * consume, así que cada intento necesita un reto nuevo.
  */
 @Component({
   selector: 'app-recover-password',
@@ -41,6 +49,7 @@ const CLAVE_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%
     MatProgressSpinnerModule,
     MatDividerModule,
     IsotipoAnimadoComponent,
+    ValidadorSeguridadComponent,
   ],
   templateUrl: './recover-password.component.html',
   styleUrls: ['./recover-password.component.scss'],
@@ -49,6 +58,9 @@ export class RecoverPasswordComponent implements OnInit {
   private readonly reset = inject(PasswordResetService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  /** Verificador de seguridad (captcha PoW) de la pantalla. */
+  @ViewChild(ValidadorSeguridadComponent) validador!: ValidadorSeguridadComponent;
 
   readonly anio = new Date().getFullYear();
 
@@ -103,6 +115,16 @@ export class RecoverPasswordComponent implements OnInit {
 
   get claveInvalida(): boolean {
     return this.longitudNueva > 0 && !CLAVE_REGEX.test(this.nuevaCtrl.value as string);
+  }
+
+  /** Estado del verificador de seguridad (captcha PoW). */
+  get validadorEstado(): EstadoValidador {
+    return this.validador?.estado() ?? 'idle';
+  }
+
+  /** `true` mientras el reto se resuelve (o se valida en el servidor). */
+  get validadorResolviendo(): boolean {
+    return this.validadorEstado === 'cargando';
   }
 
   ngOnInit(): void {
@@ -167,7 +189,7 @@ export class RecoverPasswordComponent implements OnInit {
     }
   }
 
-  confirmar(): void {
+  async confirmar(): Promise<void> {
     const clave = this.nuevaCtrl.value as string;
 
     if (!CLAVE_REGEX.test(clave)) {
@@ -182,14 +204,31 @@ export class RecoverPasswordComponent implements OnInit {
     this.enviando.set(true);
     this.errorMensaje.set('');
 
+    // Verificación de seguridad: el servidor valida la solución del reto PoW
+    // (y la consume). Sin ella no se guarda la clave nueva.
+    const verificado = await this.validador?.asegurar();
+
+    if (!verificado) {
+      this.enviando.set(false);
+      const mensaje =
+        'No se pudo completar la verificación de seguridad. Revise su conexión e intente nuevamente.';
+      this.errorMensaje.set(mensaje);
+      this.alerta('error', mensaje);
+      return;
+    }
+
     this.reset.restablecer(this.token, clave).subscribe({
       next: () => {
         this.enviando.set(false);
+        this.validador?.invalidar();
         this.alerta('success', 'Contraseña restablecida. Inicie sesión con su clave nueva.');
         this.router.navigate(['/login']);
       },
       error: (err: Error) => {
         this.enviando.set(false);
+        // Reto nuevo para el siguiente intento (la solución anterior ya se
+        // consumió al validarla en el servidor).
+        this.validador?.invalidar();
         const mensaje =
           err?.message || 'No se pudo restablecer la contraseña. Intente de nuevo.';
         this.errorMensaje.set(mensaje);

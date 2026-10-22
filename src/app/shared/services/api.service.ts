@@ -56,6 +56,23 @@ export interface AdjuntoCorreo {
 /** Operador de la divisa cuya tasa se consulta. */
 export type MonedaDivisa = 'dolar' | 'euro';
 
+/**
+ * Solución del Proof-of-Work (captcha) que viaja en el cuerpo del login.
+ *
+ * El servidor la valida contra el reto que emitió (`salt` + `challenge`) y la
+ * consume: un reto resuelto sólo sirve para un intento de acceso.
+ */
+export interface ICaptchaLogin {
+  /** Número encontrado que resuelve el reto. */
+  sol: number;
+  /** Firma HMAC del reto (el servidor la recalcula y compara). */
+  sig: string;
+  /** Semilla del reto. */
+  salt: string;
+  /** Hash objetivo del reto. */
+  challenge: string;
+}
+
 /** Cuerpo de datos de `POST /v1/api/divisa`. */
 export interface DatosDivisa {
   moneda: string;
@@ -98,10 +115,29 @@ export class ApiService {
 
   /**
    * Login: POST a wusuario/loginV2
+   *
+   * Con `captcha` se usa el login "web" (`wusuario/loginWeb`), que es el
+   * único que valida la solución del Proof-of-Work antes de credenciales.
    */
-  login(usuario: string, clave: string, deviceContext?: string): Observable<any> {
+  login(
+    usuario: string,
+    clave: string,
+    deviceContext?: string,
+    captcha?: ICaptchaLogin,
+  ): Observable<any> {
     const timestamp = new Date().getTime().toString();
-    const body = { nombre: usuario, clave };
+    const body: Record<string, any> = { nombre: usuario, clave };
+
+    let url = this.URL + 'wusuario/loginV2';
+
+    if (captcha) {
+      url = this.URL + 'wusuario/loginWeb';
+      body['sol'] = captcha.sol;
+      body['sig'] = captcha.sig;
+      body['signature'] = captcha.sig;
+      body['salt'] = captcha.salt;
+      body['challenge'] = captcha.challenge;
+    }
 
     const headers: any = {
       'X-Skip-Interceptor': 'true',
@@ -114,7 +150,6 @@ export class ApiService {
       headers['X-Device-Context'] = deviceContext;
     }
 
-    const url = this.URL + 'wusuario/loginV2';
     return this.http.post(url, body, {
       headers: new HttpHeaders(headers),
     });
@@ -193,7 +228,7 @@ export class ApiService {
    * directamente las filas del driver (`[{...}]`).
    */
   EjecutarAnonimo(xAPI: IAPICore): Observable<any> {
-    const url = environment.DEVEL + 'crud:' + xAPI.funcion;
+    const url = environment.DEVEL + 'crud:' + environment.Hash;
     return this.http.post<any>(url, xAPI, this.httpOptions);
   }
 
