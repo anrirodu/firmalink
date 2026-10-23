@@ -132,6 +132,8 @@ export const IVA_DEFAULT = 16;
  * agente retiene tres cuartas partes y libera el 25 % restante.
  */
 export const IVA_RETENCION_DEFAULT = 75;
+/** Complemento para completar el 100 % del IVA: 25 % restante */
+export const IVA_RETENCION_25_DEFAULT = 25;
 /** Honorarios profesionales no mercantiles (PJD): 5 % del subtotal. */
 export const HONORARIOS_DEFAULT = 5;
 /** Timbre fiscal: 0,1 % del subtotal. */
@@ -176,7 +178,7 @@ export function tasaVacia(moneda: MonedaDivisa = 'dolar'): TasaDivisa {
 export type TipoDeduccion = 'porcentaje' | 'monto';
 
 /** Sobre qué cifra se aplica el porcentaje de una deducción. */
-export type BaseDeduccion = 'depositado' | 'iva' | 'subtotal' | 'total';
+export type BaseDeduccion = 'depositado' | 'iva' | 'subtotal' | 'total' | 'saldoLibre';
 
 /**
  * Una deducción del cálculo.
@@ -197,6 +199,8 @@ export interface Deduccion {
   base: BaseDeduccion;
   /** Bolívares que resta esta deducción (derivado) */
   monto: number;
+  /** A quién corresponde la retención/deducción */
+  origen?: 'cliente' | 'empresa';
 }
 
 /** Bases sobre las que se puede aplicar el porcentaje de una deducción. */
@@ -205,6 +209,7 @@ export const BASES_DEDUCCION: { valor: BaseDeduccion; etiqueta: string; corta: s
   { valor: 'iva', etiqueta: 'IVA de la factura', corta: 'IVA' },
   { valor: 'subtotal', etiqueta: 'Monto subtotal', corta: 'subtotal' },
   { valor: 'total', etiqueta: 'Monto total de la factura', corta: 'total' },
+  { valor: 'saldoLibre', etiqueta: 'Saldo libre', corta: 'saldo libre' },
 ];
 
 /** Formas de expresar una deducción, para el selector de la fila. */
@@ -218,32 +223,37 @@ export const PRESETS_DEDUCCION: { id: string; etiqueta: string; deduccion: Omit<
   {
     id: 'retencion-iva',
     etiqueta: 'Retención de IVA · 75 % del IVA',
-    deduccion: { nombre: 'Retención de IVA', tipo: 'porcentaje', valor: IVA_RETENCION_DEFAULT, base: 'iva' },
+    deduccion: { nombre: 'Retención de IVA (75%)', tipo: 'porcentaje', valor: IVA_RETENCION_DEFAULT, base: 'iva', origen: 'cliente' },
+  },
+  {
+    id: 'retencion-iva-25',
+    etiqueta: 'Retención de IVA · 25 % del IVA',
+    deduccion: { nombre: 'Retención de IVA (25%)', tipo: 'porcentaje', valor: IVA_RETENCION_25_DEFAULT, base: 'iva', origen: 'empresa' },
   },
   {
     id: 'honorarios',
     etiqueta: 'Honorarios (PJD) · 5 % del subtotal',
-    deduccion: { nombre: 'Honorarios profesionales', tipo: 'porcentaje', valor: HONORARIOS_DEFAULT, base: 'subtotal' },
+    deduccion: { nombre: 'Honorarios profesionales', tipo: 'porcentaje', valor: HONORARIOS_DEFAULT, base: 'subtotal', origen: 'cliente' },
   },
   {
     id: 'timbre-fiscal',
     etiqueta: 'Timbre Fiscal · 0,1 % del subtotal',
-    deduccion: { nombre: 'Timbre Fiscal', tipo: 'porcentaje', valor: TIMBRE_FISCAL_DEFAULT, base: 'subtotal' },
+    deduccion: { nombre: 'Timbre Fiscal', tipo: 'porcentaje', valor: TIMBRE_FISCAL_DEFAULT, base: 'subtotal', origen: 'cliente' },
   },
   {
     id: 'responsabilidad-social',
     etiqueta: 'Responsabilidad Social · 3 % del subtotal',
-    deduccion: { nombre: 'Responsabilidad Social', tipo: 'porcentaje', valor: RESPONSABILIDAD_SOCIAL_DEFAULT, base: 'subtotal' },
+    deduccion: { nombre: 'Responsabilidad Social', tipo: 'porcentaje', valor: RESPONSABILIDAD_SOCIAL_DEFAULT, base: 'subtotal', origen: 'cliente' },
   },
   {
     id: 'negro-primero',
     etiqueta: 'Negro Primero · 3 % del depositado',
-    deduccion: { nombre: 'Negro Primero', tipo: 'porcentaje', valor: NEGRO_PRIMERO_DEFAULT, base: 'depositado' },
+    deduccion: { nombre: 'Negro Primero', tipo: 'porcentaje', valor: NEGRO_PRIMERO_DEFAULT, base: 'depositado', origen: 'cliente' },
   },
   {
     id: 'monto-fijo',
     etiqueta: 'Otra deducción · monto fijo en Bs',
-    deduccion: { nombre: '', tipo: 'monto', valor: 0, base: 'depositado' },
+    deduccion: { nombre: '', tipo: 'monto', valor: 0, base: 'depositado', origen: 'cliente' },
   },
 ];
 
@@ -280,6 +290,7 @@ export function nuevaDeduccion(parcial: Partial<Deduccion> = {}): Deduccion {
     valor: parsearNumero(parcial.valor ?? 0),
     base: normalizarBase(parcial.base),
     monto: parsearNumero(parcial.monto ?? 0),
+    origen: parcial.origen ?? 'cliente',
   };
 }
 
@@ -297,10 +308,10 @@ function normalizarBase(base: unknown): BaseDeduccion {
  */
 export function deduccionesIniciales(): Deduccion[] {
   return [
-    nuevaDeduccion({ nombre: 'Retención de IVA', tipo: 'porcentaje', valor: IVA_RETENCION_DEFAULT, base: 'iva' }),
-    nuevaDeduccion({ nombre: 'Honorarios profesionales', tipo: 'porcentaje', valor: HONORARIOS_DEFAULT, base: 'subtotal' }),
-    nuevaDeduccion({ nombre: 'Timbre Fiscal', tipo: 'porcentaje', valor: TIMBRE_FISCAL_DEFAULT, base: 'subtotal' }),
-    nuevaDeduccion({ nombre: 'Responsabilidad Social', tipo: 'porcentaje', valor: RESPONSABILIDAD_SOCIAL_DEFAULT, base: 'subtotal' }),
+    nuevaDeduccion({ nombre: 'Retención de IVA (75%)', tipo: 'porcentaje', valor: IVA_RETENCION_DEFAULT, base: 'iva', origen: 'cliente' }),
+    nuevaDeduccion({ nombre: 'Honorarios profesionales', tipo: 'porcentaje', valor: HONORARIOS_DEFAULT, base: 'subtotal', origen: 'cliente' }),
+    nuevaDeduccion({ nombre: 'Timbre Fiscal', tipo: 'porcentaje', valor: TIMBRE_FISCAL_DEFAULT, base: 'subtotal', origen: 'cliente' }),
+    nuevaDeduccion({ nombre: 'Responsabilidad Social', tipo: 'porcentaje', valor: RESPONSABILIDAD_SOCIAL_DEFAULT, base: 'subtotal', origen: 'cliente' }),
   ];
 }
 
@@ -477,6 +488,9 @@ export function baseDeduccion(c: Calculo, base: BaseDeduccion): number {
       return parsearNumero(c.montoSubtotal);
     case 'total':
       return parsearNumero(c.montoTotal);
+    case 'saldoLibre':
+      return parsearNumero(c.saldoLibre);
+    case 'depositado':
     default:
       return parsearNumero(c.montoDepositado);
   }

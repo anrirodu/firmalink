@@ -28,16 +28,20 @@ import {
   Presupuesto,
   alicuotaIvaEfectiva,
   calcularTotalesPresupuesto,
+  datosMoneda,
   descuentoEfectivo,
   fechaValidezCorta,
+  montoEnLetrasMoneda,
+  presupuestoSinIva,
 } from './presupuesto.model';
-import { formatoBs, formatoCantidad, formatoPorcentaje, montoEnLetras } from '../billing/factura.model';
+import { formatoBs, formatoCantidad, formatoPorcentaje } from '../billing/factura.model';
 
 /** Título del documento. El presupuesto no es "formato libre" ni "nota de entrega". */
 export const TITULO_DOCUMENTO = 'PRESUPUESTO';
 
 /** Renglones de la hoja: una fila por item, con los importes ya calculados. */
 function filasItems(p: Presupuesto): string {
+  const simbolo = datosMoneda(p).simbolo;
   const items = p.items ?? [];
   if (items.length === 0) {
     return '<tr class="fx-fila-vacia"><td colspan="4">Sin renglones cotizados.</td></tr>';
@@ -49,8 +53,8 @@ function filasItems(p: Presupuesto): string {
       return `<tr>
         <td class="fx-col-desc">${escaparHtml(it.descripcion)}</td>
         <td class="fx-col-cant fx-num">${escaparHtml(formatoCantidad(it.cantidad))}</td>
-        <td class="fx-col-precio fx-num">${escaparHtml(formatoBs(it.precio))}</td>
-        <td class="fx-col-total fx-num">${escaparHtml(formatoBs(total))}</td>
+        <td class="fx-col-precio fx-num">${escaparHtml(formatoBs(it.precio))} ${escaparHtml(simbolo)}</td>
+        <td class="fx-col-total fx-num">${escaparHtml(formatoBs(total))} ${escaparHtml(simbolo)}</td>
       </tr>`;
     })
     .join('');
@@ -67,6 +71,8 @@ function filasItems(p: Presupuesto): string {
 function filasTotales(p: Presupuesto): string {
   const t = calcularTotalesPresupuesto(p);
   const descuento = descuentoEfectivo(p);
+  const moneda = datosMoneda(p);
+  const sinIva = presupuestoSinIva(p);
   const filas: string[] = [];
 
   filas.push(`<tr>
@@ -75,25 +81,51 @@ function filasTotales(p: Presupuesto): string {
         <td class="fx-amount">${escaparHtml(formatoBs(t.subtotal))}</td>
       </tr>`);
 
-  filas.push(`<tr>
-        <td class="fx-son-cell" colspan="2"><span class="fx-label">Son:</span> <span class="fx-son">${escaparHtml(montoEnLetras(t.total))}</span></td>
-        <td class="fx-label">${descuento > 0 ? 'Descuento' : 'IVA'}: ${escaparHtml(formatoPorcentaje(descuento > 0 ? descuento : alicuotaIvaEfectiva(p)))}</td>
-        <td class="fx-amount">${descuento > 0 ? '- ' : ''}${escaparHtml(formatoBs(descuento > 0 ? t.descuento : t.montoIva))}</td>
+  // La fila del descuento cobra protagonismo cuando existe; sin descuento, ese
+  // renglón lo ocupa el IVA (o la nota de que no se aplicó impuesto).
+  if (descuento > 0) {
+    filas.push(`<tr>
+        <td class="fx-son-cell" colspan="2"><span class="fx-label">Son:</span> <span class="fx-son">${escaparHtml(montoEnLetrasMoneda(t.total, moneda))}</span></td>
+        <td class="fx-label">Descuento: ${escaparHtml(formatoPorcentaje(descuento))}</td>
+        <td class="fx-amount">- ${escaparHtml(formatoBs(t.descuento))}</td>
       </tr>`);
+  } else {
+    filas.push(`<tr>
+        <td class="fx-son-cell" colspan="2"><span class="fx-label">Son:</span> <span class="fx-son">${escaparHtml(montoEnLetrasMoneda(t.total, moneda))}</span></td>
+        <td class="fx-label">${sinIva ? 'IVA:' : `IVA: ${escaparHtml(formatoPorcentaje(alicuotaIvaEfectiva(p)))}`}</td>
+        <td class="fx-amount">${sinIva
+          ? `<span class="fx-sin-iva-tag">NO APLICA</span>`
+          : escaparHtml(formatoBs(t.montoIva))}</td>
+      </tr>`);
+  }
 
+  // Con descuento, el IVA viaja en su propia fila; y si el usuario lo apagó, en
+  // vez del importe se advierte en rojo que el monto no lo lleva incluido.
   if (descuento > 0) {
     filas.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
-        <td class="fx-label">IVA: ${escaparHtml(formatoPorcentaje(alicuotaIvaEfectiva(p)))}</td>
-        <td class="fx-amount">${escaparHtml(formatoBs(t.montoIva))}</td>
+        <td class="fx-label">${sinIva ? 'IVA:' : `IVA: ${escaparHtml(formatoPorcentaje(alicuotaIvaEfectiva(p)))}`}</td>
+        <td class="fx-amount">${sinIva
+          ? `<span class="fx-sin-iva-tag">NO APLICA</span>`
+          : escaparHtml(formatoBs(t.montoIva))}</td>
       </tr>`);
   }
 
   filas.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
-        <td class="fx-label fx-total-final">Total Bs:</td>
+        <td class="fx-label fx-total-final">Total ${escaparHtml(moneda.etiqueta)}:</td>
         <td class="fx-amount fx-total-final">${escaparHtml(formatoBs(t.total))}</td>
       </tr>`);
+
+  // Aviso en rojo exigido por la operación: un presupuesto sin IVA que no lo
+  // diga se lee como si el impuesto estuviera incluido.
+  if (sinIva) {
+    filas.push(`<tr>
+        <td class="fx-son-cell" colspan="4">
+          <div class="fx-aviso-sin-iva">MONTO SIN IVA INCLUIDO &mdash; EL PRECIO COTIZADO NO INCLUYE IVA</div>
+        </td>
+      </tr>`);
+  }
 
   return filas.join('');
 }
@@ -111,6 +143,7 @@ function bloqueCondiciones(p: Presupuesto): string {
     );
   };
 
+  linea('Moneda', `${datosMoneda(p).etiqueta} (${datosMoneda(p).simbolo})`);
   linea('Validez', `${formatoCantidad(c.validezDias)} dias, hasta el ${fechaValidezCorta(p)}`);
   linea('Forma de pago', c.formaPago);
   linea('Tiempo de entrega', c.tiempoEntrega);

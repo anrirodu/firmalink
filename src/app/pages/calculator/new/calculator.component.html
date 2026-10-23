@@ -1,84 +1,35 @@
-<div class="cl-page">
+<div class="cl-backdrop" (click)="volver()">
+  <div class="cl-modal" role="dialog" aria-modal="true" aria-labelledby="cl-titulo" (click)="$event.stopPropagation()">
 
   <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
-  <header class="page-header">
-    <div class="header-content">
-      <div class="cl-volver-fila">
-        <button mat-icon-button type="button" (click)="volver()"
-                matTooltip="Volver al listado de cálculos" aria-label="Volver al listado">
-          <mat-icon>arrow_back</mat-icon>
-        </button>
-      </div>
-      <div class="cl-titulo-bloque">
-        <h1>Calculadora</h1>
-        <p class="cl-subtitulo">
-          <strong>{{ nombreCalculo(calculo()) }}</strong>
-          @if (calculo().codigo) { <span class="cl-punto">·</span> {{ calculo().codigo }} }
-          <span class="cl-punto">·</span> {{ calculo().fechaTexto }}
-        </p>
-        <div class="cl-huella">
-          <span class="cl-huella-codigo">
-            <mat-icon class="cl-huella-icono" inline>tag</mat-icon>
-            <strong>{{ calculo().codigo || 'Sin registrar' }}</strong>
-          </span>
-          @if (calculo().huella) {
-            <span class="cl-huella-chip"
-                  matTooltip="Huella SHA-256 del cálculo: cambia si alguien altera sus cifras">
-              <mat-icon class="cl-huella-chip-icono" inline>fingerprint</mat-icon>
-              {{ calculo().huella }}
-            </span>
-          }
-        </div>
-      </div>
+  <div class="cl-header">
+    <div class="cl-header-icon">
+      <mat-icon>calculate</mat-icon>
     </div>
-
-    <div class="header-actions">
-      @if (cambiado() && !soloLectura()) {
-        <span class="cl-pendiente">
-          <mat-icon inline>edit_note</mat-icon> Sin guardar
-        </span>
-      }
-
-      @if (soloLectura()) {
-        <span class="cl-estado-chip cl-estado-chip-grande" [style.color]="infoEstado(calculo().estado).color">
-          <mat-icon inline>{{ infoEstado(calculo().estado).icono }}</mat-icon>
-          {{ infoEstado(calculo().estado).etiqueta }}
-        </span>
-
-        @if (puedeCambiarA('anulada')) {
-          <button mat-stroked-button type="button" (click)="anular()" [disabled]="guardando()"
-                  matTooltip="Descarta el cálculo sin borrarlo: queda en el listado para la traza">
-            <mat-icon>block</mat-icon> Anular
-          </button>
+    <div class="cl-header-texto">
+      <h3 class="cl-title" id="cl-titulo">Calculadora</h3>
+      <p class="cl-subtitle">
+        <strong>{{ nombreCalculo(calculo()) }}</strong>
+        @if (calculo().codigo) {
+          <span class="cl-punto">·</span> {{ calculo().codigo }}
         }
-      } @else {
-        <button mat-stroked-button type="button" (click)="recalcularTodo()" [disabled]="!hayAjustes()"
-                matTooltip="Devuelve a la fórmula las cifras que escribió a mano">
-          <mat-icon>restart_alt</mat-icon> Volver a la fórmula
-        </button>
-
-        <button mat-stroked-button color="primary" type="button" (click)="procesar()" [disabled]="guardando()"
-                matTooltip="Cerrar el cálculo: sus cifras ya no admiten ediciones">
-          <mat-icon>task_alt</mat-icon> Procesar
-        </button>
-
-        <button mat-flat-button color="primary" type="button" (click)="guardar()" [disabled]="guardando()">
-          <mat-icon>save</mat-icon> {{ guardando() ? 'Guardando…' : 'Guardar' }}
-        </button>
+        <span class="cl-punto">·</span> {{ calculo().fechaTexto }}
+      </p>
+      @if (calculo().huella) {
+        <span class="cl-huella-chip"
+              matTooltip="Huella SHA-256 del cálculo: cambia si alguien altera sus cifras">
+          <mat-icon class="cl-huella-chip-icono" inline>fingerprint</mat-icon>
+          {{ calculo().huella }}
+        </span>
       }
-
-      @if (calculo().codigo) {
-        <button mat-stroked-button type="button" (click)="eliminar()" [disabled]="guardando()">
-          <mat-icon>delete_outline</mat-icon> Eliminar
-        </button>
-      }
-
-      <button mat-icon-button type="button" (click)="nuevo()" [disabled]="guardando()"
-              matTooltip="Empezar un cálculo nuevo">
-        <mat-icon>add</mat-icon>
-      </button>
     </div>
-  </header>
+    <button class="cl-close" type="button" (click)="volver()" aria-label="Cerrar">
+      &times;
+    </button>
+  </div>
+
+  <div class="cl-body">
+  <div class="cl-page">
 
   @if (soloLectura() && !cargando()) {
     <div class="cl-bloqueo">
@@ -243,16 +194,16 @@
       </div>
     </section>
 
-    <!-- ── Paso 3 · Deducciones ───────────────────────────────────────── -->
+    <!-- ── Paso 3 · Retenciones Cliente ───────────────────────────────── -->
     <section class="cl-card cl-card-deducciones">
       <h2 class="cl-card-titulo">
-        <span class="cl-paso">3</span> Deducciones
+        <span class="cl-paso">3</span> Retenciones Cliente
         <em class="cl-leyenda">
-          {{ deducciones().length }} {{ deducciones().length === 1 ? 'deducción' : 'deducciones' }} · las que necesite
+          {{ deduccionesCliente().length }} {{ deduccionesCliente().length === 1 ? 'retención' : 'retenciones' }} · las que necesite
         </em>
       </h2>
 
-      @if (deducciones().length > 0) {
+      @if (deduccionesCliente().length > 0) {
         <div class="cl-deducciones">
           <div class="cl-deduccion-cabecera">
             <span>Concepto</span>
@@ -263,7 +214,7 @@
             <span aria-hidden="true"></span>
           </div>
 
-          @for (d of deducciones(); track d.id) {
+          @for (d of deduccionesCliente(); track d.id) {
             <div class="cl-deduccion">
               <input class="cl-deduccion-nombre" type="text" [value]="d.nombre"
                      placeholder="Nombre de la deducción"
@@ -313,35 +264,127 @@
         </div>
 
         <footer class="cl-deduccion-total">
-          <span>Total deducciones ({{ deducciones().length }})</span>
-          <strong>− {{ formatoBs(calculo().subtotalDeducciones) }} Bs</strong>
+          <span>Total retenciones cliente ({{ deduccionesCliente().length }})</span>
+          <strong>− {{ formatoBs(subtotalDeduccionesCliente()) }} Bs</strong>
         </footer>
       } @else {
         <p class="cl-vacio">
           <mat-icon inline>check_circle</mat-icon>
-          Sin deducciones: el saldo disponible es el monto depositado completo.
+          Sin retenciones de cliente.
         </p>
       }
 
       <div class="cl-deduccion-acciones">
-        <button mat-stroked-button type="button" (click)="agregarDeduccion()">
-          <mat-icon>add</mat-icon> Agregar deducción
+        <button mat-stroked-button type="button" (click)="agregarRetencionCliente()">
+          <mat-icon>add</mat-icon> Agregar retención cliente
         </button>
         @for (p of presets; track p.id; let i = $index) {
-          <button mat-button type="button" class="cl-preset" (click)="agregarPreset(i)">{{ p.etiqueta }}</button>
+          @if (p.deduccion.origen !== 'empresa') {
+            <button mat-button type="button" class="cl-preset" (click)="agregarPreset(i)">{{ p.etiqueta }}</button>
+          }
         }
       </div>
-
-      @if (excedido()) {
-        <div class="cl-aviso cl-aviso-suave">
-          <mat-icon>warning_amber</mat-icon>
-          <div>
-            <strong>Las deducciones superan el monto depositado.</strong>
-            Revise las cifras: el saldo disponible queda por debajo de cero.
-          </div>
-        </div>
-      }
     </section>
+
+    <!-- ── Paso 4 · Retenciones Empresa ───────────────────────────────── -->
+    <section class="cl-card cl-card-deducciones">
+      <h2 class="cl-card-titulo">
+        <span class="cl-paso">4</span> Retenciones Empresa
+        <em class="cl-leyenda">Completa el 100 % del IVA · 25 % restante</em>
+      </h2>
+
+      @if (deduccionesEmpresa().length > 0) {
+        <div class="cl-deducciones">
+          <div class="cl-deduccion-cabecera">
+            <span>Concepto</span>
+            <span>Tipo</span>
+            <span>Valor</span>
+            <span>Base</span>
+            <span>Monto</span>
+            <span aria-hidden="true"></span>
+          </div>
+
+          @for (d of deduccionesEmpresa(); track d.id) {
+            <div class="cl-deduccion">
+              <input class="cl-deduccion-nombre" type="text" [value]="d.nombre"
+                     placeholder="Nombre de la deducción"
+                     (input)="setDeduccionNombre(d, $any($event.target).value)">
+
+              <select class="cl-deduccion-tipo" [value]="d.tipo"
+                      (change)="setDeduccionTipo(d, $any($event.target).value)"
+                      matTooltip="Un porcentaje sobre una base, o un monto fijo en bolívares">
+                @for (t of tipos; track t.valor) {
+                  <option [value]="t.valor">{{ t.etiqueta }}</option>
+                }
+              </select>
+
+              <input class="cl-deduccion-valor" type="text" inputmode="decimal" [value]="d.valor"
+                     (input)="setDeduccionValor(d, $any($event.target).value)"
+                     [matTooltip]="d.tipo === 'monto' ? 'Monto en bolívares' : 'Porcentaje a aplicar'">
+
+              <select class="cl-deduccion-base" [value]="d.base" [disabled]="d.tipo === 'monto'"
+                      (change)="setDeduccionBase(d, $any($event.target).value)"
+                      [matTooltip]="d.tipo === 'monto' ? 'No aplica: es un monto fijo' : 'Cifra sobre la que se aplica el porcentaje'">
+                @for (b of bases; track b.valor) {
+                  <option [value]="b.valor">{{ b.etiqueta }}</option>
+                }
+              </select>
+
+              <span class="cl-deduccion-monto" [class.cl-ajustado]="esAjusteDeduccion(d)"
+                    [matTooltip]="detalleDeduccion(d)">
+                @if (d.tipo === 'monto') {
+                  <strong>{{ formatoBs(d.monto) }} Bs</strong>
+                } @else {
+                  <input type="text" inputmode="decimal" [value]="d.monto"
+                         [readOnly]="!esAjusteDeduccion(d)"
+                         (input)="setDeduccionMonto(d, $any($event.target).value)">
+                  <button type="button" class="cl-candado cl-candado-mini" (click)="alternarAjusteDeduccion(d)"
+                          [matTooltip]="esAjusteDeduccion(d) ? 'Volver al porcentaje' : 'Escribir el monto a mano'">
+                    <mat-icon inline>{{ esAjusteDeduccion(d) ? 'undo' : 'edit' }}</mat-icon>
+                  </button>
+                }
+              </span>
+
+              <button mat-icon-button type="button" class="cl-deduccion-quitar" (click)="quitarDeduccion(d)"
+                      matTooltip="Quitar esta deducción" aria-label="Quitar la deducción">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+
+        <footer class="cl-deduccion-total">
+          <span>Total retenciones empresa ({{ deduccionesEmpresa().length }})</span>
+          <strong>− {{ formatoBs(subtotalDeduccionesEmpresa()) }} Bs</strong>
+        </footer>
+      } @else {
+        <p class="cl-vacio">
+          <mat-icon inline>info</mat-icon>
+          El <strong>75 %</strong> queda en <strong>Retenciones Cliente</strong>. Aquí va el <strong>25 % restante</strong> del IVA para completar el 100 %.
+        </p>
+      }
+
+      <div class="cl-deduccion-acciones">
+        <button mat-stroked-button type="button" (click)="agregarRetencionEmpresa()">
+          <mat-icon>add</mat-icon> Agregar retención empresa
+        </button>
+        @for (p of presets; track p.id; let i = $index) {
+          @if (p.deduccion.origen === 'empresa') {
+            <button mat-button type="button" class="cl-preset" (click)="agregarPreset(i)">{{ p.etiqueta }}</button>
+          }
+        }
+      </div>
+    </section>
+
+    @if (excedido()) {
+      <div class="cl-aviso cl-aviso-suave">
+        <mat-icon>warning_amber</mat-icon>
+        <div>
+          <strong>Las deducciones superan el monto depositado.</strong>
+          Revise las cifras: el saldo disponible queda por debajo de cero.
+        </div>
+      </div>
+    }
 
     <!-- ── Pendientes de guardar ──────────────────────────────────────── -->
     @if (problemas().length > 0) {
@@ -365,7 +408,7 @@
 
       <section class="cl-card cl-card-resultados">
         <h2 class="cl-card-titulo">
-          <span class="cl-paso">4</span> Resultados
+          <span class="cl-paso">5</span> Resultados
           <em class="cl-leyenda">lo que queda</em>
         </h2>
 
@@ -434,7 +477,9 @@
           <div><dt>IVA {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</dt><dd>{{ formatoBs(calculo().montoIva) }} Bs</dd></div>
           <div><dt>Total factura</dt><dd>{{ formatoBs(calculo().montoTotal) }} Bs</dd></div>
           <div><dt>Depositado</dt><dd>{{ formatoBs(calculo().montoDepositado) }} Bs</dd></div>
-          <div><dt>Deducciones ({{ deducciones().length }})</dt><dd>− {{ formatoBs(calculo().subtotalDeducciones) }} Bs</dd></div>
+          <div><dt>Retenciones Cliente ({{ deduccionesCliente().length }})</dt><dd>− {{ formatoBs(subtotalDeduccionesCliente()) }} Bs</dd></div>
+          <div><dt>Retenciones Empresa ({{ deduccionesEmpresa().length }})</dt><dd>− {{ formatoBs(subtotalDeduccionesEmpresa()) }} Bs</dd></div>
+          <div><dt>Deducciones totales ({{ deducciones().length }})</dt><dd>− {{ formatoBs(calculo().subtotalDeducciones) }} Bs</dd></div>
           <div><dt>Disponible</dt><dd>{{ formatoBs(calculo().saldoDisponible) }} Bs</dd></div>
           <div><dt>Ganancia {{ formatoPorcentaje(calculo().gananciaPorcentaje) }}</dt><dd>− {{ formatoBs(calculo().ganancia) }} Bs</dd></div>
         </dl>
@@ -504,4 +549,60 @@
 
     </div><!-- /.cl-lienzo -->
   }
-</div>
+  </div><!-- /.cl-page -->
+  </div><!-- /.cl-body -->
+
+  <!-- ── Pie de acciones ─────────────────────────────────────────────── -->
+  <div class="cl-footer">
+    <div class="cl-footer-info">
+      @if (cambiado() && !soloLectura()) {
+        <span class="cl-pendiente">
+          <mat-icon inline>edit_note</mat-icon> Sin guardar
+        </span>
+      }
+      @if (soloLectura()) {
+        <span class="cl-estado-chip" [style.color]="infoEstado(calculo().estado).color">
+          <mat-icon inline>{{ infoEstado(calculo().estado).icono }}</mat-icon>
+          {{ infoEstado(calculo().estado).etiqueta }}
+        </span>
+      }
+      <span class="cl-footer-cifra">{{ formatoBs(calculo().saldoLibre) }} Bs de saldo libre</span>
+    </div>
+
+    @if (soloLectura()) {
+      @if (puedeCambiarA('anulada')) {
+        <button mat-stroked-button type="button" (click)="anular()" [disabled]="guardando()"
+                matTooltip="Descarta el cálculo sin borrarlo: queda en el listado para la traza">
+          <mat-icon>block</mat-icon> Anular
+        </button>
+      }
+    } @else {
+      <button mat-stroked-button type="button" (click)="recalcularTodo()" [disabled]="!hayAjustes()"
+              matTooltip="Devuelve a la fórmula las cifras que escribió a mano">
+        <mat-icon>restart_alt</mat-icon> Volver a la fórmula
+      </button>
+
+      <button mat-stroked-button color="primary" type="button" (click)="procesar()" [disabled]="guardando()"
+              matTooltip="Cerrar el cálculo: sus cifras ya no admiten ediciones">
+        <mat-icon>task_alt</mat-icon> Procesar
+      </button>
+
+      <button mat-flat-button color="primary" type="button" (click)="guardar()" [disabled]="guardando()">
+        <mat-icon>save</mat-icon> {{ guardando() ? 'Guardando…' : 'Guardar' }}
+      </button>
+    }
+
+    @if (calculo().codigo) {
+      <button mat-stroked-button type="button" (click)="eliminar()" [disabled]="guardando()">
+        <mat-icon>delete_outline</mat-icon> Eliminar
+      </button>
+    }
+
+    <button mat-icon-button type="button" (click)="nuevo()" [disabled]="guardando()"
+            matTooltip="Empezar un cálculo nuevo">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  </div><!-- /.cl-modal -->
+</div><!-- /.cl-backdrop -->

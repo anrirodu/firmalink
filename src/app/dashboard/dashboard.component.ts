@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
+import { CONFIG } from '../config';
 
 interface Servicio {
   titulo: string;
@@ -29,6 +30,9 @@ interface Nota {
   styleUrls: ['./dashboard.component.scss'],
 })
 export class DashboardComponent {
+  /** Configuración del producto (marca y textos). */
+  protected readonly cfg = CONFIG;
+
   acciones = [
     {
       titulo: 'Nuevo Acuerdo',
@@ -161,7 +165,7 @@ export class DashboardComponent {
     {
       numero: 'NOTA N°02',
       texto:
-        'Nunca comparta sus credenciales ni el PIN de su token; FirmaLink jamás solicitará su clave por correo, teléfono o mensajería.',
+        `Nunca comparta sus credenciales ni el PIN de su token; ${CONFIG.identidad.nombre} jamás solicitará su clave por correo, teléfono o mensajería.`,
     },
     {
       numero: 'NOTA N°03',

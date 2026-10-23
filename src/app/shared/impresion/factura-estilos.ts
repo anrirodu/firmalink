@@ -190,6 +190,28 @@ export const CSS_FACTURA = `
 
 .fx-son { text-transform: uppercase; }
 
+/* Presupuesto sin IVA: el importe cotizado no lleva el impuesto incluido y
+   tiene que leerse antes de la firma, por eso va en rojo y en su propia fila. */
+.fx-sin-iva-tag {
+  color: #c62828;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.fx-aviso-sin-iva {
+  margin-top: 2mm;
+  padding: 1.6mm 2.5mm;
+  border: 1px solid #c62828;
+  border-left: 1.2mm solid #c62828;
+  border-radius: 1mm;
+  background: #fdecec;
+  color: #b3261e;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
 /* ── Firma y sello ───────────────────────────────────────────────────────── */
 .fx-firma-sello {
   position: relative;

@@ -1,5 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { IsotipoAnimadoComponent } from '../isotipo-animado/isotipo-animado.component';
+import { CONFIG } from '../../../config';
 
 /**
  * Overlay de bienvenida a pantalla completa tras un acceso directo.
@@ -19,6 +20,9 @@ import { IsotipoAnimadoComponent } from '../isotipo-animado/isotipo-animado.comp
   styleUrl: './acceso-bienvenida.component.scss',
 })
 export class AccesoBienvenidaComponent {
+  /** Configuración del producto (marca y textos). */
+  protected readonly cfg = CONFIG;
+
   /** Nombre a mostrar bajo el título; si viene vacío no se pinta. */
   readonly nombre = input<string>('');
 

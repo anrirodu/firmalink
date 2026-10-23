@@ -24,6 +24,7 @@ import {
   ValidadorSeguridadComponent,
 } from '../../shared/components/validador-seguridad/validador-seguridad.component';
 import { environment } from '../../../environments/environment';
+import { CONFIG } from '../../config';
 
 /**
  * Duración mínima de la bienvenida animada antes de entrar al panel.
@@ -159,6 +160,9 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
   get validadorTotpResolviendo(): boolean {
     return this.validadorTotp?.estado() === 'cargando';
   }
+
+  /** Configuración del producto (marca, textos y enlaces). */
+  protected readonly cfg = CONFIG;
 
   private loginEnCurso = false;
 
@@ -630,7 +634,7 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
 
     const sinAcceso = error?.message === 'SIN_ACCESO_APP';
     this.mostrarError(
-      sinAcceso ? 'No tiene acceso a FirmaLink' : 'Error al iniciar sesión',
+      sinAcceso ? `No tiene acceso a ${CONFIG.identidad.nombre}` : 'Error al iniciar sesión',
     );
     this.limpiarCampos();
   }

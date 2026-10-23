@@ -140,7 +140,7 @@
       left: 0;
       width: 50%;
       height: 100%;
-      background-color: #00c9a7;
+      background-color: var(--accent, #00c9a7);
       border-radius: 2px;
       animation: progressBar 2.5s ease-in-out infinite;
     }
@@ -239,7 +239,7 @@
               width="150"
               height="90"
               rx="45"
-              stroke="#0c2d48"
+              style="stroke: var(--primary, #0c2d48)"
               stroke-width="26"
               fill="none"
             />
@@ -249,14 +249,14 @@
               width="150"
               height="90"
               rx="45"
-              stroke="#00c9a7"
+              style="stroke: var(--accent, #00c9a7)"
               stroke-width="26"
               fill="none"
             />
           </g>
           <path
             d="M 160 130 A 45 45 0 0 0 205 175"
-            stroke="#0c2d48"
+            style="stroke: var(--primary, #0c2d48)"
             stroke-width="26"
             fill="none"
           />
@@ -265,7 +265,7 @@
         <g class="iso-anim-check">
           <path
             d="M 205 130 L 235 160 L 315 65"
-            stroke="#00c9a7"
+            style="stroke: var(--accent, #00c9a7)"
             stroke-width="22"
             stroke-linecap="round"
             stroke-linejoin="round"

@@ -20,7 +20,7 @@
    diálogos), que van en 1000+. */
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #0d1b3e 0%, #0c2d48 100%);
+  background: var(--brand-gradiente-sidebar);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -155,9 +155,9 @@
   }
 
   &.active {
-    background: rgba(0, 201, 167, 0.15);
-    color: #4ee1c8;
-    border-right: 3px solid #00c9a7;
+    background: rgb(var(--accent-rgb) / 0.15);
+    color: var(--accent-light);
+    border-right: 3px solid var(--accent);
   }
 }
 
@@ -222,9 +222,9 @@
   }
 
   &.active {
-    background: rgba(0, 201, 167, 0.1);
-    color: #4ee1c8;
-    border-right: 2px solid #00c9a7;
+    background: rgb(var(--accent-rgb) / 0.1);
+    color: var(--accent-light);
+    border-right: 2px solid var(--accent);
   }
 }
 
@@ -284,7 +284,7 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #0c2d48, #12406b);
+  background: var(--brand-gradiente-boton);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -352,9 +352,12 @@
     a {
       color: #757575;
       transition: color 0.2s;
+      /* Sin href (destino aún sin definir) el <a> pierde el puntero por
+         defecto: se fuerza para que siga leyéndose como enlace. */
+      cursor: pointer;
 
       &:hover {
-        color: #0c2d48;
+        color: var(--primary);
       }
     }
   }
@@ -454,7 +457,7 @@
     border-top-color: #333;
 
     a:hover {
-      color: #00c9a7;
+      color: var(--accent);
     }
   }
 }

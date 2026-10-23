@@ -18,6 +18,8 @@
  *     servidor no tiene por qué ser alcanzable desde el cliente de correo.
  */
 
+import { CONFIG } from '../../config';
+
 export interface OpcionesPlantillaCorreo {
   /** Texto de la pestaña del navegador y de algunos clientes de escritorio */
   titulo: string;
@@ -58,9 +60,9 @@ export function plantillaCorreo(opciones: OpcionesPlantillaCorreo): string {
     cuerpoHtml,
     preheader,
     logoCid,
-    logoAlt = 'FirmaLink',
-    pieTitulo = `© ${anioActual()} <strong>BUNKER TECHNOLOGIES SOLUTIONS</strong>. Todos los derechos reservados.`,
-    pieNota = 'Este correo fue enviado automáticamente por motivos de seguridad. Por favor no respondas a este mensaje.',
+    logoAlt = CONFIG.correo.logoAlt,
+    pieTitulo = `© ${anioActual()} <strong>${CONFIG.correo.pieTitulo}</strong>. Todos los derechos reservados.`,
+    pieNota = CONFIG.correo.pieNota,
   } = opciones;
 
   // Se escapa: un cid saneado no lleva caracteres especiales y queda intacto,

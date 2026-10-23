@@ -8,6 +8,7 @@ import {
   textoRecuperacion,
 } from '../correo/recuperacion-correo';
 import { environment } from '../../../environments/environment';
+import { CONFIG } from '../../config';
 
 export { VIGENCIA_MINUTOS };
 
@@ -288,7 +289,7 @@ export class PasswordResetService {
         this.api.FnxAnonima({
           funcion: environment.functions.ENVIAR_CORREO_FNX,
           para: correo,
-          asunto: 'Recuperación de contraseña — FirmaLink',
+          asunto: `Recuperación de contraseña — ${CONFIG.identidad.nombre}`,
           html: htmlRecuperacion(login, enlace),
           texto: textoRecuperacion(login, enlace),
           idempotencia: `reset-${login}-${Date.now()}`,

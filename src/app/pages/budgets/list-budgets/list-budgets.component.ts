@@ -26,6 +26,7 @@ import {
   estadoVisible,
   fechaValidezCorta,
   formatoBs,
+  formatoMoneda,
   infoEstadoPresupuesto,
   motivoBloqueo,
   transicionesPermitidas,
@@ -432,7 +433,9 @@ export class ListBudgetsComponent implements OnInit, OnDestroy {
         valor: cotizado,
         clase: 'kpi-cotizado',
         icono: 'payments',
-        texto: formatoBs(cotizado) + ' Bs',
+        // El listado mezcla presupuestos de varias divisas: se muestra el
+        // importe sin símbolo y la columna de cada fila sí lleva la suya.
+        texto: formatoBs(cotizado),
       },
     ];
   }
@@ -491,7 +494,7 @@ export class ListBudgetsComponent implements OnInit, OnDestroy {
 
   totalTexto(p: Presupuesto): string {
     const total = this.totalDe(p);
-    return total > 0 ? formatoBs(total) + ' Bs' : '—';
+    return total > 0 ? formatoMoneda(total, p) : '—';
   }
 
   /**

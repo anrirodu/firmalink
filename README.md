@@ -933,20 +933,56 @@ propietario de la cuenta; `delivered@resend.dev` es útil para verificar el fluj
 
 ## Tema visual y branding
 
-Paleta definida en `src/styles.scss` como variables CSS y conmutable en tiempo de ejecución:
+Toda la configuración del producto vive en **`src/app/config.ts`** (única fuente de verdad). Para
+rebautizar la aplicación y repintarla no hay que tocar componentes: basta con editar ese archivo.
 
-| Variable | Claro | Oscuro |
-|----------|-------|--------|
-| `--primary` | `#0c2d48` | `#1e5f9e` |
-| `--primary-light` | `#2a6fb0` | `#2fd4bb` |
-| `--primary-dark` | `#061829` | `#0a3358` |
-| `--accent` | `#00c9a7` | `#00c9a7` |
-| `--warn` | `#f44336` | `#ff5252` |
-| `--background` | `#f5f5f5` | `#121212` |
+```ts
+export const CONFIG: ConfiguracionApp = {
+  identidad: { nombre: 'FirmaLink', eslogan: '…', empresa: '…' },
+  marca: {
+    colores:  { primario: '#0c2d48', acento: '#00c9a7', … },  // tema claro
+    oscuro:   { primario: '#1e5f9e', … },                     // sólo lo que cambia
+    superficies: { profundo: '#0d1b3e', medio: '#12406b', claro: '#1a5490' },
+    tipografia: "'Inter', …",
+    radio: 12,
+  },
+  recursos: { logo: 'assets/images/logo.png', favicon: '…', colorBarra: '' },
+  enlaces: { soporte: '…', terminos: '…', privacidad: '…' },
+  auth: { beneficios: [ … ], etiquetaIsotipo: '…', pieMarca: '…' },
+  correo: { remitente: '…', pieNota: '…' },
+};
+```
 
-El tema oscuro se activa con el atributo `data-theme="dark"` en `<body>` y la preferencia se guarda
-en `localStorage` bajo la clave `firmalink-theme`. El isotipo (dos eslabones entrelazados + check) se
-reutiliza como logo animado en la pantalla de carga y en el login.
+| Bloque | Gobierna |
+|--------|----------|
+| `identidad` | Nombre, eslogan, empresa, título de pestaña, `lang` |
+| `marca.colores` / `marca.oscuro` | Paleta clara y oscura (`--primary`, `--accent`, …) |
+| `marca.superficies` | Degradados de login, sidebar y botones (`--brand-gradiente-*`) |
+| `recursos` | Logo, favicon y `theme-color` |
+| `enlaces` | Pie de página (soporte, términos, privacidad) |
+| `auth` | Beneficios del panel de acceso, textos de bienvenida y pie |
+| `correo` | Pie institucional y alt del logo en los correos |
+
+**`BrandingService`** (`src/app/shared/services/branding.service.ts`), registrado con
+`provideAppInitializer` en `app.config.ts`, aplica la configuración **antes del primer render**:
+fija el título, el favicon, el `theme-color` y el `lang`, e inyecta un `<style id="branding-vars">`
+al final del `<head>` con las variables CSS derivadas de la paleta. Como va después de
+`styles.scss`, **gana por cascada**: cambiar un color en `config.ts` repinta login, sidebar, botones
+y overlay sin editar SCSS. Los componentes que necesitan la marca en la plantilla exponen
+`protected readonly cfg = CONFIG`.
+
+Los valores por defecto equivalentes quedan también en `src/styles.scss` (primer instante de render)
+y el isotipo del loader en `index.html` usa `var(--primary)` / `var(--accent)`.
+
+### Montar un producto nuevo con esta plantilla
+
+1. Copiar el proyecto y editar `src/app/config.ts` (nombre, eslogan, paleta, recursos, enlaces).
+2. Reemplazar `src/assets/images/logo.png` (logo y favicon por defecto).
+3. Ajustar `src/environments/environment*.ts` (endpoints del servidor) y `proxy.conf.json`.
+4. `npm run build:prod`.
+
+El tema claro/oscuro se sigue activando con `data-theme="dark"` en `<body>` (preferencia en
+`localStorage`); el acento de las variables oscuras se define en `config.marca.oscuro`.
 
 ---
 

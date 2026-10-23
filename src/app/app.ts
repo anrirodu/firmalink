@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import Swal from 'sweetalert2';
 import { LoadingScreenService } from './shared/services/loading-screen.service';
 import { VersionService } from './shared/services/version.service';
+import { CONFIG } from './config';
 
 @Component({
   selector: 'app-root',
@@ -49,7 +50,7 @@ export class App {
         </p>
       `,
       confirmButtonText: 'Actualizar ahora',
-      confirmButtonColor: '#0c2d48',
+      confirmButtonColor: CONFIG.marca.colores.primario,
       showCancelButton: true,
       cancelButtonText: 'Más tarde',
       cancelButtonColor: '#757575',

@@ -102,6 +102,26 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   /** Deducciones del cálculo, en el orden en que se ven. */
   readonly deducciones = computed<Deduccion[]>(() => this.calculo().deducciones ?? []);
 
+  /** Retenciones que corresponden al cliente/agente de retención */
+  readonly deduccionesCliente = computed<Deduccion[]>(() =>
+    this.deducciones().filter((d) => (d.origen ?? 'cliente') === 'cliente')
+  );
+
+  /** Retenciones que corresponden a la empresa */
+  readonly deduccionesEmpresa = computed<Deduccion[]>(() =>
+    this.deducciones().filter((d) => d.origen === 'empresa')
+  );
+
+  /** Suma de retenciones cliente */
+  readonly subtotalDeduccionesCliente = computed(() =>
+    this.deduccionesCliente().reduce((s, d) => s + parsearNumero(d.monto), 0)
+  );
+
+  /** Suma de retenciones empresa */
+  readonly subtotalDeduccionesEmpresa = computed(() =>
+    this.deduccionesEmpresa().reduce((s, d) => s + parsearNumero(d.monto), 0)
+  );
+
   /** ¿Hay alguna cifra fuera de la fórmula? */
   readonly hayAjustes = computed(() => this.ajustes().length > 0 || this.depositadoManual());
 
@@ -396,9 +416,22 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   /** Agrega una deducción en blanco (o con los datos de un atajo). */
   agregarDeduccion(datos: Partial<Deduccion> = {}): void {
     if (this.soloLectura()) return;
-    this.calculo.update((c) => ({ ...c, deducciones: [...(c.deducciones ?? []), nuevaDeduccion(datos)] }));
+    const parcial: Partial<Deduccion> = { origen: 'cliente', ...datos };
+    this.calculo.update((c) => ({ ...c, deducciones: [...(c.deducciones ?? []), nuevaDeduccion(parcial)] }));
     this.recalcular();
     this.cambiado.set(true);
+  }
+
+  /** Agrega una retención para el cliente (Paso 3). */
+  agregarRetencionCliente(): void {
+    if (this.soloLectura()) return;
+    this.agregarDeduccion({ origen: 'cliente', tipo: 'porcentaje', base: 'iva', nombre: '', valor: 0 });
+  }
+
+  /** Agrega una retención para la empresa (Paso 4). */
+  agregarRetencionEmpresa(): void {
+    if (this.soloLectura()) return;
+    this.agregarDeduccion({ origen: 'empresa', tipo: 'porcentaje', base: 'iva', nombre: '', valor: 0 });
   }
 
   /** Agrega una de las deducciones de siempre (Negro Primero, retención…). */

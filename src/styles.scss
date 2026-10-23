@@ -3,13 +3,27 @@
    Angular Material + Bootstrap + Custom Theme
    ============================================ */
 
-/* ---------- Variables ---------- */
+/* ---------- Variables ----------
+   La paleta de marca (--primary, --accent, superficies, degradados y
+   tipografía) la inyecta `BrandingService` desde `config.ts` al arrancar, al
+   final del <head>, y gana por cascada sobre estos valores por defecto. Los
+   valores de aquí sólo cubren el primer instante de render. */
 :root {
   --primary: #0c2d48;
   --primary-light: #2a6fb0;
   --primary-dark: #061829;
   --accent: #00c9a7;
   --accent-light: #4ee1c8;
+  --accent-rgb: 0 201 167;
+  --primary-rgb: 12 45 72;
+  --brand-profundo: #0d1b3e;
+  --brand-medio: #12406b;
+  --brand-claro: #1a5490;
+  --brand-gradiente-auth: linear-gradient(135deg, #0d1b3e 0%, #0c2d48 40%, #12406b 70%, #1a5490 100%);
+  --brand-gradiente-sidebar: linear-gradient(180deg, #0d1b3e 0%, #0c2d48 100%);
+  --brand-gradiente-boton: linear-gradient(135deg, #0c2d48, #12406b);
+  --brand-gradiente-titulo: linear-gradient(135deg, #ffffff 0%, #4ee1c8 100%);
+  --brand-gradiente-acento: linear-gradient(90deg, #00c9a7, #4ee1c8);
   --warn: #f44336;
   --surface: #ffffff;
   --background: #f5f5f5;

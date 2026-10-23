@@ -16,8 +16,8 @@
     [class.compact]="isCompact()"
   >
     <div class="sidebar-header">
-      <img src="assets/images/logo.png" alt="FirmaLink" class="sidebar-logo-img" />
-      <span class="sidebar-title">FirmaLink</span>
+      <img [src]="cfg.recursos.logo" [alt]="cfg.identidad.nombre" class="sidebar-logo-img" />
+      <span class="sidebar-title">{{ cfg.identidad.nombre }}</span>
       @if (isCompact()) {
         <button mat-icon-button class="sidebar-close" (click)="closeSidenav()">
           <mat-icon>close</mat-icon>
@@ -135,13 +135,15 @@
     <!-- Footer -->
     <footer class="app-footer">
       <div class="footer-left">
-        <mat-icon style="font-size:16px;width:16px;height:16px;color:#00c9a7">link</mat-icon>
-        <span>FirmaLink &copy; {{ currentYear }} — BUNKER TECHNOLOGIES SOLUTIONS C.A</span>
+        <mat-icon class="footer-icon">link</mat-icon>
+        <span>{{ cfg.identidad.nombre }} &copy; {{ currentYear }} — {{ cfg.identidad.empresa }}</span>
       </div>
       <div class="footer-right">
-        <a href="javascript:void(0)">Soporte</a>
-        <a href="javascript:void(0)">Términos</a>
-        <a href="javascript:void(0)">Política de Privacidad</a>
+        <!-- `[attr.href]` sólo cuando hay destino: sin URL real el enlace queda
+             inerte y Angular no sanea nada (evita el warning de javascript:). -->
+        <a [attr.href]="cfg.enlaces.soporte || null" (click)="sinDestino($event)">Soporte</a>
+        <a [attr.href]="cfg.enlaces.terminos || null" (click)="sinDestino($event)">Términos</a>
+        <a [attr.href]="cfg.enlaces.privacidad || null" (click)="sinDestino($event)">Política de Privacidad</a>
       </div>
     </footer>
   </div>

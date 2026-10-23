@@ -28,9 +28,11 @@ import { ClienteDocumento } from '../customers/cliente.model';
 import {
   EMISOR_DEFAULT,
   clienteExentoIva,
+  enteroALetras,
   fechaCorta,
   fechaTextoEmision,
   formatearNumeroFactura,
+  formatoBs,
   parsearNumero,
   redondear,
   siguienteNumero,
@@ -89,6 +91,88 @@ export const ESTADOS_PRESUPUESTO: PresupuestoEstado[] = [
 ];
 
 // ═══════════════════════════════════════════
+// Moneda
+// ═══════════════════════════════════════════
+
+/**
+ * Divisa en la que se cotiza el presupuesto.
+ *
+ * No convierte importes: el presupuesto se negocia en una sola moneda y todos
+ * los renglones, el descuento y el IVA se expresan en ella. Cambiar de divisa
+ * sólo cambia el símbolo y el nombre con el que se imprime.
+ */
+export type MonedaPresupuesto = 'VES' | 'USD' | 'EUR';
+
+/** Datos de impresión de cada divisa. */
+export interface DatosMoneda {
+  /** Símbolo que precede al monto en la hoja y en pantalla */
+  simbolo: string;
+  /** Nombre singular usado en el monto en letras ("DOLAR") */
+  nombre: string;
+  /** Nombre plural usado en el monto en letras ("DOLARES") */
+  plural: string;
+  /** Rótulo corto para tablas y totales ("Bs", "USD", "EUR") */
+  etiqueta: string;
+}
+
+/** Catálogo de divisas admitidas. */
+export const MONEDAS_PRESUPUESTO: Record<MonedaPresupuesto, DatosMoneda> = {
+  VES: { simbolo: 'Bs', nombre: 'BOLIVAR', plural: 'BOLIVARES', etiqueta: 'Bs' },
+  USD: { simbolo: '$', nombre: 'DOLAR', plural: 'DOLARES', etiqueta: 'USD' },
+  EUR: { simbolo: '€', nombre: 'EURO', plural: 'EUROS', etiqueta: 'EUR' },
+};
+
+/** Opciones para el selector del formulario, en el orden en que se muestran. */
+export const MONEDAS_OPCIONES: { valor: MonedaPresupuesto; texto: string }[] = [
+  { valor: 'VES', texto: 'Bolívares (Bs)' },
+  { valor: 'USD', texto: 'Dólares (USD)' },
+  { valor: 'EUR', texto: 'Euros (EUR)' },
+];
+
+/** Moneda por defecto de un presupuesto nuevo. */
+export const MONEDA_DEFAULT: MonedaPresupuesto = 'VES';
+
+/** Normaliza la divisa: cualquier valor desconocido cae en bolívares. */
+export function monedaValida(moneda: string | undefined | null): MonedaPresupuesto {
+  return moneda === 'USD' || moneda === 'EUR' || moneda === 'VES' ? moneda : MONEDA_DEFAULT;
+}
+
+/** Datos de impresión de la divisa del presupuesto (VES si viene vacía). */
+export function datosMoneda(p: Pick<Presupuesto, 'moneda'> | MonedaPresupuesto | undefined): DatosMoneda {
+  const clave = typeof p === 'string' ? p : p?.moneda;
+  return MONEDAS_PRESUPUESTO[clave ?? MONEDA_DEFAULT] ?? MONEDAS_PRESUPUESTO.VES;
+}
+
+/**
+ * Monto con su símbolo de divisa: "Bs 1.234,56", "$ 1.234,56", "€ 1.234,56".
+ *
+ * Reutiliza el formato numérico venezolano (miles con punto, decimales con
+ * coma) para las tres divisas: es el que ya usan la hoja y la pantalla.
+ */
+export function formatoMoneda(monto: number, p: Pick<Presupuesto, 'moneda'> | MonedaPresupuesto | undefined): string {
+  return `${datosMoneda(p).simbolo} ${formatoBs(monto)}`;
+}
+
+/**
+ * Importe en letras con el nombre de la divisa: "UN MIL ... DOLARES CON ...".
+ *
+ * La factura sólo conoce bolívares, así que su `montoEnLetras` termina siempre
+ * en "BOLIVARES". Aquí se reutiliza su conversión de número a letras y se
+ * sustituye el nombre de la moneda por el de la divisa del presupuesto.
+ */
+export function montoEnLetrasMoneda(monto: number, moneda: DatosMoneda): string {
+  const valor = Number.isFinite(monto) ? monto : 0;
+  const [enteros, centimos] = Math.abs(valor).toFixed(2).split('.');
+
+  let texto = enteroALetras(parseInt(enteros, 10));
+  texto += parseInt(enteros, 10) === 1 ? ` ${moneda.nombre}` : ` ${moneda.plural}`;
+  texto += ' CON ' + (parseInt(centimos, 10) > 0 ? enteroALetras(parseInt(centimos, 10)) : 'CERO');
+  texto += parseInt(centimos, 10) === 1 ? ' CENTIMO' : ' CENTIMOS';
+  // "UNO" como palabra independiente → "UN" (UN DOLAR, UN MILLON UN, ...)
+  return texto.replace(/\bUNO\b/g, 'UN');
+}
+
+// ═══════════════════════════════════════════
 // Documento
 // ═══════════════════════════════════════════
 
@@ -103,7 +187,7 @@ export interface ItemPresupuesto {
   /** Descripción tal como se imprime (texto libre, puede ser largo) */
   descripcion: string;
   cantidad: number;
-  /** Precio unitario en bolívares */
+  /** Precio unitario en la moneda del presupuesto (`Presupuesto.moneda`) */
   precio: number;
 }
 
@@ -150,7 +234,7 @@ export interface TotalesPresupuesto {
   /** Base sobre la que se calcula el IVA: subtotal − descuento */
   baseImponible: number;
   montoIva: number;
-  /** Total Bs del presupuesto: base + IVA */
+  /** Total de la moneda del presupuesto: base + IVA (IVA = 0 si no aplica) */
   total: number;
 }
 
@@ -169,6 +253,13 @@ export interface Presupuesto {
   mes?: string;
   /** Último día de validez en ISO 8601 (emisión + `condiciones.validezDias`) */
   fechaValidez: string;
+  /** Divisa en la que se cotiza: bolívares, dólares o euros */
+  moneda: MonedaPresupuesto;
+  /**
+   * ¿El presupuesto lleva IVA? Al desactivarlo, el total sale sin impuesto y la
+   * hoja lo advierte en rojo: el monto cotizado no incluye IVA.
+   */
+  aplicaIva: boolean;
   /** Alícuota de IVA en porcentaje (16 la general, 0 si el cliente está exento) */
   alicuotaIva: number;
   /** Descuento comercial en porcentaje (0 la mayoría de las veces) */
@@ -216,6 +307,9 @@ export const CONDICIONES_DEFAULT: CondicionesPresupuesto = {
 
 /** Alícuota de IVA general (16 %), la que trae el formulario. */
 export const ALICUOTA_IVA_DEFAULT = 16;
+
+/** Un presupuesto nuevo arranca con IVA. */
+export const APLICA_IVA_DEFAULT = true;
 
 /**
  * Identidad de BUNKER para la cabecera y el pie del presupuesto.
@@ -295,11 +389,28 @@ export function diasDeValidezRestantes(p: Pick<Presupuesto, 'fechaValidez'>, aho
 /**
  * Alícuota de IVA que de verdad se aplica.
  *
- * Un cliente exento compra sin IVA por mandato legal, así que su presupuesto se
- * cotiza en cero aunque la alícuota general siga siendo 16 %.
+ * Dos cosas pueden dejar el presupuesto sin IVA: que el usuario lo haya
+ * desactivado con el interruptor (`aplicaIva` en falso) o que el cliente sea
+ * exento por mandato legal. En ambos casos el impuesto es cero aunque la
+ * alícuota general siga escrita en 16 %.
  */
-export function alicuotaIvaEfectiva(p: Pick<Presupuesto, 'cliente' | 'alicuotaIva'>): number {
+export function alicuotaIvaEfectiva(
+  p: Pick<Presupuesto, 'cliente' | 'alicuotaIva' | 'aplicaIva'>,
+): number {
+  if (p.aplicaIva === false) return 0;
   return clienteExentoIva(p) ? 0 : parsearNumero(p.alicuotaIva);
+}
+
+/**
+ * ¿El presupuesto sale sin IVA por una razón que conviene advertir?
+ *
+ * Sólo cuenta el interruptor del usuario: un cliente exento ya tiene su propio
+ * aviso ("el presupuesto sale sin IVA") y no es algo que el usuario pueda
+ * corregir. Aquí interesa el caso en que el usuario apagó el impuesto, porque
+ * el monto cotizado deja de llevarlo incluido y hay que decirlo en rojo.
+ */
+export function presupuestoSinIva(p: Pick<Presupuesto, 'aplicaIva' | 'cliente'>): boolean {
+  return p.aplicaIva === false && !clienteExentoIva(p);
 }
 
 /** Subtotal: suma de cantidad × precio de los renglones. */
@@ -341,6 +452,8 @@ export function calcularTotalesPresupuesto(p: Presupuesto): TotalesPresupuesto {
 
 export interface OpcionesPresupuestoVacio {
   numero?: string | number;
+  /** Divisa con la que nace el presupuesto (VES por defecto) */
+  moneda?: MonedaPresupuesto;
   /** Último número emitido, para correlacionar la serie */
   ultimoNumero?: string | number;
   ahora?: Date;
@@ -364,6 +477,8 @@ export function presupuestoVacio(opciones: OpcionesPresupuestoVacio = {}): Presu
     fechaEmision: ahora.toISOString(),
     fechaTexto: fechaTextoEmision(ahora),
     fechaValidez: fechaValidez(ahora, condiciones.validezDias).toISOString(),
+    moneda: opciones.moneda ?? MONEDA_DEFAULT,
+    aplicaIva: APLICA_IVA_DEFAULT,
     alicuotaIva: ALICUOTA_IVA_DEFAULT,
     descuentoPorcentaje: 0,
     items: [],
@@ -416,6 +531,10 @@ export function normalizarPresupuesto(p: Partial<Presupuesto> | null | undefined
     fechaEmision: p.fechaEmision || base.fechaEmision,
     fechaTexto: p.fechaTexto || base.fechaTexto,
     fechaValidez: p.fechaValidez || fechaValidez(new Date(p.fechaEmision || base.fechaEmision), condiciones.validezDias).toISOString(),
+    moneda: monedaValida(p.moneda),
+    // Documentos guardados antes de existir el interruptor: si traen alícuota
+    // mayor que cero, el IVA estaba activo; se respeta esa intención.
+    aplicaIva: p.aplicaIva ?? (parsearNumero(p.alicuotaIva ?? base.alicuotaIva) > 0),
     alicuotaIva: parsearNumero(p.alicuotaIva ?? base.alicuotaIva),
     descuentoPorcentaje: parsearNumero(p.descuentoPorcentaje ?? base.descuentoPorcentaje),
     mostrarFirmaSello: p.mostrarFirmaSello !== false,

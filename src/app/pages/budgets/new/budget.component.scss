@@ -12,19 +12,159 @@
    ocupa todo el viewport y no deja ver el sidebar ni la topbar. La ruta
    sigue existiendo (deep-links y guards intactos); sólo cambia el pintado. */
 :host {
+  display: block;
+}
+
+/* ---------- Backdrop ---------- */
+.bl-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 3000;
-  display: block;
-  overflow: auto;
+  background: rgba(6, 20, 36, 0.62);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3050;
+  animation: blFade 0.22s ease;
+}
+
+@keyframes blFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------- Modal ---------- */
+.bl-modal {
   background: #f4f6f8;
-  padding: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: blSlideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes blSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---------- Cabecera ---------- */
+.bl-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  background: linear-gradient(135deg, #0c2d48 0%, #12406b 60%, #1a5490 100%);
+  color: white;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.bl-header-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #8fe8d8;
+  }
+}
+
+.bl-header-texto {
+  min-width: 0;
+  flex: 1;
+}
+
+.bl-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 2px;
+  color: white;
+  letter-spacing: 0.01em;
+}
+
+.bl-subtitle {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+
+  strong { color: #8fe8d8; }
+}
+
+.bl-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+
+  &:hover { background: rgba(255, 255, 255, 0.28); }
+}
+
+/* ---------- Cuerpo ---------- */
+.bl-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ---------- Pie ---------- */
+.bl-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 12px 22px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e3eaf1;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+
+  button {
+    min-height: 42px;
+
+    mat-icon { margin-right: 0.35rem; }
+  }
+
+  button[mat-icon-button] mat-icon { margin-right: 0; }
+}
+
+.bl-footer-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .bl-page {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  padding: 1.25rem clamp(1rem, 3vw, 2.5rem) 2rem;
+  max-width: 1680px;
+  margin: 0 auto;
 }
 
 /* ---------- Header ---------- */
@@ -427,6 +567,37 @@
     color: #8a97a3;
     line-height: 1.3;
   }
+
+  /* Aviso en rojo: el dato es correcto pero la operación pierde el impuesto. */
+  .bl-hint-alerta {
+    color: #c62828;
+    font-weight: 600;
+  }
+}
+
+/* ---------- Selector nativo (moneda) ---------- */
+.bl-select {
+  width: 100%;
+  min-height: 34px;
+  padding: 0.35rem 2rem 0.35rem 0.6rem;
+  border: 1px solid #cfd8e0;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #17324a;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  appearance: none;
+  /* Flecha dibujada: el control nativo se ve distinto en cada navegador. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235c6b7a' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+
+  &:disabled {
+    background-color: #f5f7f9;
+    color: #8a97a3;
+    cursor: not-allowed;
+  }
 }
 
 /* ── Código interno + huella (badge con efecto verde) ──
@@ -720,6 +891,32 @@
   }
 }
 
+/* Aviso de "monto sin IVA". Vive FUERA de `.bl-totales` en la plantilla (va
+   tras el `</dl>`), así que su regla también va a este nivel: si se anida bajo
+   `.bl-totales` —como estaban `.bl-total` y `.bl-retencion`— el selector
+   compilado no matchea el div y el aviso sale sin color ni fondo. */
+.bl-aviso-iva {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #e6a9a9;
+  border-left: 4px solid #c62828;
+  border-radius: 6px;
+  background: #fdecec;
+  color: #b3261e;
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #c62828;
+  }
+}
+
 /* ---------- Interruptores ---------- */
 .bl-interruptores {
   display: flex;
@@ -805,6 +1002,16 @@
 
 /* ---------- Tema oscuro ---------- */
 :host-context([data-theme="dark"]) {
+  .bl-modal,
+  .bl-body {
+    background: #10161d;
+  }
+
+  .bl-footer {
+    background: #18212b;
+    border-top-color: #263341;
+  }
+
   .page-header .header-content {
     h1 { color: #e8eef4; }
     p { color: #9aa7b4; }
@@ -880,6 +1087,16 @@
     }
 
     .bl-hint { color: #7f8b98; }
+    .bl-hint-alerta { color: #ff8a80; }
+  }
+
+  .bl-aviso-iva {
+    background: rgba(198, 40, 40, 0.16);
+    border-color: #7f2c2c;
+    border-left-color: #ff6b6b;
+    color: #ffb4ab;
+
+    mat-icon { color: #ff6b6b; }
   }
 
   /* Huella (fuera de .bl-campo: el badge vive en la tarjeta Hoja) */
@@ -907,6 +1124,19 @@
 
   .bl-switch {
     color: #e8eef4;
+  }
+
+  /* La flecha dibujada usa un color claro para el fondo oscuro. */
+  .bl-select {
+    background-color: #131b24;
+    border-color: #2c3746;
+    color: #e8eef4;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239aa7b4' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+
+    &:disabled {
+      background-color: #101821;
+      color: #8a97a3;
+    }
   }
 
   .bl-item {
@@ -985,6 +1215,18 @@
     button {
       flex: 1 1 auto;
     }
+  }
+
+  .bl-footer {
+    flex-wrap: wrap;
+    padding: 12px 16px 16px;
+
+    button {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+
+    .bl-footer-info { flex-basis: 100%; }
   }
 
   .bl-grid {

@@ -16,6 +16,7 @@ import {
   ValidadorSeguridadComponent,
 } from '../../shared/components/validador-seguridad/validador-seguridad.component';
 import { PasswordResetService, EstadoToken } from '../services/password-reset.service';
+import { CONFIG } from '../../config';
 
 /** Misma expresión de complejidad que el cambio de contraseña autenticado. */
 const CLAVE_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/;
@@ -55,6 +56,9 @@ const CLAVE_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%
   styleUrls: ['./recover-password.component.scss'],
 })
 export class RecoverPasswordComponent implements OnInit {
+  /** Configuración del producto (marca y textos). */
+  protected readonly cfg = CONFIG;
+
   private readonly reset = inject(PasswordResetService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);

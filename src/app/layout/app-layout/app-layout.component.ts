@@ -10,6 +10,7 @@ import { AuthService } from '../../auth/services/auth.service';
 import { MenuService, MenuItem } from '../../shared/services/menu.service';
 import { ThemeService } from '../../shared/services/theme.service';
 import { IdleService } from '../../shared/services/idle.service';
+import { CONFIG } from '../../config';
 
 /**
  * Layout compartido después de iniciar sesión.
@@ -34,6 +35,9 @@ import { IdleService } from '../../shared/services/idle.service';
   styleUrls: ['./app-layout.component.scss'],
 })
 export class AppLayoutComponent implements OnInit {
+  /** Configuración del producto (marca, enlaces y textos). */
+  protected readonly cfg = CONFIG;
+
   /**
    * Ancho máximo (px) en el que el sidebar pasa a comportarse como panel
    * deslizante. Cubre tablet y móvil: en esos tamaños el menú nace cerrado,
@@ -45,6 +49,17 @@ export class AppLayoutComponent implements OnInit {
   /** true en móvil y tablet (el sidebar se muestra como panel deslizante) */
   isCompact = signal(false);
   currentYear = new Date().getFullYear();
+
+  /**
+   * Enlaces del pie sin destino todavía: se anula la navegación para que el
+   * clic no recargue ni salte a `#`. Cuando config traiga la URL real, el
+   * navegador la abre normalmente.
+   */
+  sinDestino(evento: Event): void {
+    if (!(evento.currentTarget as HTMLAnchorElement)?.getAttribute('href')) {
+      evento.preventDefault();
+    }
+  }
 
   // Submenús expandidos del menu dinámico
   expandedMenus = signal<Set<string>>(new Set());

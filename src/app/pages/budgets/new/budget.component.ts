@@ -36,11 +36,14 @@ import {
 import {
   CondicionesPresupuesto,
   ESTADOS_PRESUPUESTO,
+  MONEDAS_OPCIONES,
+  MonedaPresupuesto,
   Presupuesto,
   PresupuestoEstado,
   alicuotaIvaEfectiva,
   calcularTotalesPresupuesto,
   clienteExentoIva,
+  datosMoneda,
   descuentoEfectivo,
   esEditable,
   estadoVisible,
@@ -49,6 +52,7 @@ import {
   fechaValidezCorta,
   formatoBs,
   formatoCantidad,
+  formatoMoneda,
   formatoPorcentaje,
   formatearNumeroPresupuesto,
   infoEstadoPresupuesto,
@@ -56,6 +60,7 @@ import {
   motivoBloqueo,
   parsearNumero,
   presupuestoVacio,
+  presupuestoSinIva,
   validarPresupuesto,
 } from '../presupuesto.model';
 import { PresupuestoService } from '../presupuesto.service';
@@ -125,8 +130,17 @@ export class BudgetsComponent implements OnInit, OnDestroy, PuedeSalir {
   readonly estadoMostrado = computed(() => estadoVisible(this.presupuesto()));
   readonly estadoInfo = computed(() => infoEstadoPresupuesto(this.estadoMostrado()));
   readonly bloqueo = computed(() => motivoBloqueo(this.presupuesto().estado));
-  /** Descuento comercial en bolívares, tal como lo resta la hoja. */
+  /** Descuento comercial en la moneda del presupuesto, tal como lo resta la hoja. */
   readonly descuento = computed(() => descuentoEfectivo(this.presupuesto()));
+
+  /** Divisa del presupuesto: símbolo, nombre y etiqueta para los totales. */
+  readonly moneda = computed(() => datosMoneda(this.presupuesto()));
+
+  /**
+   * El usuario apagó el IVA: hay que advertir en rojo que el monto cotizado no
+   * lleva impuesto incluido. El cliente exento tiene su propio aviso aparte.
+   */
+  readonly sinIva = computed(() => presupuestoSinIva(this.presupuesto()));
 
   /** La hoja impresa, igual que se ve en la vista previa. */
   readonly hoja = computed<SafeHtml>(() =>
@@ -135,12 +149,15 @@ export class BudgetsComponent implements OnInit, OnDestroy, PuedeSalir {
 
   readonly escalas = ESCALAS;
   readonly estadosPresupuesto = ESTADOS_PRESUPUESTO;
+  readonly monedasOpciones = MONEDAS_OPCIONES;
 
   /** Utilidades del modelo y del cliente que usa la plantilla. */
   readonly nombreCliente = nombreCliente;
   readonly formatoBs = formatoBs;
   readonly formatoCantidad = formatoCantidad;
   readonly formatoPorcentaje = formatoPorcentaje;
+  /** Formato del modelo, atado a la divisa del documento. */
+  readonly formatoMoneda = (monto: number): string => formatoMoneda(monto, this.presupuesto());
   readonly formatearNumeroPresupuesto = formatearNumeroPresupuesto;
   readonly fechaValidezCorta = fechaValidezCorta;
 
@@ -252,6 +269,22 @@ export class BudgetsComponent implements OnInit, OnDestroy, PuedeSalir {
   /** Cambia un número escrito como texto ("1.234,56") en un campo del documento. */
   setNumero(campo: 'alicuotaIva' | 'descuentoPorcentaje', valor: string): void {
     this.set(campo, parsearNumero(valor));
+  }
+
+  /** Cambia la divisa del presupuesto (no convierte importes). */
+  setMoneda(moneda: string): void {
+    this.set('moneda', moneda as MonedaPresupuesto);
+  }
+
+  /**
+   * Enciende o apaga el IVA del presupuesto.
+   *
+   * Al apagarlo el impuesto deja de sumarse y la hoja y el resumen advierten que
+   * el monto no lo lleva incluido; al encenderlo vuelve la alícuota guardada.
+   */
+  alternarIva(): void {
+    if (this.readonly_()) return;
+    this.set('aplicaIva', !this.presupuesto().aplicaIva);
   }
 
   /**

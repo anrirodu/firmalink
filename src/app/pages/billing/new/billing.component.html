@@ -1,59 +1,25 @@
-<div class="bl-page">
+<div class="bl-backdrop" (click)="volver()">
+  <div class="bl-modal" role="dialog" aria-modal="true" aria-labelledby="bl-titulo" (click)="$event.stopPropagation()">
 
   <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
-  <header class="page-header">
-    <div class="header-content">
-      <div class="bl-volver-fila">
-        <button mat-icon-button type="button" (click)="volver()"
-                matTooltip="Volver al listado de facturas" aria-label="Volver al listado">
-          <mat-icon>arrow_back</mat-icon>
-        </button>
-      </div>
-      <h1>Facturación</h1>
-      <!-- <p>
-        Emita la factura digital con el formato de la hoja 21,7 × 28 cm. El cliente
-        llega de su ficha: su RIF, su domicilio y su trato fiscal —retención de IVA
-        e ISLR, IGTF, exención— se copian dentro del documento.
-      </p> -->
+  <div class="bl-header">
+    <div class="bl-header-icon">
+      <mat-icon>receipt_long</mat-icon>
     </div>
-
-        <div class="header-actions">
-      <span class="bl-estado" [style.--bl-estado-color]="estadoInfo().color">
-        <mat-icon>{{ estadoInfo().icono }}</mat-icon>
-        {{ estadoInfo().etiqueta }}
-      </span>
-
-      <button mat-icon-button type="button" [matMenuTriggerFor]="accionesMenu"
-              class="bl-acciones-trigger"
-              matTooltip="Acciones de la factura">
-        <mat-icon>more_vert</mat-icon>
-      </button>
-
-      <mat-menu #accionesMenu="matMenu" class="bl-acciones-menu">
-        @if (Privilegio('Create')) {
-          <button mat-menu-item type="button" (click)="nueva()">
-            <mat-icon>note_add</mat-icon> <span>Nueva</span>
-          </button>
+    <div class="bl-header-texto">
+      <h3 class="bl-title" id="bl-titulo">Facturación</h3>
+      <p class="bl-subtitle">
+        @if (factura().numero) {
+          <strong>{{ factura().numero }}</strong> ·
         }
-        <button mat-menu-item type="button" (click)="imprimir()" [disabled]="cargando()">
-          <mat-icon>print</mat-icon> <span>Imprimir</span>
-        </button>
-        @if (!documentoCerrado() && Privilegio('Update')) {
-          <button mat-menu-item type="button" (click)="guardar(false)" [disabled]="guardando()">
-            <mat-icon>save</mat-icon> <span>Guardar</span>
-          </button>
-          <button mat-menu-item type="button" (click)="guardar(true)" [disabled]="guardando()">
-            <mat-icon>receipt_long</mat-icon> <span>Emitir</span>
-          </button>
-        }
-        @if (documentoCerrado() && factura().estado === 'emitida' && Privilegio('Update')) {
-          <button mat-menu-item type="button" (click)="anular()">
-            <mat-icon>block</mat-icon> <span>Anular</span>
-          </button>
-        }
-      </mat-menu>
+        {{ factura().fechaTexto || 'Documento sin emitir' }}
+      </p>
     </div>
-  </header>
+    <button class="bl-close" type="button" (click)="volver()" aria-label="Cerrar">&times;</button>
+  </div>
+
+  <div class="bl-body">
+  <div class="bl-page">
 
   @if (bloqueo()) {
     <div class="bl-aviso bl-aviso-bloqueo">
@@ -589,4 +555,65 @@
       }
     </section>
   </div>
-</div>
+  </div><!-- /.bl-page -->
+  </div><!-- /.bl-body -->
+
+  <!-- ── Pie de acciones ─────────────────────────────────────────────── -->
+  <div class="bl-footer">
+    <div class="bl-footer-info">
+      <span class="bl-estado" [style.--bl-estado-color]="estadoInfo().color">
+        <mat-icon>{{ estadoInfo().icono }}</mat-icon>
+        {{ estadoInfo().etiqueta }}
+      </span>
+    </div>
+
+    <button mat-stroked-button type="button" (click)="imprimir()" [disabled]="cargando()">
+      <mat-icon>print</mat-icon> Imprimir
+    </button>
+    @if (!documentoCerrado() && Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="guardar(false)" [disabled]="guardando()">
+        <mat-icon>save</mat-icon> Guardar
+      </button>
+      <button mat-flat-button color="primary" type="button" (click)="guardar(true)" [disabled]="guardando()">
+        <mat-icon>receipt_long</mat-icon> Emitir
+      </button>
+    }
+    @if (documentoCerrado() && factura().estado === 'emitida' && Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="anular()">
+        <mat-icon>block</mat-icon> Anular
+      </button>
+    }
+
+    <button mat-icon-button type="button" [matMenuTriggerFor]="accionesMenu"
+            class="bl-acciones-trigger"
+            matTooltip="Más acciones de la factura">
+      <mat-icon>more_vert</mat-icon>
+    </button>
+
+    <mat-menu #accionesMenu="matMenu" class="bl-acciones-menu">
+      @if (Privilegio('Create')) {
+        <button mat-menu-item type="button" (click)="nueva()">
+          <mat-icon>note_add</mat-icon> <span>Nueva</span>
+        </button>
+      }
+      <button mat-menu-item type="button" (click)="imprimir()" [disabled]="cargando()">
+        <mat-icon>print</mat-icon> <span>Imprimir</span>
+      </button>
+      @if (!documentoCerrado() && Privilegio('Update')) {
+        <button mat-menu-item type="button" (click)="guardar(false)" [disabled]="guardando()">
+          <mat-icon>save</mat-icon> <span>Guardar</span>
+        </button>
+        <button mat-menu-item type="button" (click)="guardar(true)" [disabled]="guardando()">
+          <mat-icon>receipt_long</mat-icon> <span>Emitir</span>
+        </button>
+      }
+      @if (documentoCerrado() && factura().estado === 'emitida' && Privilegio('Update')) {
+        <button mat-menu-item type="button" (click)="anular()">
+          <mat-icon>block</mat-icon> <span>Anular</span>
+        </button>
+      }
+    </mat-menu>
+  </div>
+
+  </div><!-- /.bl-modal -->
+</div><!-- /.bl-backdrop -->

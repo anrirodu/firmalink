@@ -10,6 +10,7 @@
  */
 
 import { esc, plantillaCorreo } from '../../shared/correo/plantilla-correo';
+import { CONFIG } from '../../config';
 
 /** Minutos de vigencia del enlace, repetidos en el aviso del cuerpo. */
 export const VIGENCIA_MINUTOS = 15;
@@ -97,16 +98,16 @@ export function htmlRecuperacion(login: string, enlace: string, fecha = new Date
 
               <!-- Nota de seguridad -->
               <div style="margin:20px 0 0 0;border-left:3px solid #059669;background-color:#F0FDF7;padding:12px 16px;font:400 13px Arial,sans-serif;color:#37474F;line-height:1.6">
-                Nadie de FirmaLink le pedirá su contraseña por correo ni por teléfono. Si no reconoce
+                Nadie de ${CONFIG.identidad.nombre} le pedirá su contraseña por correo ni por teléfono. Si no reconoce
                 esta solicitud, no pulse el enlace y comuníquelo al administrador del sistema.
               </div>`;
 
   return plantillaCorreo({
-    titulo: 'Recuperación de contraseña — FirmaLink',
-    encabezado: 'FIRMALINK',
+    titulo: `Recuperación de contraseña — ${CONFIG.identidad.nombre}`,
+    encabezado: CONFIG.identidad.nombre.toUpperCase(),
     preheader: `Restablezca su contraseña: el enlace vence en ${VIGENCIA_MINUTOS} minutos y solo se puede usar una vez.`,
     cuerpoHtml,
-    logoAlt: 'FirmaLink',
+    logoAlt: CONFIG.correo.logoAlt,
   });
 }
 

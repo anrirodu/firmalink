@@ -1,4 +1,5 @@
 import { Component, ElementRef, computed, input } from '@angular/core';
+import { CONFIG } from '../../../config';
 
 /**
  * Isotipo animado de FirmaLink — dos eslabones entrelazados + check trazado.
@@ -129,12 +130,15 @@ import { Component, ElementRef, computed, input } from '@angular/core';
 export class IsotipoAnimadoComponent {
   private static secuencia = 0;
 
-  /** Colores por defecto para fondos claros (Azul Marino + Verde Mente/Cian). */
-  readonly colorEslabonA = input<string>('#0c2d48');
-  readonly colorEslabonB = input<string>('#00c9a7');
+  /**
+   * Colores por defecto para fondos claros, tomados de la paleta de
+   * `config.ts` (las pantallas sobre fondo oscuro los sobrescriben).
+   */
+  readonly colorEslabonA = input<string>(CONFIG.marca.colores.primario);
+  readonly colorEslabonB = input<string>(CONFIG.marca.colores.acento);
 
   readonly ancho = input<number>(400);
-  readonly etiqueta = input<string>('FirmaLink');
+  readonly etiqueta = input<string>(CONFIG.identidad.nombre);
 
   /** Animación en bucle infinito (indicador de carga). */
   readonly loop = input<boolean>(false);

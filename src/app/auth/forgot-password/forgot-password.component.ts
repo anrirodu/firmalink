@@ -15,6 +15,7 @@ import {
   ValidadorSeguridadComponent,
 } from '../../shared/components/validador-seguridad/validador-seguridad.component';
 import { PasswordResetService, VIGENCIA_MINUTOS } from '../services/password-reset.service';
+import { CONFIG } from '../../config';
 
 /**
  * ForgotPasswordComponent — pantalla pre-autenticación "¿Olvidó su contraseña?".
@@ -70,6 +71,9 @@ export class ForgotPasswordComponent {
   }
 
   readonly anio = new Date().getFullYear();
+
+  /** Configuración del producto (marca y textos). */
+  protected readonly cfg = CONFIG;
 
   enviando = signal(false);
   enviado = signal(false);

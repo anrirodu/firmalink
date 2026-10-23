@@ -4,11 +4,13 @@ import { esc, plantillaCorreo } from '../../shared/correo/plantilla-correo';
 import {
   alicuotaIvaEfectiva,
   calcularTotalesPresupuesto,
+  datosMoneda,
   diasDeValidezRestantes,
   fechaValidezCorta,
   formatoBs,
   formatoCantidad,
   formatoPorcentaje,
+  presupuestoSinIva,
   type Presupuesto,
 } from './presupuesto.model';
 
@@ -56,14 +58,14 @@ function filaImporte(etiqueta: string, importe: string, negativo = false): strin
 }
 
 /** Fila de la tabla de renglones cotizados */
-function filaRenglon(descripcion: string, cantidad: number, precio: number): string {
+function filaRenglon(descripcion: string, cantidad: number, precio: number, simbolo: string): string {
   const total = (Number(cantidad) || 0) * (Number(precio) || 0);
   return `
               <tr>
                 <td style="padding:6px 10px 6px 0;color:#111827;font:400 13px Arial,sans-serif;border-bottom:1px solid #F3F4F6">${esc(descripcion)}</td>
                 <td style="padding:6px 10px 6px 0;color:#111827;font:400 13px Arial,sans-serif;text-align:right;white-space:nowrap;border-bottom:1px solid #F3F4F6">${esc(formatoCantidad(cantidad))}</td>
-                <td style="padding:6px 10px 6px 0;color:#111827;font:400 13px Arial,sans-serif;text-align:right;white-space:nowrap;border-bottom:1px solid #F3F4F6">${esc(formatoBs(precio))}</td>
-                <td style="padding:6px 0;color:#111827;font:600 13px Arial,sans-serif;text-align:right;white-space:nowrap;border-bottom:1px solid #F3F4F6">${esc(formatoBs(total))}</td>
+                <td style="padding:6px 10px 6px 0;color:#111827;font:400 13px Arial,sans-serif;text-align:right;white-space:nowrap;border-bottom:1px solid #F3F4F6">${esc(formatoBs(precio))} ${esc(simbolo)}</td>
+                <td style="padding:6px 0;color:#111827;font:600 13px Arial,sans-serif;text-align:right;white-space:nowrap;border-bottom:1px solid #F3F4F6">${esc(formatoBs(total))} ${esc(simbolo)}</td>
               </tr>`;
 }
 
@@ -110,6 +112,8 @@ export function construirCorreoPresupuesto(
   // Sin totales congelados se calculan al vuelo: el correo nunca muestra cero
   const t = presupuesto.totales ?? calcularTotalesPresupuesto(presupuesto);
   const alicuota = alicuotaIvaEfectiva(presupuesto);
+  const moneda = datosMoneda(presupuesto);
+  const sinIva = presupuestoSinIva(presupuesto);
   const validezCorta = fechaValidezCorta(presupuesto);
   const diasRestantes = diasDeValidezRestantes(presupuesto);
   const validezTexto = validezCorta
@@ -177,7 +181,7 @@ export function construirCorreoPresupuesto(
                         <td style="padding:0 0 6px 0;color:#6B7280;font:600 11px Arial,sans-serif;text-align:right;text-transform:uppercase;border-bottom:1px solid #E5E7EB">Total</td>
                       </tr>
                       ${presupuesto.items
-                        .map((it) => filaRenglon(it.descripcion, it.cantidad, it.precio))
+                        .map((it) => filaRenglon(it.descripcion, it.cantidad, it.precio, moneda.simbolo))
                         .join('')}
                     </table>
                   </td>
@@ -196,10 +200,12 @@ export function construirCorreoPresupuesto(
                 <tr>
                   <td>
                     <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;width:100%;margin-top:6px">
-                      ${filaImporte('Subtotal', `${t.subtotal.toFixed(2)} Bs`)}
-                      ${t.descuento > 0 ? filaImporte('Descuento', `- ${t.descuento.toFixed(2)} Bs`, true) : ''}
-                      ${filaImporte(`IVA (${formatoPorcentaje(alicuota)})`, `${t.montoIva.toFixed(2)} Bs`)}
-                      ${filaImporte('Total Bs', `${t.total.toFixed(2)} Bs`)}
+                      ${filaImporte('Subtotal', `${t.subtotal.toFixed(2)} ${moneda.etiqueta}`)}
+                      ${t.descuento > 0 ? filaImporte('Descuento', `- ${t.descuento.toFixed(2)} ${moneda.etiqueta}`, true) : ''}
+                      ${sinIva
+                        ? `<tr><td colspan="2" style="padding:8px 0 0 0"><div style="border:1px solid #c62828;border-left:4px solid #c62828;border-radius:6px;background:#fdecec;color:#b3261e;font:800 12px Arial,sans-serif;padding:8px 12px;text-align:center">MONTO SIN IVA INCLUIDO &mdash; EL PRECIO COTIZADO NO INCLUYE IVA</div></td></tr>`
+                        : filaImporte(`IVA (${formatoPorcentaje(alicuota)})`, `${t.montoIva.toFixed(2)} ${moneda.etiqueta}`)}
+                      ${filaImporte(`Total ${moneda.etiqueta}`, `${t.total.toFixed(2)} ${moneda.etiqueta}`)}
                     </table>
                   </td>
                 </tr>
@@ -301,10 +307,12 @@ export function construirCorreoPresupuesto(
     presupuesto.mes ? `Periodo: ${presupuesto.mes}` : '',
     `Cliente: ${presupuesto.cliente?.nombre ?? ''}`,
     `RIF: ${presupuesto.cliente?.rif || presupuesto.cliente?.identificacion || ''}`,
-    t ? `Subtotal: ${t.subtotal.toFixed(2)} Bs` : '',
-    t && t.descuento > 0 ? `Descuento: - ${t.descuento.toFixed(2)} Bs` : '',
-    t ? `IVA (${formatoPorcentaje(alicuota)}): ${t.montoIva.toFixed(2)} Bs` : '',
-    t ? `Total Bs: ${t.total.toFixed(2)} Bs` : '',
+    t ? `Moneda: ${moneda.etiqueta}` : '',
+    t ? `Subtotal: ${t.subtotal.toFixed(2)} ${moneda.etiqueta}` : '',
+    t && t.descuento > 0 ? `Descuento: - ${t.descuento.toFixed(2)} ${moneda.etiqueta}` : '',
+    t && sinIva ? 'MONTO SIN IVA INCLUIDO: el precio cotizado no incluye IVA.' : '',
+    t && !sinIva ? `IVA (${formatoPorcentaje(alicuota)}): ${t.montoIva.toFixed(2)} ${moneda.etiqueta}` : '',
+    t ? `Total ${moneda.etiqueta}: ${t.total.toFixed(2)} ${moneda.etiqueta}` : '',
   ].filter(Boolean);
 
   const condiciones: string[] = [

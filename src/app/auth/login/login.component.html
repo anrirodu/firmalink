@@ -15,59 +15,40 @@
           class="brand-isotipo"
           [ancho]="420"
           colorEslabonA="#ffffff"
-          colorEslabonB="#4ee1c8"
+          [colorEslabonB]="cfg.marca.colores.acentoClaro"
           [replayOnClick]="true"
-          etiqueta="FirmaLink — La forma inteligente de acordar y firmar"
+          [etiqueta]="cfg.auth.etiquetaIsotipo"
         />
       </div>
 
       <!-- Título principal -->
       <h1 class="brand-title">
-        FirmaLink
+        {{ cfg.identidad.nombre }}
       </h1>
 
       <p class="brand-subtitle">
-        La forma inteligente de acordar y firmar.
+        {{ cfg.identidad.eslogan }}
       </p>
 
       <mat-divider class="brand-divider"></mat-divider>
 
       <!-- Features -->
       <div class="features-list">
-        <div class="feature-item">
-          <mat-icon>hub</mat-icon>
-          <div>
-            <strong>Conexión Inteligente</strong>
-            <span>Enlaza personas, acuerdos y firmas en una sola plataforma</span>
+        @for (beneficio of cfg.auth.beneficios; track beneficio.titulo) {
+          <div class="feature-item">
+            <mat-icon>{{ beneficio.icono }}</mat-icon>
+            <div>
+              <strong>{{ beneficio.titulo }}</strong>
+              <span>{{ beneficio.detalle }}</span>
+            </div>
           </div>
-        </div>
-        <div class="feature-item">
-          <mat-icon>bolt</mat-icon>
-          <div>
-            <strong>Firma Ágil</strong>
-            <span>Acuerdos firmados en tiempo real, sin fricción ni papeleo</span>
-          </div>
-        </div>
-        <div class="feature-item">
-          <mat-icon>verified_user</mat-icon>
-          <div>
-            <strong>Confianza y Seguridad</strong>
-            <span>Autenticación robusta y protección de datos de extremo a extremo</span>
-          </div>
-        </div>
-        <div class="feature-item">
-          <mat-icon>task_alt</mat-icon>
-          <div>
-            <strong>Trazabilidad Total</strong>
-            <span>Seguimiento, métricas y reportes de cada acuerdo y firma</span>
-          </div>
-        </div>
+        }
       </div>
     </div>
 
     <!-- Footer branding -->
     <div class="branding-footer">
-      <span>&copy; {{ currentYear }} — BUNKER TECHNOLOGIES SOLUTIONS C.A</span>
+      <span>&copy; {{ currentYear }} — {{ cfg.auth.pieMarca }}</span>
     </div>
   </aside>
 
@@ -81,11 +62,11 @@
           class="mobile-isotipo"
           [ancho]="240"
           colorEslabonA="#ffffff"
-          colorEslabonB="#4ee1c8"
+          [colorEslabonB]="cfg.marca.colores.acentoClaro"
           [replayOnClick]="true"
-          etiqueta="FirmaLink — La forma inteligente de acordar y firmar"
+          [etiqueta]="cfg.auth.etiquetaIsotipo"
         />
-        <span>FirmaLink</span>
+        <span>{{ cfg.identidad.nombre }}</span>
       </div>
 
       <!-- Card del formulario -->
@@ -201,7 +182,7 @@
                 </div>
 
                 <p class="success-title">Verificación exitosa</p>
-                <p class="success-sub">Bienvenido a FirmaLink</p>
+                <p class="success-sub">{{ cfg.auth.mensajeBienvenida }}</p>
 
                 <div class="success-loading">
                   <mat-spinner diameter="22"></mat-spinner>

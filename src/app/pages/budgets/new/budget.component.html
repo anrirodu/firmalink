@@ -1,70 +1,24 @@
-<div class="bl-page">
+<div class="bl-backdrop" (click)="volver()">
+  <div class="bl-modal" role="dialog" aria-modal="true" aria-labelledby="bl-titulo" (click)="$event.stopPropagation()">
 
   <!-- ── Cabecera ─────────────────────────────────────────────────────── -->
-  <header class="page-header">
-    <div class="header-content">
-      <div class="bl-volver-fila">
-        <button mat-icon-button type="button" (click)="volver()"
-                matTooltip="Volver al listado de presupuestos" aria-label="Volver al listado">
-          <mat-icon>arrow_back</mat-icon>
-        </button>
-      </div>
-      <h1>Presupuestos</h1>
-      <p>
-        Presupuesto <strong>{{ formatearNumeroPresupuesto(presupuesto().numero) }}</strong>
+  <div class="bl-header">
+    <div class="bl-header-icon">
+      <mat-icon>request_quote</mat-icon>
+    </div>
+    <div class="bl-header-texto">
+      <h3 class="bl-title" id="bl-titulo">Presupuesto</h3>
+      <p class="bl-subtitle">
+        <strong>{{ formatearNumeroPresupuesto(presupuesto().numero) }}</strong>
         · Emisión: {{ presupuesto().fechaTexto }}
         · Válido hasta: {{ fechaValidezCorta(presupuesto()) }}
       </p>
     </div>
+    <button class="bl-close" type="button" (click)="volver()" aria-label="Cerrar">&times;</button>
+  </div>
 
-    <div class="header-actions">
-      <span class="bl-estado" [style.--bl-estado-color]="estadoInfo().color">
-        <mat-icon>{{ estadoInfo().icono }}</mat-icon>
-        {{ estadoInfo().etiqueta }}
-      </span>
-
-      @if (!readonly_() && Privilegio('Update')) {
-        <button mat-stroked-button type="button" (click)="guardar(false)" [disabled]="guardando()">
-          <mat-icon>save</mat-icon> Guardar borrador
-        </button>
-      }
-      @if (!readonly_() && estadoMostrado() === 'borrador' && Privilegio('Update')) {
-        <button mat-stroked-button type="button" (click)="guardar(true)" [disabled]="guardando()">
-          <mat-icon>send</mat-icon> Enviar al cliente
-        </button>
-      }
-      @if (presupuesto().estado === 'enviado' && Privilegio('Update')) {
-        <button mat-stroked-button type="button" (click)="responder('aprobado')">
-          <mat-icon>verified</mat-icon> Aprobar
-        </button>
-        <button mat-stroked-button type="button" (click)="responder('rechazado')">
-          <mat-icon>thumb_down</mat-icon> Rechazar
-        </button>
-      }
-      @if ((presupuesto().estado === 'enviado'
-           || presupuesto().estado === 'aprobado'
-           || presupuesto().estado === 'rechazado') && Privilegio('Update')) {
-        <button mat-stroked-button type="button" (click)="anular()">
-          <mat-icon>block</mat-icon> Anular
-        </button>
-      }
-      @if (presupuesto().estado === 'borrador' && Privilegio('Delete')) {
-        <button mat-stroked-button type="button" (click)="eliminar()">
-          <mat-icon>delete_outline</mat-icon> Eliminar
-        </button>
-      }
-      <button mat-icon-button type="button" (click)="imprimir()" [disabled]="cargando()"
-              matTooltip="Imprimir el presupuesto">
-        <mat-icon>print</mat-icon>
-      </button>
-      @if (Privilegio('Create')) {
-        <button mat-icon-button type="button" (click)="nueva()"
-                matTooltip="Presupuesto nuevo">
-          <mat-icon>note_add</mat-icon>
-        </button>
-      }
-    </div>
-  </header>
+  <div class="bl-body">
+  <div class="bl-page">
 
   @if (bloqueo()) {
     <div class="bl-aviso bl-aviso-bloqueo">
@@ -317,19 +271,49 @@
 <!-- Impuestos y descuento comercial -->
       <section class="bl-card">
         <h2 class="bl-card-titulo">
-          <mat-icon>percent</mat-icon> Impuestos y descuento
+          <mat-icon>percent</mat-icon> Moneda, impuestos y descuento
         </h2>
 
         <div class="bl-grid">
           <label class="bl-campo">
-            <span>IVA (%)</span>
-            <input type="text" inputmode="decimal" [value]="presupuesto().alicuotaIva"
-                   (input)="setNumero('alicuotaIva', $any($event.target).value)"
-                   [attr.readonly]="readonly_() ? '' : null">
-            @if (clienteExentoIva()) {
+            <span>Moneda</span>
+            <select class="bl-select" [value]="presupuesto().moneda"
+                    (change)="setMoneda($any($event.target).value)"
+                    [attr.disabled]="readonly_() ? '' : null">
+              @for (opcion of monedasOpciones; track opcion.valor) {
+                <option [value]="opcion.valor" [selected]="opcion.valor === presupuesto().moneda">
+                  {{ opcion.texto }}
+                </option>
+              }
+            </select>
+            <small class="bl-hint">La divisa con la que se imprime el presupuesto.</small>
+          </label>
+
+          <div class="bl-campo">
+            <span class="bl-switch">
+              <input type="checkbox" id="bl-aplica-iva" [checked]="presupuesto().aplicaIva"
+                     (change)="alternarIva()"
+                     [attr.disabled]="readonly_() ? '' : null">
+              <label for="bl-aplica-iva">Aplicar IVA ({{ formatoPorcentaje(alicuotaIvaEfectiva()) }})</label>
+            </span>
+            @if (sinIva()) {
+              <small class="bl-hint bl-hint-alerta">
+                Sin IVA: el monto cotizado no lleva impuesto incluido.
+              </small>
+            } @else if (clienteExentoIva()) {
               <small class="bl-hint">Cliente exento: el presupuesto sale sin IVA.</small>
             } @else {
               <small class="bl-hint">Alícuota efectiva: {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}.</small>
+            }
+          </div>
+
+          <label class="bl-campo">
+            <span>IVA (%)</span>
+            <input type="text" inputmode="decimal" [value]="presupuesto().alicuotaIva"
+                   (input)="setNumero('alicuotaIva', $any($event.target).value)"
+                   [attr.readonly]="(readonly_() || !presupuesto().aplicaIva) ? '' : null">
+            @if (!presupuesto().aplicaIva) {
+              <small class="bl-hint">Se activa al marcar «Aplicar IVA».</small>
             }
           </label>
 
@@ -340,7 +324,7 @@
                    [attr.readonly]="readonly_() ? '' : null">
             <small class="bl-hint">
               @if (descuento() > 0) {
-                Se descuentan {{ formatoBs(descuento()) }} Bs antes de calcular el IVA.
+                Se descuentan {{ formatoMoneda(descuento()) }} antes de calcular el IVA.
               } @else {
                 Se aplica sobre el subtotal antes de calcular el IVA.
               }
@@ -396,7 +380,7 @@
                   </label>
                   <div class="bl-item-total">
                     <span>Total</span>
-                    <strong>{{ formatoBs(totalItem(i)) }}</strong>
+                    <strong>{{ formatoMoneda(totalItem(i)) }}</strong>
                   </div>
                   <button mat-icon-button type="button" class="bl-item-quitar"
                           (click)="quitarItem(i)" [disabled]="readonly_()"
@@ -437,18 +421,30 @@
         </h2>
 
         <dl class="bl-totales">
-          <div><dt>Subtotal</dt><dd>{{ formatoBs(totales().subtotal) }}</dd></div>
+          <div><dt>Subtotal</dt><dd>{{ formatoMoneda(totales().subtotal) }}</dd></div>
           @if (descuento() > 0) {
             <div class="bl-retencion">
               <dt>Descuento {{ formatoPorcentaje(presupuesto().descuentoPorcentaje) }}</dt>
-              <dd>- {{ formatoBs(descuento()) }}</dd>
+              <dd>- {{ formatoMoneda(descuento()) }}</dd>
             </div>
           }
-          <div><dt>Base imponible</dt><dd>{{ formatoBs(totales().baseImponible) }}</dd></div>
-          <div><dt>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}</dt>
-            <dd>{{ formatoBs(totales().montoIva) }}</dd></div>
-          <div class="bl-total"><dt>Total Bs</dt><dd>{{ formatoBs(totales().total) }}</dd></div>
+          <div><dt>Base imponible</dt><dd>{{ formatoMoneda(totales().baseImponible) }}</dd></div>
+          <div>
+            <dt>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}</dt>
+            <dd>{{ formatoMoneda(totales().montoIva) }}</dd>
+          </div>
+          <div class="bl-total">
+            <dt>Total {{ moneda().etiqueta }}</dt>
+            <dd>{{ formatoMoneda(totales().total) }}</dd>
+          </div>
         </dl>
+
+        @if (sinIva()) {
+          <div class="bl-aviso-iva" role="alert">
+            <mat-icon>warning</mat-icon>
+            <span>El monto no posee IVA incluido.</span>
+          </div>
+        }
       </section>
       </ng-template>
 
@@ -543,11 +539,11 @@
             <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
           </button>
 
-          <button class="bl-seccion" type="button" (click)="abrirSeccion('Impuestos y descuento', tplImpuestos)">
+          <button class="bl-seccion" type="button" (click)="abrirSeccion('Moneda, impuestos y descuento', tplImpuestos)">
             <mat-icon>percent</mat-icon>
             <span class="bl-seccion-texto">
-              <strong>Impuestos y descuento</strong>
-              <small>IVA {{ formatoPorcentaje(alicuotaIvaEfectiva()) }}@if (presupuesto().descuentoPorcentaje > 0) { · Desc. {{ formatoPorcentaje(presupuesto().descuentoPorcentaje) }} }</small>
+              <strong>Moneda, impuestos y descuento</strong>
+              <small>{{ moneda().etiqueta }} · {{ presupuesto().aplicaIva ? 'IVA ' + formatoPorcentaje(alicuotaIvaEfectiva()) : 'SIN IVA' }}@if (presupuesto().descuentoPorcentaje > 0) { · Desc. {{ formatoPorcentaje(presupuesto().descuentoPorcentaje) }} }</small>
             </span>
             <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
           </button>
@@ -565,7 +561,7 @@
             <mat-icon>functions</mat-icon>
             <span class="bl-seccion-texto">
               <strong>Resumen</strong>
-              <small>Total {{ formatoBs(totales().total) }}</small>
+              <small>Total {{ moneda().etiqueta }} {{ formatoBs(totales().total) }}</small>
             </span>
             <mat-icon class="bl-seccion-flecha">chevron_right</mat-icon>
           </button>
@@ -609,4 +605,59 @@
       }
     </section>
   </div>
-</div>
+  </div><!-- /.bl-page -->
+  </div><!-- /.bl-body -->
+
+  <!-- ── Pie de acciones ─────────────────────────────────────────────── -->
+  <div class="bl-footer">
+    <div class="bl-footer-info">
+      <span class="bl-estado" [style.--bl-estado-color]="estadoInfo().color">
+        <mat-icon>{{ estadoInfo().icono }}</mat-icon>
+        {{ estadoInfo().etiqueta }}
+      </span>
+    </div>
+
+    @if (!readonly_() && Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="guardar(false)" [disabled]="guardando()">
+        <mat-icon>save</mat-icon> Guardar borrador
+      </button>
+    }
+    @if (!readonly_() && estadoMostrado() === 'borrador' && Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="guardar(true)" [disabled]="guardando()">
+        <mat-icon>send</mat-icon> Enviar al cliente
+      </button>
+    }
+    @if (presupuesto().estado === 'enviado' && Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="responder('aprobado')">
+        <mat-icon>verified</mat-icon> Aprobar
+      </button>
+      <button mat-stroked-button type="button" (click)="responder('rechazado')">
+        <mat-icon>thumb_down</mat-icon> Rechazar
+      </button>
+    }
+    @if ((presupuesto().estado === 'enviado'
+         || presupuesto().estado === 'aprobado'
+         || presupuesto().estado === 'rechazado') && Privilegio('Update')) {
+      <button mat-stroked-button type="button" (click)="anular()">
+        <mat-icon>block</mat-icon> Anular
+      </button>
+    }
+    @if (presupuesto().estado === 'borrador' && Privilegio('Delete')) {
+      <button mat-stroked-button type="button" (click)="eliminar()">
+        <mat-icon>delete_outline</mat-icon> Eliminar
+      </button>
+    }
+    <button mat-icon-button type="button" (click)="imprimir()" [disabled]="cargando()"
+            matTooltip="Imprimir el presupuesto">
+      <mat-icon>print</mat-icon>
+    </button>
+    @if (Privilegio('Create')) {
+      <button mat-icon-button type="button" (click)="nueva()"
+              matTooltip="Presupuesto nuevo">
+        <mat-icon>note_add</mat-icon>
+      </button>
+    }
+  </div>
+
+  </div><!-- /.bl-modal -->
+</div><!-- /.bl-backdrop -->
