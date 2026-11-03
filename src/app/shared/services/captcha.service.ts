@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom, Observable, of } from 'rxjs';
 import { timeout, catchError, map } from 'rxjs/operators';
@@ -26,6 +26,9 @@ export interface ICaptchaSolution {
  */
 const CEDE_CADA_ITERACIONES = 250;
 
+/** Estado del captcha compartido por los componentes que lo consumen. */
+export type EstadoCaptcha = 'inactivo' | 'resolviendo' | 'resuelto' | 'error';
+
 /**
  * Cede el control al hilo principal para que el navegador pueda pintar.
  */
@@ -40,6 +43,20 @@ export class CaptchaService {
   private http = inject(HttpClient);
   private endpoint = '/v1/api/captcha/challenge';
   private endpointVerify = '/v1/api/captcha/verify';
+
+  /**
+   * Estado del captcha compartido por toda la app.
+   *
+   * Evita que dos widgets pidan retos distintos al mismo tiempo: el login,
+   * el sello de licencia y el segundo factor leen el mismo estado.
+   */
+  private readonly _estado = signal<EstadoCaptcha>('inactivo');
+
+  /** Estado observable (sólo lectura) del último reto. */
+  readonly estado = this._estado.asReadonly();
+
+  /** Petición en vuelo: las llamadas concurrentes comparten la misma promesa. */
+  private enCurso: Promise<ICaptchaSolution | null> | null = null;
 
   /**
    * Obtiene el reto criptográfico desde Sandra Server con timeout seguro.
@@ -135,19 +152,41 @@ export class CaptchaService {
    * así que cada intento de acceso necesita un reto nuevo.
    */
   async obtenerYResolver(): Promise<ICaptchaSolution | null> {
+    // Varios widgets pueden pedir el reto a la vez: se comparte la petición
+    // en vuelo para no generar un `challenge` por cada uno.
+    if (this.enCurso) {
+      return this.enCurso;
+    }
+
+    this._estado.set('resolviendo');
+    this.enCurso = this.resolverReto();
+
+    try {
+      return await this.enCurso;
+    } finally {
+      this.enCurso = null;
+    }
+  }
+
+  /** Obtiene el reto y resuelve el PoW; actualiza el estado compartido. */
+  private async resolverReto(): Promise<ICaptchaSolution | null> {
     const inicio = Date.now();
 
     try {
       const ch = await firstValueFrom(this.obtenerChallenge());
       if (!ch || !ch.challenge || !ch.salt) {
+        this._estado.set('error');
         return null;
       }
 
       const sol = await this.resolverPoW(ch.salt, ch.challenge, ch.maxnumber || 50000);
       if (sol === -1) {
+        this._estado.set('error');
         console.warn('[CaptchaService] No se encontró solución para el challenge PoW');
         return null;
       }
+
+      this._estado.set('resuelto');
 
       return {
         sol,
@@ -157,6 +196,7 @@ export class CaptchaService {
         ms: Date.now() - inicio,
       };
     } catch (error) {
+      this._estado.set('error');
       console.error('[CaptchaService] Error al obtener o resolver el challenge:', error);
       return null;
     }

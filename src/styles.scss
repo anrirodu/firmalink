@@ -282,6 +282,24 @@ a {
   z-index: 3100;
 }
 
+/* ---------- Diálogo de verificación en dos pasos (TOTP) ----------
+   El componente pinta toda la superficie; aquí se elimina el relleno del
+   contenedor de Material y se redondean las esquinas. */
+.totp-dialog-panel {
+  .mat-mdc-dialog-container {
+    padding: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .mat-mdc-dialog-container .mdc-dialog__surface {
+    padding: 0 !important;
+    border-radius: var(--radius-lg) !important;
+    overflow: hidden;
+    background: var(--surface);
+  }
+}
+
 /* ---------- Utility Classes ---------- */
 .fade-in {
   animation: fadeIn 0.5s ease-out;

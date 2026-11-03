@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { MatDialog } from '@angular/material/dialog';
 import { Observable, from, switchMap, of, shareReplay } from 'rxjs';
 import { map, catchError, take } from 'rxjs/operators';
 import { lastValueFrom } from 'rxjs';
@@ -32,6 +33,7 @@ export class AuthService {
     private sha256: Sha256Service,
     private menuService: MenuService,
     private http: HttpClient,
+    private dialog: MatDialog,
   ) {
     // Restaurar sesión desde sessionStorage
     const token = sessionStorage.getItem('token');
@@ -497,6 +499,12 @@ export class AuthService {
   public async performLogoutProcess(
     progressCallback: (message: string) => void,
   ): Promise<void> {
+    // Lo primero: quitar de encima cualquier capa abierta (diálogos Material,
+    // avisos de SweetAlert2). Si no, el usuario ve el modal sobre la pantalla
+    // de cierre de sesión —los overlays viven en <body>, fuera del router— y
+    // un diálogo con `disableClose` (p. ej. el de TOTP) nunca se cerraría.
+    this.cerrarCapasSuperpuestas();
+
     try {
       progressCallback('Cerrando conexiones en tiempo real...');
       await this.delay(300);
@@ -515,6 +523,9 @@ export class AuthService {
 
       progressCallback('¡Hasta pronto!');
       await this.delay(1200);
+      // Segunda pasada: nada abierto durante la secuencia puede sobrevivir al
+      // cambio de ruta (login, avisos de inactividad, etc.).
+      this.cerrarCapasSuperpuestas();
       this.router.navigate(['/login']);
     }
   }
@@ -589,11 +600,48 @@ export class AuthService {
    * Limpiar sesión
    */
   clearSession(): void {
+    // Defensa: cualquier ruta que destruya la sesión (logout explícito, 401,
+    // token inválido) debe dejar la pantalla limpia de diálogos Material.
+    // Los avisos de SweetAlert2 no se tocan aquí: hay flujos que limpian la
+    // sesión y aun así muestran un aviso de éxito (cambio de contraseña).
+    this.cerrarDialogos();
+
     this.currentUser.set(null);
     this.tempAuthToken = '';
     this.menuService.clearMenu();
     sessionStorage.clear();
     localStorage.clear();
+  }
+
+  /**
+   * Cierra las capas superpuestas al finalizar la sesión:
+   * diálogos Material + avisos de SweetAlert2.
+   */
+  private cerrarCapasSuperpuestas(): void {
+    this.cerrarDialogos();
+
+    try {
+      if (Swal.isVisible()) {
+        Swal.close();
+      }
+    } catch (error) {
+      console.warn('[AuthService] No se pudo cerrar SweetAlert2:', error);
+    }
+  }
+
+  /**
+   * Cierra los diálogos de Angular Material, incluidos los abiertos con
+   * `disableClose` (el de TOTP), y libera el scroll bloqueado por el overlay.
+   * Los overlays se montan en `<body>`, así que cambiar de ruta no los elimina.
+   */
+  private cerrarDialogos(): void {
+    try {
+      this.dialog.closeAll();
+    } catch (error) {
+      console.warn('[AuthService] No se pudieron cerrar los diálogos:', error);
+    }
+
+    document.body.classList.remove('cdk-global-scrollblock');
   }
 
   /**

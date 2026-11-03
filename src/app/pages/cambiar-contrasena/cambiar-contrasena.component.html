@@ -125,60 +125,27 @@
       ></mat-slide-toggle>
     </div>
 
-    @if (showTotpSection()) {
-      <mat-divider class="totp-divider"></mat-divider>
-
-      <div class="totp-body">
-        <div class="alert light-info-alert">
-          <mat-icon>help</mat-icon>
-          <small>
-            Para mayor seguridad, active la autenticación de dos factores. Escanee el código QR con una
-            aplicación como Google Authenticator, Authy o similar.
-          </small>
-        </div>
-
-        <div class="totp-qr-row">
-          <div class="qr-area">
-            @if (generatingQr()) {
-              <div class="qr-placeholder">
-                <mat-spinner diameter="28"></mat-spinner>
-                <small>Generando código...</small>
-              </div>
-            } @else if (totpQrCodeUrl()) {
-              <img [src]="totpQrCodeUrl()" alt="Código QR TOTP" class="qr-image" />
-            } @else {
-              <div class="qr-placeholder">
-                <mat-icon>qr_code</mat-icon>
-                <small>Sin código QR</small>
-              </div>
-            }
-          </div>
-
-          <div class="qr-info">
-            <p class="muted">Si no puede escanear el código, ingrese manualmente la siguiente clave en su aplicación de autenticación:</p>
-            <div class="secret-box">
-              <input
-                type="text"
-                readonly
-                [value]="totpSecret()"
-                placeholder="Clave secreta..."
-              />
-              <button
-                mat-icon-button
-                color="primary"
-                (click)="copyTotpSecret()"
-                [disabled]="!totpSecret()"
-                matTooltip="Copiar clave"
-              >
-                <mat-icon>{{ isTotpSecretCopied() ? 'check' : 'content_copy' }}</mat-icon>
-              </button>
-            </div>
-            @if (isTotpSecretCopied()) {
-              <small class="copied-msg">¡Clave copiada!</small>
-            }
-          </div>
-        </div>
+    <!-- Estado actual: el flujo (QR, verificación y baja) vive en el diálogo -->
+    <div class="totp-estado" [class.totp-estado--activa]="isTotpActive()">
+      <mat-icon>{{ isTotpActive() ? 'verified_user' : 'gpp_maybe' }}</mat-icon>
+      <div>
+        <strong>
+          {{
+            isTotpActive()
+              ? 'Verificación en dos pasos activada'
+              : 'Verificación en dos pasos desactivada'
+          }}
+        </strong>
+        <small>
+          @if (isTotpActive()) {
+            Al iniciar sesión deberá ingresar, además de su contraseña, el código de 6 dígitos que
+            genera su aplicación de autenticación. Para desactivarla se le pedirá ese mismo código.
+          } @else {
+            Active la verificación para proteger su cuenta con un código temporal generado en su
+            teléfono. Se le guiará paso a paso.
+          }
+        </small>
       </div>
-    }
+    </div>
   </mat-card-content>
 </mat-card>

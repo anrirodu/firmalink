@@ -8,13 +8,17 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatDialog } from '@angular/material/dialog';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../auth/services/auth.service';
 import { UsuarioToken } from '../../auth/interfaces/auth.interfaces';
+import {
+  TotpDialogData,
+  TotpDialogResult,
+  TotpDosFactoresDialog,
+} from './totp-dos-factores.dialog';
 
 @Component({
   selector: 'app-cambiar-contrasena',
@@ -29,8 +33,6 @@ import { UsuarioToken } from '../../auth/interfaces/auth.interfaces';
     MatProgressSpinnerModule,
     MatCardModule,
     MatSlideToggleModule,
-    MatDividerModule,
-    MatTooltipModule,
   ],
   templateUrl: './cambiar-contrasena.component.html',
   styleUrls: ['./cambiar-contrasena.component.scss'],
@@ -68,13 +70,10 @@ export class CambiarContrasenaComponent implements OnInit, OnDestroy {
   passwordStrengthColor = signal('');
   isFuerte = signal(false);
 
-  // ── TOTP (misma lógica que consola navbar.component) ──
-  showTotpSection = signal(false);
-  totpQrCodeUrl = signal('');
+  // ── TOTP — el flujo completo vive en `TotpDosFactoresDialog` ──
+  /** Secreto vigente del usuario (vacío si no tiene 2FA). Nunca se persiste. */
   totpSecret = signal('');
-  isTotpSecretCopied = signal(false);
   isTotpActive = signal(false);
-  generatingQr = signal(false);
 
   private _unsubscribeAll = new Subject<void>();
   private usuario = '';
@@ -82,6 +81,7 @@ export class CambiarContrasenaComponent implements OnInit, OnDestroy {
 
   public authService = inject(AuthService);
   private router = inject(Router);
+  private dialog = inject(MatDialog);
 
   ngOnInit(): void {
     // Obtener el usuario y datos TOTP desde el token (igual que consola accionesGenerales)
@@ -105,22 +105,18 @@ export class CambiarContrasenaComponent implements OnInit, OnDestroy {
           : !!(this.tokenData?.token && this.tokenData.token !== '');
 
       if (activo) {
-        this.showTotpSection.set(true);
         this.isTotpActive.set(true);
 
         if (secretoJwt) {
+          // El secreto vive sólo en el JWT y en memoria: se usa para validar
+          // el código cuando el usuario decida desactivar la verificación.
           this.totpSecret.set(secretoJwt);
-          // Mostrar siempre el QR correspondiente al secreto ya configurado,
-          // SIN regenerarlo (regenerar rotaría la clave y rompería la app de
-          // autenticación del usuario).
-          this.cargarQrExistente(secretoJwt);
         } else {
           // Se activó en esta pestaña y el JWT no se re-emitió: se recupera
           // el secreto desde el backend sin exponerlo en sessionStorage.
           this.authService.consultarSecretoTotp().subscribe((enBd) => {
             if (enBd) {
               this.totpSecret.set(enBd);
-              this.cargarQrExistente(enBd);
             }
           });
         }
@@ -201,191 +197,63 @@ export class CambiarContrasenaComponent implements OnInit, OnDestroy {
 
   // ───────────────────────── TOTP ─────────────────────────
   /**
-   * Activa / desactiva el TOTP enviando la petición `_SYS_UUserTOTP`:
-   *  - AL ACTIVAR  → se envía el VALOR (secreto) y siempre se muestra el QR.
-   *  - AL DESACTIVAR → se envía cadena VACÍA.
-   */
-  toggleTotp(event: any): void {
-    const isChecked = !!event?.checked;
-
-    if (isChecked) {
-      this.activarTotp();
-    } else {
-      this.desactivarTotp();
-    }
-  }
-
-  /**
-   * Activa el TOTP: genera un secreto nuevo + imagen QR, la muestra siempre
-   * y persiste el valor en backend vía `_SYS_UUserTOTP`.
+   * Abre el diálogo de verificación en dos pasos.
    *
-   * MISMO COMPORTAMIENTO QUE v2consola (navbar): al generar se pinta el QR y
-   * se guarda el secreto en memoria; NO se llama a `_SYS_UUserTOTP` al activar
-   * (solo `/wusuario/gtotp` ya lo persiste). La llamada a `_SYS_UUserTOTP`
-   * ocurre ÚNICAMENTE al desactivar (limpiarTotp).
+   * - Activar: confirmación + instrucciones + QR + comprobación del código.
+   *   El secreto sólo se guarda en `usuario.token` (`ccoleccion`) cuando el
+   *   usuario supera la verificación; cancelar antes deja la cuenta tal como
+   *   estaba.
+   * - Desactivar: exige el código TOTP vigente antes de limpiar el secreto
+   *   (`_SYS_UUserTOTP`).
    */
-  activarTotp(): void {
-    this.showTotpSection.set(true);
-    this.isTotpActive.set(true);
-    this.generatingQr.set(true);
-    this.totpQrCodeUrl.set('');
-    this.totpSecret.set('');
-
-    this.authService.generarTotpQr().subscribe({
-      next: (data) => {
-        if (!this.isTotpActive()) {
-          this.generatingQr.set(false);
-          return;
-        }
-
-        const qr = data?.contenido || '';
-        const secreto = data?.msj || '';
-
-        if (!qr || !secreto) {
-          this.activacionFallida('No se pudo generar el código QR.');
-          return;
-        }
-
-        this.totpQrCodeUrl.set(qr);
-        this.totpSecret.set(secreto);
-        this.generatingQr.set(false);
-
-        this.guardarEstadoTotp('1');
-        this.alertMini('success', 'Autenticación de dos factores activada.');
-      },
-      error: () => this.activacionFallida('No se pudo generar el código QR.'),
-    });
-  }
-
-  /**
-   * Desactiva el TOTP vía `_SYS_UUserTOTP`.
-   *
-   * Intentos de parámetro (como la consola `navbar.component.ts:700`, gdoc y
-   * sssifanb envían el secreto actual):
-   *   1º el secreto actual  →  2º cadena vacía.
-   * Un intento se descarta cuando responde `MatchedCount: 0` (la función no
-   * localizó el registro con ese parámetro); eso no lanza error porque el
-   * motor de funciones responde HTTP 200, por eso se inspecciona la respuesta.
-   * Al final se contrasta contra BD con `_SYS_CUserPanelLogin`.
-   */
-  desactivarTotp(): void {
-    this.showTotpSection.set(false);
-    this.isTotpActive.set(false);
-
-    const secreto = this.totpSecret();
-    const intentos = secreto ? [secreto, ''] : [''];
-
-    this.probarDesactivacion(intentos, 0, undefined);
-  }
-
-  /**
-   * Envía los intentos en orden; cada uno se contrasta con BD antes de pasar
-   * al siguiente.
-   */
-  private probarDesactivacion(intentos: string[], i: number, ultimoError?: string): void {
-    if (i >= intentos.length) {
-      this.desactivacionFallida(ultimoError);
+  toggleTotp(event: MatSlideToggleChange): void {
+    const deseaActivar = event.checked;
+    if (deseaActivar === this.isTotpActive()) {
       return;
     }
 
-    this.authService.actualizarTotp(intentos[i]).subscribe({
-      next: (data) => {
-        const matched =
-          data && typeof data.MatchedCount === 'number' ? data.MatchedCount : null;
+    const data: TotpDialogData = {
+      modo: deseaActivar ? 'activar' : 'desactivar',
+      secreto: deseaActivar ? '' : this.totpSecret(),
+    };
 
-        // MatchedCount 0 → probado y no matcheó: intento siguiente.
-        if (matched === 0 && i + 1 < intentos.length) {
-          this.probarDesactivacion(intentos, i + 1);
-          return;
-        }
-
-        this.verificarDesactivacion(intentos, i, matched);
+    const ref = this.dialog.open<TotpDosFactoresDialog, TotpDialogData, TotpDialogResult>(
+      TotpDosFactoresDialog,
+      {
+        width: 'min(96vw, 720px)',
+        maxWidth: '96vw',
+        maxHeight: '92vh',
+        autoFocus: false,
+        disableClose: true,
+        panelClass: 'totp-dialog-panel',
+        data,
       },
-      error: (err) => {
-        if (i + 1 < intentos.length) {
-          this.probarDesactivacion(intentos, i + 1, err?.message);
-          return;
-        }
-        this.desactivacionFallida(err?.message || ultimoError);
-      },
-    });
-  }
-
-  /**
-   * Contraste final con BD (`_SYS_CUserPanelLogin` → campo `token`):
-   *  - `''`  → borrado confirmado.
-   *  - cadena→ sigue ahí → siguiente intento o fallo.
-   *  - null  → la función no expone `token` → se decide con `MatchedCount`.
-   */
-  private verificarDesactivacion(intentos: string[], i: number, matched: number | null): void {
-    this.authService.consultarSecretoTotp().subscribe((enBd) => {
-      if (enBd === '') {
-        this.limpiarTotpLocal();
-        this.alertMini('success', 'Autenticación de dos factores desactivada.');
-        return;
-      }
-
-      if (enBd === null) {
-        if (matched === 0) {
-          // Nada fue modificado: se conserva el estado real (encendido).
-          this.restaurarTotpActivo();
-          this.alertMini(
-            'error',
-            'La función no encontró su registro (MatchedCount 0): el secreto NO se borró.',
-          );
-          return;
-        }
-        this.limpiarTotpLocal();
-        this.alertMini(
-          'warning',
-          'Desactivación enviada, pero el servidor no confirmó que el secreto quedó borrado.',
-        );
-        return;
-      }
-
-      // El secreto sigue en BD → probar con el siguiente parámetro.
-      if (i + 1 < intentos.length) {
-        this.probarDesactivacion(intentos, i + 1);
-        return;
-      }
-
-      this.restaurarTotpActivo();
-      this.alertMini(
-        'error',
-        matched === 0
-          ? 'La función no encontró su registro (MatchedCount 0): el secreto sigue en la base de datos.'
-          : 'El servidor no borró el secreto TOTP. Verifique la función _SYS_UUserTOTP.',
-      );
-    });
-  }
-
-  /**
-   * Fallo de la llamada: se restaura el interruptor y se avisa.
-   */
-  private desactivacionFallida(msg?: string): void {
-    this.restaurarTotpActivo();
-    this.alertMini(
-      'error',
-      this.msjCorto(msg) || 'No se pudo desactivar la verificación en dos factores.',
     );
-  }
 
-  /**
-   * Restaura el interruptor en ON (el backend no aceptó el cambio).
-   */
-  private restaurarTotpActivo(): void {
-    this.showTotpSection.set(true);
-    this.isTotpActive.set(true);
-  }
+    ref
+      .afterClosed()
+      .pipe(takeUntil(this._unsubscribeAll))
+      .subscribe((resultado) => {
+        if (!resultado) {
+          // Cancelado: el interruptor vuelve a reflejar el estado real. El
+          // binding [checked] no se re-aplica porque el valor no cambió.
+          event.source.checked = this.isTotpActive();
+          return;
+        }
 
-  /**
-   * Limpia el QR/ secreto y deja marcada la sesión como "TOTP desactivado".
-   */
-  private limpiarTotpLocal(): void {
-    this.totpQrCodeUrl.set('');
-    this.totpSecret.set('');
-    this.generatingQr.set(false);
-    this.guardarEstadoTotp('0');
+        if (resultado.secreto) {
+          this.totpSecret.set(resultado.secreto);
+          this.isTotpActive.set(true);
+          this.guardarEstadoTotp('1');
+          this.alertMini('success', 'Verificación en dos pasos activada.');
+          return;
+        }
+
+        this.totpSecret.set('');
+        this.isTotpActive.set(false);
+        this.guardarEstadoTotp('0');
+        this.alertMini('success', 'Verificación en dos pasos desactivada.');
+      });
   }
 
   /**
@@ -396,61 +264,6 @@ export class CambiarContrasenaComponent implements OnInit, OnDestroy {
    */
   private guardarEstadoTotp(activo: '0' | '1'): void {
     sessionStorage.setItem('totp', activo);
-  }
-
-  /**
-   * Acorta el mensaje del servidor para el toast.
-   */
-  private msjCorto(msg?: string): string {
-    const m = (msg || '').trim();
-    if (!m) return '';
-    return m.length > 110 ? m.slice(0, 107) + '…' : m;
-  }
-
-  /**
-   * Fallo al activar: se revierte el interruptor y se limpia la sección.
-   */
-  private activacionFallida(mensaje: string): void {
-    this.generatingQr.set(false);
-    this.totpQrCodeUrl.set('');
-    this.totpSecret.set('');
-    this.showTotpSection.set(false);
-    this.isTotpActive.set(false);
-    this.alertMini('error', mensaje);
-  }
-
-  /**
-   * Obtiene la imagen QR del secreto YA configurado, sin regenerarlo.
-   * (`/wusuario/gtotp/base64` crea un secreto nuevo en cada llamada).
-   */
-  private cargarQrExistente(secret: string): void {
-    this.generatingQr.set(true);
-
-    this.authService.getImagenQr(secret).subscribe({
-      next: (data) => {
-        this.totpQrCodeUrl.set(data?.contenido || '');
-        this.generatingQr.set(false);
-      },
-      error: () => {
-        this.totpQrCodeUrl.set('');
-        this.generatingQr.set(false);
-      },
-    });
-  }
-
-  /**
-   * Copia la clave secreta de TOTP al portapapeles.
-   */
-  copyTotpSecret(): void {
-    if (!this.totpSecret()) return;
-
-    navigator.clipboard.writeText(this.totpSecret()).then(() => {
-      this.isTotpSecretCopied.set(true);
-      setTimeout(() => this.isTotpSecretCopied.set(false), 2500);
-    }).catch(err => {
-      console.error('Error al copiar la clave TOTP:', err);
-      this.alertMini('error', 'No se pudo copiar la clave.');
-    });
   }
 
   /**

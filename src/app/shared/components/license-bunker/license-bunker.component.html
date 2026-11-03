@@ -1,0 +1,32 @@
+<div class="lb-root" [attr.aria-label]="descripcion">
+  <!-- Panel de texto: se despliega al pasar el puntero -->
+  <div class="lb-panel">
+    <div class="lb-text">
+      <div class="lb-linea lb-linea--marca">
+        <span class="lb-marca">
+          Protegido por
+          <button
+            type="button"
+            class="lb-marca__accion"
+            (click)="consultar()"
+            [attr.title]="descripcion"
+            aria-label="Volver a consultar el captcha de licencia"
+          >
+            <strong>BUNKER</strong>
+          </button>
+        </span>
+      </div>
+      <div class="lb-linea lb-linea--legal">
+        <span>Privacidad - Condiciones</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logo circular con el estado de la licencia -->
+  <div class="lb-logo">
+    <div class="lb-aro" [style.border]="'2px solid ' + colorAro" [attr.title]="descripcion">
+      <img src="assets/images/bunker.webp" alt="Bunker Technologies Solutions" />
+      <div class="lb-badge" [style.background]="badge.color">{{ badge.simbolo }}</div>
+    </div>
+  </div>
+</div>

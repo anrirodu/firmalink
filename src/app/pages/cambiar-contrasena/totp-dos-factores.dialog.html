@@ -1,0 +1,388 @@
+<!-- ============================================
+     DIÁLOGO — AUTENTICACIÓN DE DOS FACTORES (TOTP)
+     Activación guiada (confirmar → QR → verificar) y desactivación con código.
+     ============================================ -->
+<div class="td" [class.td--peligro]="esDesactivar()">
+  <!-- Cabecera con degradado de marca -->
+  <header class="td-cabecera">
+    <span class="td-brillo" aria-hidden="true"></span>
+
+    <span class="td-icono">
+      <mat-icon>{{ iconoCabecera() }}</mat-icon>
+    </span>
+
+    <div class="td-titulos">
+      <h2>{{ titulo() }}</h2>
+      @if (subtitulo()) {
+        <p>{{ subtitulo() }}</p>
+      }
+    </div>
+
+    <button
+      mat-icon-button
+      type="button"
+      class="td-cerrar"
+      aria-label="Cerrar"
+      [disabled]="verificando()"
+      (click)="cerrar()"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <!-- Indicador de pasos (sólo activación) -->
+  @if (!esDesactivar() && paso() !== 'listo') {
+    <ol class="td-pasos" aria-label="Pasos de la activación">
+      <li [class.activo]="indicePaso() === 0" [class.hecho]="indicePaso() > 0">
+        <span class="td-paso-punto">
+          @if (indicePaso() > 0) {
+            <mat-icon>check</mat-icon>
+          } @else {
+            1
+          }
+        </span>
+        <span class="td-paso-texto">Confirmar</span>
+      </li>
+      <li [class.activo]="indicePaso() === 1" [class.hecho]="indicePaso() > 1">
+        <span class="td-paso-punto">
+          @if (indicePaso() > 1) {
+            <mat-icon>check</mat-icon>
+          } @else {
+            2
+          }
+        </span>
+        <span class="td-paso-texto">Escanear</span>
+      </li>
+      <li [class.activo]="indicePaso() === 2">
+        <span class="td-paso-punto">3</span>
+        <span class="td-paso-texto">Verificar</span>
+      </li>
+    </ol>
+  }
+
+  <div class="td-cuerpo">
+    @switch (paso()) {
+      <!-- ══════════ PASO 1 — CONFIRMACIÓN E INSTRUCCIONES ══════════ -->
+      @case ('intro') {
+        <div class="td-aviso">
+          <mat-icon>help_outline</mat-icon>
+          <div>
+            <strong>¿Está seguro de que desea activar la verificación en dos pasos?</strong>
+            <p>
+              A partir de ahora, cada inicio de sesión pedirá su contraseña <em>y</em> un código
+              temporal de 6 dígitos generado en su teléfono.
+            </p>
+          </div>
+        </div>
+
+        <ol class="td-instrucciones">
+          <li>
+            <span class="td-num">1</span>
+            <div class="td-instruccion">
+              <h3>Descargue una aplicación de autenticación</h3>
+              <p>
+                Instale <strong>Google Authenticator</strong>, Authy o Microsoft Authenticator desde
+                la tienda de su teléfono.
+              </p>
+              <div class="td-tiendas">
+                <a
+                  class="td-tienda td-tienda--apple"
+                  href="https://apps.apple.com/app/google-authenticator/id388497605"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Descargar Google Authenticator en el App Store de Apple"
+                >
+                  <img src="assets/images/app-store.svg" alt="Descargar en el App Store" />
+                </a>
+                <a
+                  class="td-tienda td-tienda--android"
+                  href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Descargar Google Authenticator en Google Play"
+                >
+                  <img src="assets/images/play-store.svg" alt="Disponible en Google Play" />
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <span class="td-num">2</span>
+            <div class="td-instruccion">
+              <h3>Abra la aplicación</h3>
+              <p>
+                Pulse el botón «+» o «Añadir cuenta» y elija la opción
+                <strong>«Escanear código QR»</strong>.
+              </p>
+            </div>
+          </li>
+
+          <li>
+            <span class="td-num">3</span>
+            <div class="td-instruccion">
+              <h3>Escanee el código y confirme</h3>
+              <p>
+                En el siguiente paso verá el código QR. Escanéelo y escriba aquí el código de 6
+                dígitos que mostrará la aplicación para confirmar que todo quedó bien configurado.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <p class="td-nota">
+          <mat-icon>info</mat-icon>
+          <span>
+            Si cambia o pierde su teléfono necesitará la clave secreta para recuperar el acceso.
+            Guárdela en un lugar seguro.
+          </span>
+        </p>
+      }
+
+      <!-- ══════════ PASO 2 — CÓDIGO QR Y CLAVE MANUAL ══════════ -->
+      @case ('configurar') {
+        <div class="td-qr-grid">
+          <div class="td-qr">
+            @if (cargandoQr()) {
+              <div class="td-qr-cargando">
+                <mat-spinner diameter="34"></mat-spinner>
+                <small>Generando código QR…</small>
+              </div>
+            } @else if (qrUrl()) {
+              <img [src]="qrUrl()" alt="Código QR para configurar la aplicación de autenticación" />
+            } @else {
+              <div class="td-qr-vacio">
+                <mat-icon>qr_code_2</mat-icon>
+                <small>Sin código QR</small>
+              </div>
+            }
+          </div>
+
+          <div class="td-qr-info">
+            <h3>Escanee este código</h3>
+            <p>
+              Abra su aplicación de autenticación, pulse «+» y apunte la cámara a este código QR.
+            </p>
+
+            <mat-divider class="td-separador"></mat-divider>
+
+            <h3>¿No puede escanearlo?</h3>
+            <p>
+              Copie esta clave y péguela en la aplicación con la opción
+              <strong>«Introducir clave de configuración»</strong>.
+            </p>
+
+            <div class="td-clave">
+              <code>{{ secretoFormateado() }}</code>
+              <button
+                mat-icon-button
+                type="button"
+                color="primary"
+                [disabled]="!secreto()"
+                [matTooltip]="copiado() ? 'Clave copiada' : 'Copiar clave'"
+                (click)="copiarSecreto()"
+              >
+                <mat-icon>{{ copiado() ? 'check' : 'content_copy' }}</mat-icon>
+              </button>
+            </div>
+
+            @if (copiado()) {
+              <small class="td-copiado">Clave copiada al portapapeles</small>
+            }
+
+            <small class="td-hint">Tipo de clave: TOTP · 6 dígitos · 30 segundos.</small>
+          </div>
+        </div>
+
+        @if (error()) {
+          <p class="td-error" role="alert">
+            <mat-icon>error</mat-icon>
+            <span>{{ error() }}</span>
+            @if (!cargandoQr() && !qrUrl()) {
+              <button mat-button type="button" color="primary" (click)="generarQr()">
+                Reintentar
+              </button>
+            }
+          </p>
+        }
+      }
+
+      <!-- ══════════ PASO 3 — VERIFICACIÓN DEL CÓDIGO ══════════ -->
+      @case ('verificar') {
+        <div class="td-verificacion">
+          <p class="td-verificacion-texto">
+            Escriba el código de <strong>6 dígitos</strong> que muestra su aplicación para confirmar
+            que la configuración quedó bien hecha.
+          </p>
+
+          <label class="td-etiqueta" for="td-otp">Código de verificación</label>
+          <input
+            id="td-otp"
+            class="td-otp"
+            [class.td-otp--error]="!!error()"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            placeholder="000000"
+            [value]="codigo()"
+            (input)="onCodigo($event)"
+          />
+
+          <small class="td-hint">
+            El código cambia cada 30 segundos. El actual vence en {{ segundos() }} s.
+          </small>
+
+          @if (error()) {
+            <p class="td-error" role="alert">
+              <mat-icon>error</mat-icon>
+              <span>{{ error() }}</span>
+            </p>
+          }
+        </div>
+      }
+
+      <!-- ══════════ DESACTIVACIÓN ══════════ -->
+      @case ('desactivar') {
+        <div class="td-aviso td-aviso--peligro">
+          <mat-icon>warning</mat-icon>
+          <div>
+            <strong>¿Está seguro de que desea desactivar la verificación en dos pasos?</strong>
+            <p>
+              Su cuenta quedará protegida únicamente por la contraseña. Para confirmarlo, escriba el
+              código de 6 dígitos que muestra su aplicación.
+            </p>
+          </div>
+        </div>
+
+        <div class="td-verificacion">
+          <label class="td-etiqueta" for="td-otp-baja">Código de verificación</label>
+          <input
+            id="td-otp-baja"
+            class="td-otp"
+            [class.td-otp--error]="!!error()"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            placeholder="000000"
+            [value]="codigo()"
+            (input)="onCodigo($event)"
+          />
+
+          <small class="td-hint">
+            El código cambia cada 30 segundos. El actual vence en {{ segundos() }} s.
+          </small>
+
+          @if (error()) {
+            <p class="td-error" role="alert">
+              <mat-icon>error</mat-icon>
+              <span>{{ error() }}</span>
+            </p>
+          }
+        </div>
+      }
+
+      <!-- ══════════ ÉXITO ══════════ -->
+      @case ('listo') {
+        <div class="td-exito" role="status" aria-live="polite">
+          <svg class="td-check" viewBox="0 0 52 52" aria-hidden="true">
+            <circle cx="26" cy="26" r="24" />
+            <path d="M15 27 l8 8 l15 -17" />
+          </svg>
+
+          <h3>
+            {{ esDesactivar() ? 'Verificación desactivada' : 'Verificación en dos pasos activada' }}
+          </h3>
+          <p>
+            @if (esDesactivar()) {
+              Su cuenta volverá a pedir únicamente la contraseña al iniciar sesión.
+            } @else {
+              Desde ahora, al iniciar sesión se le pedirá el código de 6 dígitos de su aplicación de
+              autenticación.
+            }
+          </p>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Pie con acciones del paso actual -->
+  <footer class="td-pie">
+    @switch (paso()) {
+      @case ('intro') {
+        <button mat-stroked-button type="button" (click)="cerrar()">Cancelar</button>
+        <button mat-flat-button color="primary" type="button" (click)="comenzarConfiguracion()">
+          <mat-icon>arrow_forward</mat-icon>
+          Sí, continuar
+        </button>
+      }
+
+      @case ('configurar') {
+        <button mat-stroked-button type="button" (click)="atras()">Atrás</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          [disabled]="!secreto() || cargandoQr()"
+          (click)="irAVerificar()"
+        >
+          <mat-icon>qr_code_scanner</mat-icon>
+          Ya escaneé el código
+        </button>
+      }
+
+      @case ('verificar') {
+        <button mat-stroked-button type="button" [disabled]="verificando()" (click)="atras()">
+          Atrás
+        </button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          [disabled]="!codigoCompleto() || verificando()"
+          (click)="verificarYActivar()"
+        >
+          @if (verificando()) {
+            <mat-spinner diameter="18" class="td-spinner"></mat-spinner>
+            <span>Verificando…</span>
+          } @else {
+            <ng-container>
+              <mat-icon>verified_user</mat-icon>
+              <span>Activar verificación</span>
+            </ng-container>
+          }
+        </button>
+      }
+
+      @case ('desactivar') {
+        <button mat-stroked-button type="button" [disabled]="verificando()" (click)="cerrar()">
+          Cancelar
+        </button>
+        <button
+          mat-flat-button
+          color="warn"
+          type="button"
+          [disabled]="!codigoCompleto() || verificando() || sinSecreto()"
+          (click)="verificarYDesactivar()"
+        >
+          @if (verificando()) {
+            <mat-spinner diameter="18" class="td-spinner"></mat-spinner>
+            <span>Desactivando…</span>
+          } @else {
+            <ng-container>
+              <mat-icon>lock_open</mat-icon>
+              <span>Desactivar</span>
+            </ng-container>
+          }
+        </button>
+      }
+
+      @case ('listo') {
+        <button mat-flat-button color="primary" type="button" (click)="finalizar()">
+          Entendido
+        </button>
+      }
+    }
+  </footer>
+</div>

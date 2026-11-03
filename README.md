@@ -278,6 +278,7 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `colecciones.FACTURA` | `firmalink_facturas` | Colección de facturas |
 | `colecciones.CALCULO` | `firmalink_calculos` | Colección de cálculos de la calculadora |
 | `colecciones.USER_TASK` | `xxxxxxx` | Tareas de usuario |
+| `colecciones.USUARIO` | `usuario` | Usuarios del sistema (`login`, `clave`, `token` TOTP) |
 
 > **Atención:** en `driver.PRINCIPAL` debe ir el **ID de la conexión** (`MGDBA`), **no** el tipo de
 > driver (`mongodb`). El backend resuelve la conexión por su ID.
@@ -289,7 +290,7 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 | `CONSULTAR_USUARIO_PERFIL` | `_SYS_CUsuarioPerfil` | Perfil del usuario |
 | `CONSULTAR_LOGIN_USUARIO` | `_SYS_CUserPanelLogin` | Inicio de sesión |
 | `ACTUALIZAR_CLAVE_USUARIO` | `_SYS_UUserPanel` | Cambio de contraseña |
-| `ACTUALIZAR_TOTP` | `_SYS_UUserTOTP` | Actualización de TOTP |
+| `ACTUALIZAR_TOTP` | `_SYS_UUserTOTP` | **Baja** del secreto TOTP (deja `usuario.token` vacío) |
 | `CONSULTAR_ACUERDOS` | `_SYS_CFirmaLinkAcuerdos` | Listado liviano de acuerdos |
 | `CONSULTAR_ACUERDOS_CLIENTE` | `_SYS_CFirmaLinkAcuerdosCliente` | Acuerdos de un cliente (`cliente.codigo`) |
 | `CONSULTAR_ACUERDO` | `_SYS_CFirmaLinkAcuerdo` | Detalle completo de un acuerdo |
@@ -312,6 +313,14 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 > `basedatos: firmalink` en `sys-drivers`), no a la del sistema. Ver
 > [Reglas de negocio — Presupuestos](#reglas-de-negocio--presupuestos) y
 > [Menú dinámico](#menú-dinámico).
+>
+> **TOTP (verificación en dos pasos).** `_SYS_UUserTOTP` **no sirve para activar**: su consulta es
+> `{"operacion":"UPDATE","filtro":{"token":"$0"},"datos":{"token":""}}` sobre `usuario`, es decir,
+> localiza al usuario por el secreto y lo **borra**. Por eso la activación se guarda con
+> `POST ccoleccion` (`{coleccion:'usuario', objeto:{token}, donde:{"login":"..."}, upsert:true}`),
+> el mismo mecanismo que usa la recuperación de contraseña para `usuario.clave`, validando
+> `MatchedCount >= 1` en la respuesta. La desactivación sí usa `_SYS_UUserTOTP` con el secreto
+> vigente y se confirma releyendo `usuario.token`.
 
 ### Proxy de desarrollo (`src/proxy.conf.json`)
 

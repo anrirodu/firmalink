@@ -53,7 +53,7 @@ export class ValidadorSeguridadComponent implements OnInit {
   @Input() modo: 'resolver' | 'verificar' = 'verificar';
 
   /** Texto de la marca que se muestra bajo el mensaje principal. */
-  @Input() marca = 'Sandra Server Core • Búnker Technologies Solutions';
+  @Input() marca = 'Búnker Technologies Solutions';
 
   /** Estado visual del control. */
   readonly estado = signal<EstadoValidador>('idle');

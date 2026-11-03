@@ -208,142 +208,68 @@
   }
 }
 
-.totp-divider {
-  margin: 1.25rem 0;
-}
-
-.totp-body {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.alert.light-info-alert {
+/* Estado de la verificación (el flujo completo vive en el diálogo) */
+.totp-estado {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  background: #e3f2fd;
-  border: 1px solid #bbdefb;
-  border-radius: 8px;
-  padding: 0.65rem 0.8rem;
-  margin-bottom: 1.25rem;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(158, 158, 158, 0.08);
+  border: 1px solid rgba(158, 158, 158, 0.28);
 
-  mat-icon {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-    color: #0277bd;
+  > mat-icon {
     flex-shrink: 0;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: #757575;
     margin-top: 1px;
   }
 
-  small {
-    color: #01579b;
-    line-height: 1.35;
-  }
-}
-
-.totp-qr-row {
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.qr-area {
-  width: 168px;
-  height: 168px;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  overflow: hidden;
-  background: #fff;
-}
-
-.qr-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.qr-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  color: #9e9e9e;
-
-  mat-icon {
-    font-size: 42px;
-    width: 42px;
-    height: 42px;
+  strong {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #424242;
+    margin-bottom: 0.1rem;
   }
 
   small {
+    display: block;
     font-size: 0.78rem;
-  }
-}
-
-.qr-info {
-  flex: 1;
-  min-width: 220px;
-
-  .muted {
-    font-size: 0.82rem;
     color: #757575;
-    margin: 0 0 0.5rem;
     line-height: 1.4;
   }
 }
 
-.secret-box {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 0.1rem 0.1rem 0.1rem 0.75rem;
-  background: #fafafa;
+.totp-estado--activa {
+  background: rgba(0, 201, 167, 0.08);
+  border-color: rgba(0, 201, 167, 0.35);
 
-  input {
-    flex: 1;
-    border: none;
-    outline: none;
-    background: transparent;
-    font-size: 0.85rem;
-    color: #424242;
-    font-family: monospace;
-    letter-spacing: 1px;
-    padding: 0.55rem 0;
-    min-width: 0;
+  > mat-icon {
+    color: #00806b;
   }
-}
 
-.copied-msg {
-  display: block;
-  margin-top: 0.45rem;
-  color: #2e7d32;
-  font-weight: 600;
-  font-size: 0.78rem;
+  strong {
+    color: #0c2d48;
+  }
 }
 
 /* ═══════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════ */
 @media (max-width: 480px) {
-  .totp-qr-row {
-    flex-direction: column;
-    align-items: center;
+  .totp-header {
+    align-items: flex-start;
+    gap: 0.6rem;
   }
 
-  .qr-info {
-    width: 100%;
+  .totp-title > mat-icon {
+    font-size: 26px;
+    width: 26px;
+    height: 26px;
   }
 }
 
@@ -400,19 +326,6 @@
     }
   }
 
-  .alert.light-info-alert {
-    background: rgba(0, 121, 189, 0.15);
-    border-color: rgba(0, 121, 189, 0.4);
-
-    mat-icon {
-      color: #4fc3f7;
-    }
-
-    small {
-      color: #a9cbe0;
-    }
-  }
-
   .strength-percent {
     color: #9e9e9e;
   }
@@ -421,22 +334,34 @@
     background: #333;
   }
 
-  .secret-box {
-    background: #242424;
-    border-color: #333;
+  .totp-estado {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
 
-    input {
+    > mat-icon {
+      color: #9e9e9e;
+    }
+
+    strong {
       color: #e0e0e0;
+    }
+
+    small {
+      color: #b0b0b0;
     }
   }
 
-  .qr-area {
-    background: #1e1e1e;
-    border-color: #333;
-  }
+  .totp-estado--activa {
+    background: rgba(0, 201, 167, 0.1);
+    border-color: rgba(0, 201, 167, 0.35);
 
-  .qr-info .muted {
-    color: #9e9e9e;
+    > mat-icon {
+      color: #4ee1c8;
+    }
+
+    strong {
+      color: #ffffff;
+    }
   }
 
   /* Botón Guardar: destacado (cian FirmaLink) en tema oscuro */

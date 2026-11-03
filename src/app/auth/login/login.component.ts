@@ -23,6 +23,7 @@ import { AccesoBienvenidaComponent } from '../../shared/components/acceso-bienve
 import {
   ValidadorSeguridadComponent,
 } from '../../shared/components/validador-seguridad/validador-seguridad.component';
+import { LicenseBunkerComponent } from '../../shared/components/license-bunker/license-bunker.component';
 import { environment } from '../../../environments/environment';
 import { CONFIG } from '../../config';
 
@@ -54,6 +55,7 @@ const DURACION_ALTO = 320;
     IsotipoAnimadoComponent,
     AccesoBienvenidaComponent,
     ValidadorSeguridadComponent,
+    LicenseBunkerComponent,
     RouterLink,
   ],
   templateUrl: './login.component.html',
