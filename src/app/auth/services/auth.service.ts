@@ -27,6 +27,13 @@ export class AuthService {
 
   private tempAuthToken = '';
 
+  /**
+   * Hidratación en curso. `canActivate` y `canActivateChild` pueden dispararse
+   * a la vez en la primera navegación; ambos comparten la misma promesa para
+   * no pedir el perfil dos veces.
+   */
+  private hidratacion: { token: string; promesa: Promise<boolean> } | null = null;
+
   constructor(
     private router: Router,
     private apiService: ApiService,
@@ -50,6 +57,46 @@ export class AuthService {
         });
         this.menuService.loadMenu();
       }
+    }
+  }
+
+  /**
+   * Restaura la sesión antes de la primera navegación.
+   *
+   * Si el contenedor inyectó un token, el JWT no trae el menú y hay que pedir
+   * el perfil aquí, no en el guard: así el router no pasa por /login (y el
+   * LoginComponent no redirige a /dashboard) antes de que la sesión esté
+   * completa. Sin token, o con menú y huella ya presentes, no hace red.
+   */
+  async restaurarSesionInicial(): Promise<void> {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+
+    const payload = this.getUserDecrypt(token);
+    if (!payload?.Usuario) {
+      sessionStorage.removeItem('token');
+      sessionStorage.setItem('token_failed', token);
+      return;
+    }
+
+    // Token vencido: se descarta sin llamar a la API (evita el modal de sesión
+    // expirada del interceptor en el arranque).
+    if (payload.exp && payload.exp * 1000 <= Date.now()) {
+      this.currentUser.set(null);
+      sessionStorage.removeItem('token');
+      sessionStorage.setItem('token_failed', token);
+      return;
+    }
+
+    const menu = sessionStorage.getItem('menu');
+    const crypt = sessionStorage.getItem('crypt');
+    if (menu && crypt) return;
+
+    const hidratada = await this.hidratarSesion(token);
+    if (!hidratada) {
+      this.currentUser.set(null);
+      sessionStorage.clear();
+      sessionStorage.setItem('token_failed', token);
     }
   }
 
@@ -185,6 +232,12 @@ export class AuthService {
     // Guardar token
     sessionStorage.setItem('token', token);
 
+    // Un login manual invalida cualquier marca de token fallido inyectado por
+    // el contenedor y el menú/huella de la sesión anterior.
+    sessionStorage.removeItem('token_failed');
+    sessionStorage.removeItem('menu');
+    sessionStorage.removeItem('crypt');
+
     // El token recién emitido es la fuente autoritativa del estado TOTP:
     // se descarta el marcador de conmutación de la sesión anterior.
     sessionStorage.removeItem('totp');
@@ -217,9 +270,258 @@ export class AuthService {
   }
 
   /**
-   * Obtener perfil de usuario y menú desde la API
+   * Completa una sesión que llegó desde el contenedor de escritorio.
+   *
+   * El token que inyecta el contenedor (`wusuario/loginPC`) no trae el menú:
+   * `ValidarV2` proyecta fuera `Aplicacion.Rol`. Por eso, si falta el menú o
+   * su huella, hay que pedir el perfil a la API antes de dejar pasar al
+   * `authGuardGuard`. Devuelve `false` si el token no es válido, no incluye
+   * esta aplicación o el perfil no se pudo cargar.
    */
-  private async obtenerPerfil(itk: string): Promise<void> {
+  hidratarSesion(token: string): Promise<boolean> {
+    if (this.hidratacion?.token === token) {
+      return this.hidratacion.promesa;
+    }
+
+    let promesa: Promise<boolean>;
+    promesa = this.completarSesionDesdeToken(token).finally(() => {
+      if (this.hidratacion?.promesa === promesa) {
+        this.hidratacion = null;
+      }
+    });
+
+    this.hidratacion = { token, promesa };
+    return promesa;
+  }
+
+  private async completarSesionDesdeToken(token: string): Promise<boolean> {
+    const payload = this.getUserDecrypt(token);
+    if (!payload?.Usuario) return false;
+    if (payload.exp && payload.exp * 1000 <= Date.now()) return false;
+    if (!this.tieneAccesoAplicacion(payload)) return false;
+
+    // La API genérica (`Ejecutar`) toma el token de sessionStorage.
+    sessionStorage.setItem('token', token);
+
+    if (!this.currentUser()) {
+      this.currentUser.set({
+        id: payload.Usuario.cedula,
+        nombre: payload.Usuario.nombre,
+        email: payload.Usuario.correo,
+        rol: payload.Usuario.Perfil?.descripcion || 'Usuario',
+        cedula: payload.Usuario.cedula,
+        sistema: payload.Usuario.sistema,
+      });
+    }
+
+    const menu = sessionStorage.getItem('menu');
+    const crypt = sessionStorage.getItem('crypt');
+
+    // Menú y huella presentes: se respeta la verificación de integridad del
+    // guard. Si no coinciden, NO se recarga el perfil (sería una alteración).
+    if (menu && crypt) {
+      if (huellaMenu(menu) !== crypt) return false;
+      this.menuService.loadMenu();
+      return true;
+    }
+
+    // Falta el menú (token del contenedor) o se perdió la huella: se pide el
+    // perfil sin avisos, porque el guard decide qué mostrar.
+    try {
+      await this.obtenerPerfil(token, true);
+      sessionStorage.removeItem('token_failed');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Selecciona, dentro de la respuesta de `_SYS_CUsuarioPerfil`, el registro
+   * del usuario autenticado y la aplicación configurada en `environment.ID`.
+   *
+   * La API puede devolver varias aplicaciones para un mismo usuario (e
+   * incluso varios registros si comparte cédula entre sistemas). Usar
+   * `data[0].Aplicacion[0]` cargaba el menú de la primera aplicación, no
+   * necesariamente FirmaLink. Aquí se cruzan los datos del JWT con la
+   * respuesta para escoger el perfil y la aplicación correctos.
+   */
+  private seleccionarAplicacionDelPerfil(
+    data: any,
+    payload: TokenPayload,
+  ): Aplicacion {
+    const perfiles = Array.isArray(data) ? data : data ? [data] : [];
+    if (perfiles.length === 0) {
+      throw new Error('La respuesta del perfil de usuario está vacía');
+    }
+
+    const normalizar = (valor: unknown): string =>
+      String(valor ?? '').trim().toLowerCase();
+
+    const leer = (objeto: any, ...claves: string[]): unknown => {
+      for (const clave of claves) {
+        if (objeto?.[clave] !== undefined && objeto?.[clave] !== null) {
+          return objeto[clave];
+        }
+      }
+      return undefined;
+    };
+
+    const leerPerfil = (perfil: any, ...claves: string[]): unknown =>
+      leer(perfil, ...claves) ??
+      leer(perfil?.usuario ?? perfil?.Usuario, ...claves);
+
+    const leerRol = (app: any): unknown =>
+      leer(app, 'Rol', 'rol') ??
+      leer(leer(app, 'idper', 'idPer') as any, 'Rol', 'rol');
+
+    const leerAppIds = (app: any): string[] => {
+      const ids: string[] = [];
+
+      const directo = leer(app, 'id', 'Id', 'ID', 'idAplicacion');
+      if (directo !== undefined) ids.push(normalizar(directo));
+
+      // Algunas vistas devuelven la aplicación anidada en `idapp` y dejan
+      // `id` como el identificador de la asignación usuario-aplicación.
+      const idapp = leer(app, 'idapp', 'idApp');
+      if (idapp && typeof idapp === 'object') {
+        const anidado = leer(idapp as any, 'id', 'Id', 'ID');
+        if (anidado !== undefined) ids.push(normalizar(anidado));
+      } else if (idapp !== undefined) {
+        ids.push(normalizar(idapp));
+      }
+
+      return ids;
+    };
+
+    const usuario = payload.Usuario;
+    const sistemaToken = normalizar(usuario.sistema);
+    const cedulaToken = normalizar(usuario.cedula);
+    const correoToken = normalizar(usuario.correo);
+    const loginToken = normalizar(usuario.usuario);
+
+    const puntuarPerfil = (perfil: any): number => {
+      const cedula = normalizar(
+        leerPerfil(perfil, 'cedula', 'Cedula', 'documento', 'identificacion'),
+      );
+      const sistema = normalizar(leerPerfil(perfil, 'sistema', 'Sistema'));
+      const correo = normalizar(
+        leerPerfil(perfil, 'correo', 'Correo', 'email'),
+      );
+      const login = normalizar(
+        leerPerfil(perfil, 'usuario', 'Usuario', 'login', 'nombreUsuario'),
+      );
+
+      let puntaje = 0;
+      if (cedulaToken && cedula === cedulaToken) puntaje += 4;
+      if (sistemaToken && sistema === sistemaToken) puntaje += 2;
+      if (correoToken && correo === correoToken) puntaje += 2;
+      if (loginToken && login === loginToken) puntaje += 1;
+      return puntaje;
+    };
+
+    // Con un solo registro no hay ambigüedad: la consulta ya filtró por
+    // cédula/sistema/correo. Con varios, se exige coincidencia con el JWT.
+    const perfil =
+      perfiles.length === 1
+        ? perfiles[0]
+        : perfiles
+            .map((candidato) => ({
+              candidato,
+              puntaje: puntuarPerfil(candidato),
+            }))
+            .sort((a, b) => b.puntaje - a.puntaje)
+            .find(({ puntaje }) => puntaje > 0)?.candidato;
+
+    if (!perfil) {
+      throw new Error(
+        'El perfil devuelto no corresponde al usuario autenticado',
+      );
+    }
+
+    // La cédula es el identificador fuerte: si el perfil la expone y no
+    // coincide con el token, no se debe cargar ese menú.
+    const cedulaPerfil = normalizar(
+      leerPerfil(perfil, 'cedula', 'Cedula', 'documento', 'identificacion'),
+    );
+    if (cedulaToken && cedulaPerfil && cedulaPerfil !== cedulaToken) {
+      throw new Error(
+        'El perfil devuelto no corresponde a la cédula del token',
+      );
+    }
+
+    const aplicacionesRaw =
+      leer(perfil, 'Aplicacion', 'aplicacion', 'Aplicaciones', 'aplicaciones') ??
+      leer(
+        perfil?.usuario ?? perfil?.Usuario,
+        'Aplicacion',
+        'aplicacion',
+        'Aplicaciones',
+        'aplicaciones',
+      );
+    const aplicaciones: any[] = Array.isArray(aplicacionesRaw)
+      ? aplicacionesRaw
+      : aplicacionesRaw
+        ? [aplicacionesRaw]
+        : [];
+
+    if (aplicaciones.length === 0) {
+      throw new Error('El perfil del usuario no contiene aplicaciones');
+    }
+
+    const idBuscado = normalizar(environment.ID);
+    const aplicacionesApp = aplicaciones.filter((app) =>
+      leerAppIds(app).includes(idBuscado),
+    );
+
+    if (aplicacionesApp.length === 0) {
+      throw new Error(
+        `El usuario no tiene la aplicación ${environment.ID} asignada`,
+      );
+    }
+
+    // Si el usuario tiene varios roles en la misma aplicación, se usa el
+    // que coincide con el Perfil del token; si no hay coincidencia, el
+    // primero de la aplicación (el backend sigue validando privilegios).
+    const perfilToken = normalizar(usuario.Perfil?.descripcion);
+    const aplicacion =
+      (perfilToken &&
+        aplicacionesApp.find((app) => {
+          const rol = leerRol(app);
+          return (
+            normalizar(leer(rol as any, 'descripcion', 'Descripcion')) ===
+            perfilToken
+          );
+        })) ||
+      aplicacionesApp[0];
+
+    const rol = leerRol(aplicacion);
+    const menu = leer(rol as any, 'Menu', 'menu');
+    if (!rol || !Array.isArray(menu)) {
+      throw new Error(
+        `La aplicación ${environment.ID} no tiene menú configurado para el usuario`,
+      );
+    }
+
+    // Se devuelve con la forma canónica que espera el resto del servicio,
+    // aunque la API use minúsculas en `rol`/`menu`.
+    return {
+      ...(aplicacion as any),
+      Rol: {
+        ...(rol as any),
+        Menu: menu,
+      },
+    } as Aplicacion;
+  }
+
+  /**
+   * Obtener perfil de usuario y menú desde la API
+   *
+   * `silencioso` se usa en la hidratación desde el contenedor: el guard ya
+   * muestra el mensaje final, así que aquí no se duplican avisos ni se borra
+   * el `localStorage` de la aplicación por un fallo transitorio.
+   */
+  private async obtenerPerfil(itk: string, silencioso = false): Promise<void> {
     const payload = this.getUserDecrypt(itk);
     if (!payload?.Usuario) return;
 
@@ -239,18 +541,15 @@ export class AuthService {
       this.apiService.Ejecutar(xAPI).subscribe({
         next: (data) => {
           try {
-            if (
-              !data ||
-              data.length === 0 ||
-              !data[0].Aplicacion ||
-              data[0].Aplicacion.length === 0 ||
-              !data[0].Aplicacion[0].Rol
-            ) {
-              throw new Error('Perfil de usuario no válido');
-            }
+            // Escoge el registro del usuario autenticado y la aplicación
+            // configurada en environment.ID (no la primera del arreglo).
+            const aplicacion = this.seleccionarAplicacionDelPerfil(
+              data,
+              payload,
+            );
 
             // Guardar menú
-            const menuJson = JSON.stringify(data[0].Aplicacion[0].Rol.Menu);
+            const menuJson = JSON.stringify(aplicacion.Rol.Menu);
             sessionStorage.setItem('menu', menuJson);
 
             // Generar userId (uuidv4) y guardarlo en localStorage, como consola
@@ -266,20 +565,24 @@ export class AuthService {
             resolve();
           } catch (e) {
             console.error('[AuthService] Error al procesar perfil:', e);
-            Swal.fire({
-              title: 'Error de Perfil',
-              text: 'No se pudo cargar la configuración de su perfil.',
-              icon: 'error',
-            });
+            if (!silencioso) {
+              Swal.fire({
+                title: 'Error de Perfil',
+                text: 'No se pudo cargar la configuración de su perfil.',
+                icon: 'error',
+              });
+              localStorage.clear();
+            }
             sessionStorage.clear();
-            localStorage.clear();
             reject(e);
           }
         },
         error: (error) => {
           console.error('[AuthService] Fallo conectando al perfil:', error);
+          if (!silencioso) {
+            localStorage.clear();
+          }
           sessionStorage.clear();
-          localStorage.clear();
           reject(error);
         },
       });

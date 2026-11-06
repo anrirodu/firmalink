@@ -132,7 +132,7 @@ function mostrarAlertaBloqueo(msj: string, router: Router): void {
       allowOutsideClick: false,
     }).then(result => {
       if (result.isConfirmed) {
-        sessionStorage.clear();
+        limpiarSesionPreservandoFallo();
         router.navigate(['/login']).then(() => window.location.reload());
       }
     });
@@ -150,9 +150,22 @@ function cerrar(msj: string, router: Router): void {
       confirmButtonText: 'Gracias por su tiempo!',
     }).then(result => {
       if (result.isConfirmed) {
-        sessionStorage.clear();
+        limpiarSesionPreservandoFallo();
         router.navigate(['/login']).then(() => window.location.reload());
       }
     });
   });
+}
+
+/**
+ * Limpia la sesión sin perder la marca del token que falló.
+ *
+ * El puente del contenedor consulta `token_failed` para no reinyectar el mismo
+ * token en bucle. Si el logout del interceptor borrara esa marca, la app
+ * volvería a cargar el token inválido tras cada recarga.
+ */
+function limpiarSesionPreservandoFallo(): void {
+  const tokenFallido = sessionStorage.getItem('token_failed');
+  sessionStorage.clear();
+  if (tokenFallido) sessionStorage.setItem('token_failed', tokenFallido);
 }

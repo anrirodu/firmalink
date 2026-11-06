@@ -173,7 +173,7 @@ firmalink/
 │   │   └── app.ts                  # Componente raíz
 │   ├── index.html                  # Pantalla de carga + puente con el escritorio
 │   ├── main.ts
-│   ├── proxy.conf.json             # Proxy de desarrollo hacia el backend
+│   ├── proxy.conf.js               # Proxy de desarrollo hacia el backend
 │   └── styles.scss                 # Tema global (claro/oscuro)
 ├── angular.json
 ├── package.json
@@ -322,10 +322,23 @@ PATH="$HOME/.nvm/versions/node/vXX.XX.X/bin:$PATH" npx ng build --configuration 
 > `MatchedCount >= 1` en la respuesta. La desactivación sí usa `_SYS_UUserTOTP` con el secreto
 > vigente y se confirma releyendo `usuario.token`.
 
-### Proxy de desarrollo (`src/proxy.conf.json`)
+### Proxy de desarrollo (`src/proxy.conf.js`)
 
-Redirige `/v1/api` y `/devel/api` hacia el backend (`https://localhost`, certificado autofirmado:
-`secure: false`), evitando problemas de CORS en desarrollo.
+Redirige `/v1/api`, `/v1/xapi` y `/devel/api` hacia el backend (`https://localhost`, certificado
+autofirmado: `secure: false`), evitando problemas de CORS en desarrollo.
+
+Angular 17+ usa Vite para `ng serve`, así que las opciones son las de `http-proxy` (no las de
+`http-proxy-middleware`). El hook `configure` imprime una línea por petición completada, con hora,
+estado, método, ruta y duración:
+
+```
+┌─ Proxy de desarrollo ──────────────────────────────────────────
+│ /v1/api, /v1/xapi, /devel/api → https://localhost
+└────────────────────────────────────────────────────────────────
+[HPM] 19:47:24 200 ✓ POST   /v1/api/wusuario/loginWeb        ·    12 ms → https://localhost
+[HPM] 19:47:24 200 ✓ GET    /v1/api/captcha/challenge        ·     4 ms → https://localhost
+[HPM] 19:47:25 404 ! GET    /v1/xapi/ping                    ·     3 ms → https://localhost
+```
 
 ---
 
@@ -987,7 +1000,7 @@ y el isotipo del loader en `index.html` usa `var(--primary)` / `var(--accent)`.
 
 1. Copiar el proyecto y editar `src/app/config.ts` (nombre, eslogan, paleta, recursos, enlaces).
 2. Reemplazar `src/assets/images/logo.png` (logo y favicon por defecto).
-3. Ajustar `src/environments/environment*.ts` (endpoints del servidor) y `proxy.conf.json`.
+3. Ajustar `src/environments/environment*.ts` (endpoints del servidor) y `proxy.conf.js`.
 4. `npm run build:prod`.
 
 El tema claro/oscuro se sigue activando con `data-theme="dark"` en `<body>` (preferencia en
