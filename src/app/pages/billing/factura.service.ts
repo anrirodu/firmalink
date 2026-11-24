@@ -101,6 +101,7 @@ export class FacturaService {
       control: f.controlPrefijo + f.numeroControl,
       fecha: f.fechaEmision,
       mes: f.mes,
+      tipoPago: f.tipoPago,
       cliente: f.cliente?.codigo ?? '',
       rif: f.cliente?.rif ?? '',
       items: f.items,

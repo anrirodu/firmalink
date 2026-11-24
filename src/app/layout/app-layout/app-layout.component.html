@@ -72,6 +72,85 @@
         <mat-icon>menu</mat-icon>
       </button>
 
+      <!-- ═══════ INFO DE SESIÓN (junto al icono de menú) ═══════ -->
+      <div class="topbar-meta">
+        <!-- Inactividad: aparece sólo tras 5 s sin actividad (como la consola) -->
+        @if (idleService.idleActivo()) {
+          <div
+            class="navbar-idle-glass"
+            [class.idle-warning]="
+              idleService.segundosRestantes() <= 60 &&
+              idleService.segundosRestantes() > 20
+            "
+            [class.idle-danger]="idleService.segundosRestantes() <= 20"
+            [matTooltip]="
+              'Inactividad detectada: cerrando en ' +
+              formatearCuenta(idleService.segundosRestantes())
+            "
+          >
+            <div class="idle-badge-icon">
+              <mat-icon class="glass-icon">schedule</mat-icon>
+              <span class="idle-pulse-dot pulse-active"></span>
+            </div>
+            <div class="idle-meta">
+              <span class="idle-label">Inactividad</span>
+              <span class="idle-counter">
+                {{ formatearCuenta(idleService.segundosRestantes()) }}
+              </span>
+            </div>
+          </div>
+        }
+
+        <!-- Vigencia de la firma digital, en días (igual que la consola) -->
+        @if (idleService.vigenciaDias() !== null) {
+          <div
+            class="navbar-vigencia-glass"
+            [class.vigencia-warning]="idleService.vigenciaEstado() === 'warning'"
+            [class.vigencia-danger]="idleService.vigenciaEstado() === 'danger'"
+            [matTooltip]="
+              'Vigencia de Firma Digital activa (' +
+              idleService.vigenciaDias() +
+              ' días restantes)'
+            "
+          >
+            <div class="vigencia-badge-icon">
+              <mat-icon class="glass-icon">verified_user</mat-icon>
+              <span class="vigencia-pulse-dot"></span>
+            </div>
+            <div class="vigencia-meta">
+              <span class="vigencia-label">Vigencia</span>
+              <div class="vigencia-counter">
+                <span class="vigencia-days">
+                  {{ idleService.vigenciaDias() }}
+                </span>
+                <span class="vigencia-unit">
+                  {{ idleService.vigenciaDias() === 1 ? 'día' : 'días' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Versión de la consola (buildDate publicado en el bundle) -->
+        <div
+          class="navbar-version-glass"
+          [matTooltip]="
+            'Versión de la consola: ' + (versionService.versionActual || '—')
+          "
+        >
+          <div class="version-badge-icon">
+            <mat-icon class="glass-icon">layers</mat-icon>
+            <span class="status-pulse-dot"></span>
+          </div>
+          <div class="version-meta">
+            <span class="version-label">Versión</span>
+            <span class="version-value">
+              {{ versionService.versionActual || '—' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div class="topbar-spacer"></div>
 
       <button mat-icon-button class="topbar-icon">

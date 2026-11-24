@@ -784,7 +784,7 @@ El recorrido va **de arriba abajo**, como se hace la cuenta a mano:
 | Depositado | `total − deducciones` (salvo que se escriba a mano) |
 | Saldo disponible | `depositado` (ya viene neto de deducciones) |
 | Ganancia | `saldoDisponible × gananciaPorcentaje / 100` (10 % por defecto) |
-| Saldo libre | `saldoDisponible − ganancia` |
+| Saldo Disponible | `saldoDisponible − ganancia` |
 
 ### Deducciones libres
 
@@ -849,8 +849,8 @@ es su **estatus**.
 
 ### El listado (`/calculator`)
 
-KPIs (Cálculos, **Facturado**, **Deducciones**, **Saldo libre**, **Anuladas** y **Con tasa**), filtros
-por texto y divisa, y menú de acciones por fila. Los importes (Facturado, Deducciones, Saldo libre)
+KPIs (Cálculos, **Facturado**, **Deducciones**, **Saldo Disponible**, **Anuladas** y **Con tasa**), filtros
+por texto y divisa, y menú de acciones por fila. Los importes (Facturado, Deducciones, Saldo Disponible)
 suman **solo los cálculos procesados**; «Cálculos» cuenta todo el listado y «Anuladas» las descartadas.
 
 | Acción | Disponible cuando | Detalle |
@@ -862,7 +862,7 @@ suman **solo los cálculos procesados**; «Cálculos» cuenta todo el listado y 
 
 - El **estatus** se pinta como chip de color (`.lb-estado`): borrador ámbar, procesado azul, anulada
   rojo y borrado gris; el listado **no** muestra la columna *Huella* (queda en el editor).
-- Las columnas de importe (Total, Deducciones, Saldo libre) muestran **solo el monto**; el desglose
+- Las columnas de importe (Total, Deducciones, Saldo Disponible) muestran **solo el monto**; el desglose
   (IVA/subtotal, deducciones, disponible/ganancia) va en el *tooltip* de la celda.
 - El editor-modal se monta por estado (no es ruta) y, al cerrarse, el listado recarga la tabla.
 - El fichero de verificación aritmética del modelo es

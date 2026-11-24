@@ -12,7 +12,7 @@ export const environment = {
   Hash: ':cdd2b41298c1bf1108de6df5eca512ec.sse',
   version: 'FirmaLink 1.0.0',
   fecha: '2026-08-25',
-  buildDate: '06/11/2026 04:20:43 p. m.',
+  buildDate: '24/11/2026 07:10:45 p. m.',
   functions: {
     CONSULTAR_USUARIO_PERFIL: '_SYS_CUsuarioPerfil',
     CONSULTAR_LOGIN_USUARIO: '_SYS_CUserPanelLogin',

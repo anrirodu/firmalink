@@ -10,6 +10,7 @@ import { AuthService } from '../../auth/services/auth.service';
 import { MenuService, MenuItem } from '../../shared/services/menu.service';
 import { ThemeService } from '../../shared/services/theme.service';
 import { IdleService } from '../../shared/services/idle.service';
+import { VersionService } from '../../shared/services/version.service';
 import { CONFIG } from '../../config';
 
 /**
@@ -68,7 +69,8 @@ export class AppLayoutComponent implements OnInit {
     public authService: AuthService,
     public themeService: ThemeService,
     public menuService: MenuService,
-    private idleService: IdleService,
+    public idleService: IdleService,
+    public versionService: VersionService,
     private router: Router,
   ) {
     this.checkScreen();
@@ -149,6 +151,17 @@ export class AppLayoutComponent implements OnInit {
   /** Menú superior usuario → cambio de contraseña */
   goChangePassword(): void {
     this.router.navigate(['/change-password']);
+  }
+
+  /** Conteo de inactividad en formato `mm:ss` (o `h:mm:ss` si pasa de una hora). */
+  formatearCuenta(segundos: number): string {
+    const total = Math.max(0, Math.floor(segundos));
+    const horas = Math.floor(total / 3600);
+    const minutos = Math.floor((total % 3600) / 60);
+    const seg = total % 60;
+    const mm = String(minutos).padStart(2, '0');
+    const ss = String(seg).padStart(2, '0');
+    return horas > 0 ? `${horas}:${mm}:${ss}` : `${mm}:${ss}`;
   }
 
 }

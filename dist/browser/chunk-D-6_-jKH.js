@@ -1,4 +1,4 @@
-import{f as Ne}from"./chunk-BKM20rfe.js";import{d as O,k as y$1,m as U,n as B,p as S,u as M,x as j$1}from"./chunk-qTBJhSUT.js";var n={anchoCm:21.7,altoCm:28,margenSuperiorCm:4.5,margenInferiorCm:2.5,margenLateralCm:2};var d=`firmalink-factura-estilos`;var x=`
+import{A as z,d as O,f as P,k as y$1,m as U,n as B,u as N}from"./chunk-Cbe9BkEl.js";import{f as Ne}from"./chunk-CGku6mJa.js";var n={anchoCm:21.7,altoCm:28,margenSuperiorCm:4.5,margenInferiorCm:2.5,margenLateralCm:2};var d=`firmalink-factura-estilos`;var x=`
 /* \u2500\u2500 Lienzo de la vista previa \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .fx-lienzo {
   display: flex;
@@ -324,36 +324,36 @@ import{f as Ne}from"./chunk-BKM20rfe.js";import{d as O,k as y$1,m as U,n as B,p 
   }`}function y(a){let e=a.items??[];return e.length===0?`<tr class="fx-fila-vacia"><td colspan="4">Sin renglones registrados.</td></tr>`:e.map(o=>{let r=(Number(o.cantidad)||0)*(Number(o.precio)||0);return`<tr>
         <td class="fx-col-desc">${Ne(o.descripcion)}</td>
         <td class="fx-col-cant fx-num">${Ne(O(o.cantidad))}</td>
-        <td class="fx-col-precio fx-num">${Ne(j$1(o.precio))}</td>
-        <td class="fx-col-total fx-num">${Ne(j$1(r))}</td>
-      </tr>`}).join(``)}function C(a){let e=S(a),o=[];return o.push(`<tr>
+        <td class="fx-col-precio fx-num">${Ne(y$1(o.precio))}</td>
+        <td class="fx-col-total fx-num">${Ne(y$1(r))}</td>
+      </tr>`}).join(``)}function C(a){let e=N(a),o=[];return o.push(`<tr>
         <td class="fx-son-cell" colspan="2">Mes: <strong>${Ne(a.mes)}</strong></td>
         <td class="fx-label">SubTotal</td>
-        <td class="fx-amount">${Ne(j$1(e.subtotal))}</td>
+        <td class="fx-amount">${Ne(y$1(e.subtotal))}</td>
       </tr>`),o.push(`<tr>
-        <td class="fx-son-cell" colspan="2"><span class="fx-label">Son:</span> <span class="fx-son">${Ne(y$1(e.total))}</span></td>
-        <td class="fx-label">IVA: ${Ne(B(M(a)))}</td>
-        <td class="fx-amount">${Ne(j$1(e.montoIva))}</td>
+        <td class="fx-son-cell" colspan="2"><span class="fx-label">Son:</span> <span class="fx-son">${Ne(B(e.total))}</span></td>
+        <td class="fx-label">IVA: ${Ne(z(P(a)))}</td>
+        <td class="fx-amount">${Ne(y$1(e.montoIva))}</td>
       </tr>`),U(a)&&o.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
-        <td class="fx-label">IGTF: ${Ne(B(a.alicuotaIgtf))}</td>
-        <td class="fx-amount">${Ne(j$1(e.montoIgtf))}</td>
+        <td class="fx-label">IGTF: ${Ne(z(a.alicuotaIgtf))}</td>
+        <td class="fx-amount">${Ne(y$1(e.montoIgtf))}</td>
       </tr>`),o.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
         <td class="fx-label fx-total-final">Total Bs:</td>
-        <td class="fx-amount fx-total-final">${Ne(j$1(e.total))}</td>
+        <td class="fx-amount fx-total-final">${Ne(y$1(e.total))}</td>
       </tr>`),e.retencionIva>0&&o.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
-        <td class="fx-label fx-retencion">Ret. IVA: ${Ne(B(a.cliente?.porcentajeRetencionIva??0))}</td>
-        <td class="fx-amount fx-retencion">- ${Ne(j$1(e.retencionIva))}</td>
+        <td class="fx-label fx-retencion">Ret. IVA: ${Ne(z(a.cliente?.porcentajeRetencionIva??0))}</td>
+        <td class="fx-amount fx-retencion">- ${Ne(y$1(e.retencionIva))}</td>
       </tr>`),e.retencionIslr>0&&o.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
-        <td class="fx-label fx-retencion">Ret. ISLR: ${Ne(B(a.alicuotaIslr))}</td>
-        <td class="fx-amount fx-retencion">- ${Ne(j$1(e.retencionIslr))}</td>
+        <td class="fx-label fx-retencion">Ret. ISLR: ${Ne(z(a.alicuotaIslr))}</td>
+        <td class="fx-amount fx-retencion">- ${Ne(y$1(e.retencionIslr))}</td>
       </tr>`),(e.retencionIva>0||e.retencionIslr>0)&&o.push(`<tr>
         <td class="fx-son-cell" colspan="2"></td>
         <td class="fx-label fx-total-final">Neto a pagar:</td>
-        <td class="fx-amount fx-total-final">${Ne(j$1(e.netoAPagar))}</td>
+        <td class="fx-amount fx-total-final">${Ne(y$1(e.netoAPagar))}</td>
       </tr>`),o.join(``)}function I(a){return a.emisor}function j(a){let e=I(a),o=a.mostrarCabeceraPie,r=a.mostrarFirmaSello,f=a.mostrarMarcaAgua,m=o?`<div class="fx-header-top">
       <div class="fx-header-logo"><img src="${s(`factura/emisor.png`)}" alt=""></div>
       <div class="fx-header-empresa">

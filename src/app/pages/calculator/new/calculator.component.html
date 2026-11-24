@@ -71,9 +71,10 @@
 
         <label class="cl-campo">
           <span>Estatus</span>
-          <select [value]="calculo().estado" (change)="setEstado($any($event.target).value)">
+          <select (change)="setEstado($any($event.target).value)">
             @for (e of estados; track e) {
-              <option [value]="e" [disabled]="e !== calculo().estado && !puedeCambiarA(e)">{{ infoEstado(e).etiqueta }}</option>
+              <option [value]="e" [selected]="e === calculo().estado"
+                      [disabled]="e !== calculo().estado && !puedeCambiarA(e)">{{ infoEstado(e).etiqueta }}</option>
             }
           </select>
           <small class="cl-hint">«Procesado» cierra el cálculo; «Anulada» lo descarta sin borrarlo.</small>
@@ -92,6 +93,13 @@
       <h2 class="cl-card-titulo">
         <span class="cl-paso">1</span> La factura
         <em class="cl-leyenda">el IVA y el total salen del monto subtotal</em>
+        @if (!soloLectura()) {
+          <button type="button" class="cl-cargar-factura"
+                  (click)="abrirSelectorFactura()"
+                  matTooltip="Traer el subtotal, el IVA, el total y las retenciones de una factura de Facturación">
+            <mat-icon inline>receipt_long</mat-icon> Cargar factura
+          </button>
+        }
       </h2>
 
       <div class="cl-factura">
@@ -99,8 +107,8 @@
           <span>Monto subtotal de la factura</span>
           <div class="cl-input-sufijo">
             <input type="text" inputmode="decimal" autocomplete="off"
-                   [value]="calculo().montoSubtotal"
-                   (input)="setFuente('montoSubtotal', $any($event.target).value)">
+                   appNumero [appNumeroValor]="calculo().montoSubtotal"
+                   (appNumeroValorChange)="setFuente('montoSubtotal', $event)">
             <em>Bs</em>
           </div>
           <small class="cl-hint">{{ formatoBs(calculo().montoSubtotal) }} Bs · sin IVA</small>
@@ -110,8 +118,8 @@
           <span>Alícuota de IVA</span>
           <div class="cl-input-sufijo">
             <input type="text" inputmode="decimal"
-                   [value]="calculo().ivaPorcentaje"
-                   (input)="setFuente('ivaPorcentaje', $any($event.target).value)">
+                   appNumero appNumeroModo="cantidad" [appNumeroValor]="calculo().ivaPorcentaje"
+                   (appNumeroValorChange)="setFuente('ivaPorcentaje', $event)">
             <em>%</em>
           </div>
           <small class="cl-hint">General: {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</small>
@@ -129,9 +137,9 @@
             </button>
           </span>
           <div class="cl-input-sufijo">
-            <input type="text" inputmode="decimal" [value]="calculo().montoIva"
+            <input type="text" inputmode="decimal" appNumero [appNumeroValor]="calculo().montoIva"
                    [readOnly]="!esAjuste('montoIva')"
-                   (input)="setDerivado('montoIva', $any($event.target).value)">
+                   (appNumeroValorChange)="setDerivado('montoIva', $event)">
             <em>Bs</em>
           </div>
           <small class="cl-hint">Subtotal × {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</small>
@@ -147,9 +155,9 @@
             </button>
           </span>
           <div class="cl-input-sufijo">
-            <input type="text" inputmode="decimal" [value]="calculo().montoTotal"
+            <input type="text" inputmode="decimal" appNumero [appNumeroValor]="calculo().montoTotal"
                    [readOnly]="!esAjuste('montoTotal')"
-                   (input)="setDerivado('montoTotal', $any($event.target).value)">
+                   (appNumeroValorChange)="setDerivado('montoTotal', $event)">
             <em>Bs</em>
           </div>
           <small class="cl-hint">Subtotal + IVA</small>
@@ -171,13 +179,13 @@
             @if (!depositadoManual()) { <em class="cl-chip-suave">= total − deducciones</em> }
           </span>
           <div class="cl-input-sufijo">
-            <input type="text" inputmode="decimal" [value]="calculo().montoDepositado"
-                   (input)="setDepositado($any($event.target).value)">
+            <input type="text" inputmode="decimal" appNumero [appNumeroValor]="calculo().montoDepositado"
+                   (appNumeroValorChange)="setDepositado($event)">
             <em>Bs</em>
           </div>
           <small class="cl-hint">
             {{ formatoBs(calculo().montoDepositado) }} Bs
-            @if (hayTasa()) { · ≈ {{ depositadoEnDivisa() }} {{ simboloDivisa() }} }
+            @if (hayTasa()) { · ≈ {{ formatoBs(depositadoEnDivisa()) }} {{ simboloDivisa() }} }
           </small>
         </label>
 
@@ -220,23 +228,25 @@
                      placeholder="Nombre de la deducción"
                      (input)="setDeduccionNombre(d, $any($event.target).value)">
 
-              <select class="cl-deduccion-tipo" [value]="d.tipo"
+              <select class="cl-deduccion-tipo"
                       (change)="setDeduccionTipo(d, $any($event.target).value)"
                       matTooltip="Un porcentaje sobre una base, o un monto fijo en bolívares">
                 @for (t of tipos; track t.valor) {
-                  <option [value]="t.valor">{{ t.etiqueta }}</option>
+                  <option [value]="t.valor" [selected]="t.valor === d.tipo">{{ t.etiqueta }}</option>
                 }
               </select>
 
-              <input class="cl-deduccion-valor" type="text" inputmode="decimal" [value]="d.valor"
-                     (input)="setDeduccionValor(d, $any($event.target).value)"
+              <input class="cl-deduccion-valor" type="text" inputmode="decimal"
+                     appNumero [appNumeroModo]="d.tipo === 'monto' ? 'monto' : 'cantidad'"
+                     [appNumeroValor]="d.valor"
+                     (appNumeroValorChange)="setDeduccionValor(d, $event)"
                      [matTooltip]="d.tipo === 'monto' ? 'Monto en bolívares' : 'Porcentaje a aplicar'">
 
-              <select class="cl-deduccion-base" [value]="d.base" [disabled]="d.tipo === 'monto'"
+              <select class="cl-deduccion-base" [disabled]="d.tipo === 'monto'"
                       (change)="setDeduccionBase(d, $any($event.target).value)"
                       [matTooltip]="d.tipo === 'monto' ? 'No aplica: es un monto fijo' : 'Cifra sobre la que se aplica el porcentaje'">
                 @for (b of bases; track b.valor) {
-                  <option [value]="b.valor">{{ b.etiqueta }}</option>
+                  <option [value]="b.valor" [selected]="b.valor === d.base">{{ b.etiqueta }}</option>
                 }
               </select>
 
@@ -245,9 +255,9 @@
                 @if (d.tipo === 'monto') {
                   <strong>{{ formatoBs(d.monto) }} Bs</strong>
                 } @else {
-                  <input type="text" inputmode="decimal" [value]="d.monto"
+                  <input type="text" inputmode="decimal" appNumero [appNumeroValor]="d.monto"
                          [readOnly]="!esAjusteDeduccion(d)"
-                         (input)="setDeduccionMonto(d, $any($event.target).value)">
+                         (appNumeroValorChange)="setDeduccionMonto(d, $event)">
                   <button type="button" class="cl-candado cl-candado-mini" (click)="alternarAjusteDeduccion(d)"
                           [matTooltip]="esAjusteDeduccion(d) ? 'Volver al porcentaje' : 'Escribir el monto a mano'">
                     <mat-icon inline>{{ esAjusteDeduccion(d) ? 'undo' : 'edit' }}</mat-icon>
@@ -310,23 +320,25 @@
                      placeholder="Nombre de la deducción"
                      (input)="setDeduccionNombre(d, $any($event.target).value)">
 
-              <select class="cl-deduccion-tipo" [value]="d.tipo"
+              <select class="cl-deduccion-tipo"
                       (change)="setDeduccionTipo(d, $any($event.target).value)"
                       matTooltip="Un porcentaje sobre una base, o un monto fijo en bolívares">
                 @for (t of tipos; track t.valor) {
-                  <option [value]="t.valor">{{ t.etiqueta }}</option>
+                  <option [value]="t.valor" [selected]="t.valor === d.tipo">{{ t.etiqueta }}</option>
                 }
               </select>
 
-              <input class="cl-deduccion-valor" type="text" inputmode="decimal" [value]="d.valor"
-                     (input)="setDeduccionValor(d, $any($event.target).value)"
+              <input class="cl-deduccion-valor" type="text" inputmode="decimal"
+                     appNumero [appNumeroModo]="d.tipo === 'monto' ? 'monto' : 'cantidad'"
+                     [appNumeroValor]="d.valor"
+                     (appNumeroValorChange)="setDeduccionValor(d, $event)"
                      [matTooltip]="d.tipo === 'monto' ? 'Monto en bolívares' : 'Porcentaje a aplicar'">
 
-              <select class="cl-deduccion-base" [value]="d.base" [disabled]="d.tipo === 'monto'"
+              <select class="cl-deduccion-base" [disabled]="d.tipo === 'monto'"
                       (change)="setDeduccionBase(d, $any($event.target).value)"
                       [matTooltip]="d.tipo === 'monto' ? 'No aplica: es un monto fijo' : 'Cifra sobre la que se aplica el porcentaje'">
                 @for (b of bases; track b.valor) {
-                  <option [value]="b.valor">{{ b.etiqueta }}</option>
+                  <option [value]="b.valor" [selected]="b.valor === d.base">{{ b.etiqueta }}</option>
                 }
               </select>
 
@@ -335,9 +347,9 @@
                 @if (d.tipo === 'monto') {
                   <strong>{{ formatoBs(d.monto) }} Bs</strong>
                 } @else {
-                  <input type="text" inputmode="decimal" [value]="d.monto"
+                  <input type="text" inputmode="decimal" appNumero [appNumeroValor]="d.monto"
                          [readOnly]="!esAjusteDeduccion(d)"
-                         (input)="setDeduccionMonto(d, $any($event.target).value)">
+                         (appNumeroValorChange)="setDeduccionMonto(d, $event)">
                   <button type="button" class="cl-candado cl-candado-mini" (click)="alternarAjusteDeduccion(d)"
                           [matTooltip]="esAjusteDeduccion(d) ? 'Volver al porcentaje' : 'Escribir el monto a mano'">
                     <mat-icon inline>{{ esAjusteDeduccion(d) ? 'undo' : 'edit' }}</mat-icon>
@@ -412,31 +424,13 @@
           <em class="cl-leyenda">lo que queda</em>
         </h2>
 
-        <div class="cl-resultados">
-          <div class="cl-resultado">
-            <span>Saldo disponible</span>
-            <strong>{{ formatoBs(calculo().saldoDisponible) }} Bs</strong>
-            <small>Depósito − {{ formatoBs(calculo().subtotalDeducciones) }} Bs de deducciones</small>
-          </div>
-
-          <div class="cl-resultado cl-resultado-libre">
-            <span>Saldo libre</span>
-            <strong>{{ formatoBs(calculo().saldoLibre) }} Bs</strong>
-            @if (hayTasa()) {
-              <small>≈ {{ saldoLibreEnDivisa() }} {{ simboloDivisa() }}</small>
-            } @else {
-              <small>Disponible − ganancia</small>
-            }
-          </div>
-        </div>
-
         <div class="cl-ganancia">
           <label class="cl-campo cl-campo-corto">
             <span>Ganancia objetivo</span>
             <div class="cl-input-sufijo">
               <input type="text" inputmode="decimal"
-                     [value]="calculo().gananciaPorcentaje"
-                     (input)="setFuente('gananciaPorcentaje', $any($event.target).value)">
+                     appNumero appNumeroModo="cantidad" [appNumeroValor]="calculo().gananciaPorcentaje"
+                     (appNumeroValorChange)="setFuente('gananciaPorcentaje', $event)">
               <em>%</em>
             </div>
             <small class="cl-hint">Sobre el saldo disponible</small>
@@ -452,26 +446,36 @@
               </button>
             </span>
             <div class="cl-input-sufijo">
-              <input type="text" inputmode="decimal" [value]="calculo().ganancia"
+              <input type="text" inputmode="decimal" appNumero [appNumeroValor]="calculo().ganancia"
                      [readOnly]="!esAjuste('ganancia')"
-                     (input)="setDerivado('ganancia', $any($event.target).value)">
+                     (appNumeroValorChange)="setDerivado('ganancia', $event)">
               <em>Bs</em>
             </div>
             <small class="cl-hint">Disponible × {{ formatoPorcentaje(calculo().gananciaPorcentaje) }}</small>
           </label>
         </div>
+
+        <div class="cl-resultados">
+          <div class="cl-resultado">
+            <span>Saldo disponible</span>
+            <strong>{{ formatoBs(calculo().saldoDisponible) }} Bs</strong>
+            <small>Depósito − {{ formatoBs(subtotalDeduccionesEmpresa()) }} Bs de retenciones empresa</small>
+          </div>
+
+          <div class="cl-resultado cl-resultado-libre">
+            <span>Saldo libre</span>
+            <strong>{{ formatoBs(calculo().saldoLibre) }} Bs</strong>
+            @if (hayTasa()) {
+              <small>≈ {{ formatoBs(saldoLibreEnDivisa()) }} {{ simboloDivisa() }}</small>
+            } @else {
+              <small>Disponible − ganancia</small>
+            }
+          </div>
+        </div>
       </section>
 
       <!-- Desglose -->
       <section class="cl-resumen">
-        <div class="cl-resumen-cifra">
-          <span>Saldo libre</span>
-          <strong>{{ formatoBs(calculo().saldoLibre) }} Bs</strong>
-          @if (hayTasa()) {
-            <small>≈ {{ saldoLibreEnDivisa() }} {{ simboloDivisa() }}</small>
-          }
-        </div>
-
         <dl class="cl-resumen-detalle">
           <div><dt>Subtotal</dt><dd>{{ formatoBs(calculo().montoSubtotal) }} Bs</dd></div>
           <div><dt>IVA {{ formatoPorcentaje(calculo().ivaPorcentaje) }}</dt><dd>{{ formatoBs(calculo().montoIva) }} Bs</dd></div>
@@ -480,8 +484,9 @@
           <div><dt>Retenciones Cliente ({{ deduccionesCliente().length }})</dt><dd>− {{ formatoBs(subtotalDeduccionesCliente()) }} Bs</dd></div>
           <div><dt>Retenciones Empresa ({{ deduccionesEmpresa().length }})</dt><dd>− {{ formatoBs(subtotalDeduccionesEmpresa()) }} Bs</dd></div>
           <div><dt>Deducciones totales ({{ deducciones().length }})</dt><dd>− {{ formatoBs(calculo().subtotalDeducciones) }} Bs</dd></div>
-          <div><dt>Disponible</dt><dd>{{ formatoBs(calculo().saldoDisponible) }} Bs</dd></div>
+          <div><dt>Saldo disponible</dt><dd>{{ formatoBs(calculo().saldoDisponible) }} Bs</dd></div>
           <div><dt>Ganancia {{ formatoPorcentaje(calculo().gananciaPorcentaje) }}</dt><dd>− {{ formatoBs(calculo().ganancia) }} Bs</dd></div>
+          <div><dt>Saldo libre</dt><dd>{{ formatoBs(calculo().saldoLibre) }} Bs</dd></div>
         </dl>
       </section>
 
@@ -492,17 +497,17 @@
         <div class="cl-tasa">
           <label class="cl-campo">
             <span>Divisa</span>
-            <select [value]="calculo().tasa.moneda" (change)="cambiarMoneda($any($event.target).value)">
+            <select (change)="cambiarMoneda($any($event.target).value)">
               @for (m of monedas; track m.valor) {
-                <option [value]="m.valor">{{ m.etiqueta }}</option>
+                <option [value]="m.valor" [selected]="m.valor === calculo().tasa.moneda">{{ m.etiqueta }}</option>
               }
             </select>
           </label>
 
           <label class="cl-campo">
             <span>Bolívares por divisa</span>
-            <input type="text" inputmode="decimal" [value]="calculo().tasa.valor"
-                   (input)="setTasaValor($any($event.target).value)">
+            <input type="text" inputmode="decimal" appNumero [appNumeroValor]="calculo().tasa.valor"
+                   (appNumeroValorChange)="setTasaValor($event)">
             <small class="cl-hint">
               @if (hayTasa()) {
                 1 {{ simboloDivisa() }} = {{ formatoBs(calculo().tasa.valor) }} Bs
@@ -511,11 +516,6 @@
               }
             </small>
           </label>
-
-          <button mat-stroked-button type="button" class="cl-consultar" (click)="consultarTasa()"
-                  [disabled]="consultandoTasa()">
-            <mat-icon>refresh</mat-icon> {{ consultandoTasa() ? 'Consultando…' : 'Consultar' }}
-          </button>
 
           <label class="cl-campo">
             <span>Publicada</span>
@@ -526,21 +526,26 @@
               </small>
             }
           </label>
+
+          <button mat-stroked-button type="button" class="cl-consultar" (click)="consultarTasa()"
+                  [disabled]="consultandoTasa()">
+            <mat-icon>refresh</mat-icon> {{ consultandoTasa() ? 'Consultando…' : 'Consultar' }}
+          </button>
         </div>
 
         @if (hayTasa()) {
           <div class="cl-equivalencias">
             <div class="cl-equivalencia">
               <span>Subtotal</span>
-              <strong>{{ subtotalEnDivisa() }} {{ simboloDivisa() }}</strong>
+              <strong>{{ formatoBs(subtotalEnDivisa()) }} {{ simboloDivisa() }}</strong>
             </div>
             <div class="cl-equivalencia">
               <span>Depositado</span>
-              <strong>{{ depositadoEnDivisa() }} {{ simboloDivisa() }}</strong>
+              <strong>{{ formatoBs(depositadoEnDivisa()) }} {{ simboloDivisa() }}</strong>
             </div>
             <div class="cl-equivalencia">
               <span>Saldo libre</span>
-              <strong>{{ saldoLibreEnDivisa() }} {{ simboloDivisa() }}</strong>
+              <strong>{{ formatoBs(saldoLibreEnDivisa()) }} {{ simboloDivisa() }}</strong>
             </div>
           </div>
         }
@@ -603,6 +608,83 @@
       <mat-icon>add</mat-icon>
     </button>
   </div>
+
+  <!-- ── Selector de factura de Facturación ──────────────────────────── -->
+  @if (selectorFacturaAbierto()) {
+    <div class="cl-selector-backdrop" (click)="cerrarSelectorFactura()">
+      <section class="cl-selector" role="dialog" aria-modal="true"
+               aria-labelledby="cl-selector-titulo"
+               (click)="$event.stopPropagation()">
+        <header class="cl-selector-header">
+          <div>
+            <h3 id="cl-selector-titulo">
+              <mat-icon inline>receipt_long</mat-icon> Cargar factura
+            </h3>
+            <p>
+              Elige una factura de Facturación: se copian el subtotal, la alícuota, el IVA,
+              el total y sus retenciones.
+            </p>
+          </div>
+          <button type="button" class="cl-selector-cerrar"
+                  (click)="cerrarSelectorFactura()" aria-label="Cerrar">
+            &times;
+          </button>
+        </header>
+
+        <div class="cl-selector-buscador">
+          <mat-icon>search</mat-icon>
+          <input type="search" autocomplete="off" [value]="filtroFactura()"
+                 (input)="setFiltroFactura($any($event.target).value)"
+                 placeholder="Buscar por número, cliente, RIF o control">
+          <button type="button" class="cl-selector-refrescar"
+                  (click)="cargarFacturasDisponibles()" [disabled]="cargandoFacturas()"
+                  matTooltip="Volver a consultar las facturas">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+
+        @if (cargandoFacturas()) {
+          <div class="cl-selector-estado">
+            <mat-icon>hourglass_top</mat-icon> Consultando facturas…
+          </div>
+        } @else if (facturasFiltradas().length === 0) {
+          <div class="cl-selector-estado cl-selector-vacio">
+            <mat-icon>receipt_long</mat-icon>
+            <div>
+              <strong>No hay facturas para cargar.</strong>
+              <small>Crea una factura en Facturación o cambia el texto de búsqueda.</small>
+            </div>
+          </div>
+        } @else {
+          <div class="cl-selector-lista">
+            @for (f of facturasFiltradas(); track f.codigo || $index) {
+              <button type="button" class="cl-selector-factura" (click)="elegirFactura(f)">
+                <span class="cl-selector-factura-numero">{{ f.numero }}</span>
+                <span class="cl-selector-factura-cliente">
+                  <strong>{{ f.cliente?.nombre || 'Sin cliente' }}</strong>
+                  <small>{{ formatearControl(f.controlPrefijo, f.numeroControl) }} · {{ f.fechaTexto }}</small>
+                </span>
+                <span class="cl-selector-factura-estado"
+                      [style.color]="infoEstadoFactura(f.estado).color">
+                  <mat-icon inline>{{ infoEstadoFactura(f.estado).icono }}</mat-icon>
+                  {{ infoEstadoFactura(f.estado).etiqueta }}
+                </span>
+                <strong class="cl-selector-factura-total">{{ formatoBs(totalFactura(f)) }} Bs</strong>
+                <mat-icon class="cl-selector-factura-flecha">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        }
+
+        <footer class="cl-selector-pie">
+          <span>{{ facturasFiltradas().length }} factura(s) · se excluyen las anuladas</span>
+          <button type="button" class="cl-selector-cancelar" (click)="cerrarSelectorFactura()">
+            Cerrar
+          </button>
+        </footer>
+      </section>
+    </div>
+  }
 
   </div><!-- /.cl-modal -->
 </div><!-- /.cl-backdrop -->

@@ -210,6 +210,17 @@
                    (input)="set('mes', $any($event.target).value)"
                    [attr.readonly]="readonly_() ? '' : null">
           </label>
+
+          <label class="bl-campo bl-campo-ancho">
+            <span>Tipo de Pago</span>
+            <select [value]="factura().tipoPago"
+                    (change)="set('tipoPago', $any($event.target).value)"
+                    [attr.disabled]="readonly_() ? '' : null">
+              <option value="Contado">Contado</option>
+              <option value="Crédito">Crédito</option>
+              <option value="Exonerado">Exonerado</option>
+            </select>
+          </label>
         </div>
 
         @if (controlFueraDeRango()) {

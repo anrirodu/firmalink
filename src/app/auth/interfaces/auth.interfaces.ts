@@ -22,6 +22,10 @@ export interface UsuarioToken {
 
 export interface FirmaDigital {
   duracion?: string | number;
+  /** Vigencia del certificado de firma digital, en días (180 por defecto). */
+  vigencia?: string | number;
+  /** Fecha de emisión del certificado (string ISO o `{ $date }` de Mongo). */
+  tiempo?: string | { $date?: string };
 }
 
 export interface Perfil {

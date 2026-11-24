@@ -26,11 +26,14 @@
  * mismo monto se lea igual en todo el ecosistema. No se duplican.
  */
 import {
+  alicuotaIvaEfectiva,
+  calcularTotales,
   fechaTextoEmision,
   formatoBs,
   formatoPorcentaje,
   parsearNumero,
   redondear,
+  type Factura,
 } from '../billing/factura.model';
 
 export {
@@ -402,7 +405,7 @@ export interface Calculo {
   subtotalDeducciones: number;
 
   // ── Resultados ──
-  /** Monto depositado menos las deducciones */
+  /** Monto depositado menos las retenciones de la empresa */
   saldoDisponible: number;
   /** Ganancia sobre el saldo disponible, en porcentaje (10 %) */
   gananciaPorcentaje: number;
@@ -500,8 +503,9 @@ export function baseDeduccion(c: Calculo, base: BaseDeduccion): number {
  * Aplica la fórmula del modelo a las cifras fuente y devuelve las derivadas.
  *
  * El orden importa: el subtotal depende del IVA, el monto depositado del
- * subtotal, cada deducción de la cifra sobre la que se calcula, y el saldo libre
- * de la ganancia sobre el saldo disponible. No toca el objeto que recibe.
+ * subtotal, cada deducción de la cifra sobre la que se calcula, el saldo
+ * disponible de las retenciones de la empresa y la ganancia del saldo
+ * disponible. No toca el objeto que recibe.
  */
 export function calcularDerivados(c: Calculo): CamposDerivados {
   const r = recalcular(c, new Set(), false);
@@ -528,11 +532,12 @@ export function calcularDerivados(c: Calculo): CamposDerivados {
  * un IVA ajustado a mano sí arrastra a las deducciones calculadas sobre él —y no
  * a la cifra que la fórmula habría dado por su cuenta—.
  *
- * El **monto depositado** sigue al **total menos las deducciones** (lo que de
- * verdad abona el banco), salvo que el usuario lo escriba a mano. Por eso las
- * deducciones se resuelven en dos tiempos: primero las que no dependen del
- * depósito (IVA, subtotal, total, monto fijo), luego el depósito, y al final las
- * que se aplican sobre él (p. ej. Negro Primero).
+ * El **monto depositado** sigue al **total menos las retenciones del cliente**
+ * (lo que de verdad abona el banco), salvo que el usuario lo escriba a mano. Las
+ * retenciones de la empresa se descuentan después, al calcular el saldo
+ * disponible. Por eso las deducciones se resuelven en dos tiempos: primero las
+ * que no dependen del depósito (IVA, subtotal, total, monto fijo), luego el
+ * depósito, y al final las que se aplican sobre él (p. ej. Negro Primero).
  */
 export function recalcular(
   c: Calculo,
@@ -568,9 +573,13 @@ export function recalcular(
     if (sobreOtrasBases(d)) resueltas.set(d.id, calcularDeduccion(d));
   });
 
-  // 2.º El depósito: total menos lo ya retenido (salvo que se escriba a mano).
+  // 2.º El depósito: total menos lo retenido al cliente (salvo que se escriba a
+  // mano). Las retenciones de la empresa no salen del depósito: se descuentan
+  // después, al calcular el saldo disponible.
   if (!depositadoManual && !manual('montoDepositado')) {
-    const retenido = [...resueltas.values()].reduce((acc, d) => acc + parsearNumero(d.monto), 0);
+    const retenido = [...resueltas.values()]
+      .filter((d) => (d.origen ?? 'cliente') === 'cliente')
+      .reduce((acc, d) => acc + parsearNumero(d.monto), 0);
     out.montoDepositado = redondear(out.montoTotal - retenido);
   }
 
@@ -580,7 +589,13 @@ export function recalcular(
   );
 
   out.subtotalDeducciones = redondear(out.deducciones.reduce((acc, d) => acc + parsearNumero(d.monto), 0));
-  out.saldoDisponible = redondear(out.montoDepositado);
+  const retenidoEmpresa = redondear(
+    out.deducciones
+      .filter((d) => d.origen === 'empresa')
+      .reduce((acc, d) => acc + parsearNumero(d.monto), 0),
+  );
+
+  out.saldoDisponible = redondear(out.montoDepositado - retenidoEmpresa);
 
   if (!manual('ganancia')) {
     out.ganancia = redondear(out.saldoDisponible * (out.gananciaPorcentaje / 100));
@@ -641,6 +656,100 @@ export function calculoVacio(opciones: { ahora?: Date; usuario?: string } = {}):
   };
 }
 
+/** Resultado de cargar una factura en la calculadora. */
+export interface CargaDesdeFactura {
+  /** Cálculo ya rellenado y recalculado con los datos de la factura. */
+  calculo: Calculo;
+  /** Cifras que no cuadran con la fórmula y quedan marcadas como ajuste. */
+  ajustes: string[];
+}
+
+/**
+ * Rellena un cálculo con los datos de una factura de Facturación.
+ *
+ * Se toman las cifras que la factura ya tiene resueltas (subtotal, IVA y total)
+ * y sus retenciones de IVA e ISLR pasan a ser deducciones de monto fijo del
+ * cliente, de modo que el depósito automático quede en el neto a pagar de la
+ * factura. El IVA y el total se marcan como ajuste cuando el documento real no
+ * coincide con la fórmula de la calculadora (IGTF, redondeos o cliente exento).
+ *
+ * El nombre del cálculo se rellena solo si todavía está vacío; las deducciones
+ * anteriores se sustituyen por las de la factura.
+ */
+export function calculoDesdeFactura(
+  factura: Factura,
+  actual: Calculo = calculoVacio(),
+): CargaDesdeFactura {
+  const totales = factura.totales ?? calcularTotales(factura);
+  const subtotal = redondear(parsearNumero(totales.subtotal));
+  const alicuota = redondear(alicuotaIvaEfectiva(factura));
+  const montoIva = redondear(parsearNumero(totales.montoIva));
+  const montoTotal = redondear(parsearNumero(totales.total));
+
+  const nombreCliente = (factura.cliente?.nombre ?? '').trim();
+  const nombre =
+    (actual.nombre ?? '').trim() ||
+    [factura.numero ? `Factura ${factura.numero}` : 'Factura', nombreCliente]
+      .filter(Boolean)
+      .join(' · ');
+
+  const deducciones: Deduccion[] = [];
+  const retencionIva = redondear(parsearNumero(totales.retencionIva));
+  const retencionIslr = redondear(parsearNumero(totales.retencionIslr));
+  if (retencionIva > 0) {
+    deducciones.push(
+      nuevaDeduccion({
+        nombre: 'Retención de IVA (factura)',
+        tipo: 'monto',
+        valor: retencionIva,
+        base: 'iva',
+        monto: retencionIva,
+        origen: 'cliente',
+      }),
+    );
+  }
+  if (retencionIslr > 0) {
+    deducciones.push(
+      nuevaDeduccion({
+        nombre: 'Retención de ISLR (factura)',
+        tipo: 'monto',
+        valor: retencionIslr,
+        base: 'subtotal',
+        monto: retencionIslr,
+        origen: 'cliente',
+      }),
+    );
+  }
+
+  const ajustes: string[] = [];
+  if (Math.abs(redondear(subtotal * (alicuota / 100)) - montoIva) > 0.005) {
+    ajustes.push('montoIva');
+  }
+  if (Math.abs(redondear(subtotal + montoIva) - montoTotal) > 0.005) {
+    ajustes.push('montoTotal');
+  }
+
+  const calculo = recalcular(
+    {
+      ...actual,
+      nombre,
+      montoSubtotal: subtotal,
+      ivaPorcentaje: alicuota,
+      montoIva,
+      montoTotal,
+      deducciones,
+      subtotalDeducciones: 0,
+      saldoDisponible: 0,
+      ganancia: 0,
+      saldoLibre: 0,
+    },
+    new Set(ajustes),
+    false,
+  );
+
+  return { calculo, ajustes };
+}
+
 /**
  * Normaliza un documento venido de Mongo o del almacenamiento local.
  *
@@ -693,6 +802,15 @@ export function normalizarCalculo(c: Partial<Calculo> | null | undefined): Calcu
     },
   };
 
+  // Documentos guardados con la fórmula anterior: el saldo disponible era igual
+  // al depósito. Se rehace la cadena con las fórmulas nuevas, conservando las
+  // cifras que estaban ajustadas a mano.
+  const saldoIgualAlDeposito =
+    Math.abs(parsearNumero(calculo.saldoDisponible) - parsearNumero(calculo.montoDepositado)) <= 0.005;
+  if (saldoIgualAlDeposito && parsearNumero(viejo['montoTotal']) > 0) {
+    return migrarCalculoAnterior(calculo);
+  }
+
   // Documentos guardados antes del cambio de modelo: si no traían total propio,
   // se rehace la cadena respetando las cifras que ya venían guardadas (el IVA
   // del documento viejo entra como ajuste, para que el total cuadre con él).
@@ -703,6 +821,42 @@ export function normalizarCalculo(c: Partial<Calculo> | null | undefined): Calcu
   }
 
   return calculo;
+}
+
+/**
+ * Rehace un cálculo guardado con las fórmulas nuevas.
+ *
+ * El documento viejo traía el saldo disponible igual al depósito. Se conservan
+ * las cifras que estaban ajustadas a mano y se recalculan las demás con la
+ * cadena actual.
+ */
+function migrarCalculoAnterior(calculo: Calculo): Calculo {
+  const distintos = (a: number, b: number) => Math.abs(parsearNumero(a) - parsearNumero(b)) > 0.005;
+  const ajustes = new Set<string>();
+
+  const ivaFormula = redondear(calculo.montoSubtotal * (calculo.ivaPorcentaje / 100));
+  if (distintos(calculo.montoIva, ivaFormula)) ajustes.add('montoIva');
+
+  const totalFormula = redondear(calculo.montoSubtotal + parsearNumero(calculo.montoIva));
+  if (distintos(calculo.montoTotal, totalFormula)) ajustes.add('montoTotal');
+
+  const gananciaVieja = redondear(calculo.saldoDisponible * (calculo.gananciaPorcentaje / 100));
+  if (distintos(calculo.ganancia, gananciaVieja)) ajustes.add('ganancia');
+
+  calculo.deducciones.forEach((d) => {
+    const montoFormula =
+      d.tipo === 'monto'
+        ? parsearNumero(d.valor)
+        : redondear(baseDeduccion(calculo, d.base) * (parsearNumero(d.valor) / 100));
+    if (distintos(d.monto, montoFormula)) ajustes.add(claveDeduccion(d.id));
+  });
+
+  const retenidoViejo = calculo.deducciones
+    .filter((d) => d.tipo === 'monto' || d.base !== 'depositado')
+    .reduce((acc, d) => acc + parsearNumero(d.monto), 0);
+  const depositadoManual = distintos(calculo.montoDepositado, calculo.montoTotal - retenidoViejo);
+
+  return recalcular(calculo, ajustes, depositadoManual);
 }
 
 /**

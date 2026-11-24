@@ -77,6 +77,9 @@ export interface TotalesFactura {
 /** Documentos que admite la hoja: el formato libre y la nota de entrega. */
 export type FacturaFormato = 'FORMATO LIBRE' | 'NOTA DE ENTREGA';
 
+/** Forma de pago con la que se emite la factura. */
+export type FacturaTipoPago = 'Contado' | 'Crédito' | 'Exonerado';
+
 export interface Factura {
   _id?: string;
   /** Código interno (FAC-000001): el mismo esquema que usan los clientes */
@@ -95,6 +98,8 @@ export interface Factura {
   fechaTexto: string;
   /** Periodo facturado: "Agosto 2026" */
   mes: string;
+  /** Forma de pago: contado, crédito o exonerado */
+  tipoPago: FacturaTipoPago;
   /** Alícuota de IVA en porcentaje (16 la general) */
   alicuotaIva: number;
   /** La operación se paga en divisas: corresponde IGTF */
@@ -438,6 +443,7 @@ export function facturaVacia(opciones: OpcionesFacturaVacia = {}): Factura {
     fechaEmision: ahora.toISOString(),
     fechaTexto: fechaTextoEmision(ahora),
     mes: mesFacturado(ahora),
+    tipoPago: 'Contado',
     alicuotaIva: ALICUOTA_IVA,
     aplicaIgtf: false,
     alicuotaIgtf: ALICUOTA_IGTF,
@@ -457,6 +463,14 @@ export function facturaVacia(opciones: OpcionesFacturaVacia = {}): Factura {
 /** Renglón vacío para el formulario de items. */
 export function itemVacio(): ItemFactura {
   return { descripcion: '', cantidad: 1, precio: 0 };
+}
+
+/** Forma de pago guardada: tolera variantes antiguas sin tilde o en minúsculas. */
+export function normalizarTipoPago(valor: unknown): FacturaTipoPago {
+  const texto = String(valor ?? '').trim().toLowerCase();
+  if (texto.startsWith('cred')) return 'Crédito';
+  if (texto.startsWith('exon')) return 'Exonerado';
+  return 'Contado';
 }
 
 /**
@@ -485,6 +499,7 @@ export function normalizarFactura(p: Partial<Factura> | null | undefined): Factu
     fechaEmision: p.fechaEmision || base.fechaEmision,
     fechaTexto: p.fechaTexto || base.fechaTexto,
     mes: p.mes || base.mes,
+    tipoPago: normalizarTipoPago(p.tipoPago),
     alicuotaIva: parsearNumero(p.alicuotaIva ?? base.alicuotaIva),
     alicuotaIgtf: parsearNumero(p.alicuotaIgtf ?? base.alicuotaIgtf),
     alicuotaIslr: parsearNumero(p.alicuotaIslr ?? base.alicuotaIslr),

@@ -19,6 +19,7 @@ import {
   PRESETS_DEDUCCION,
   TIPOS_DEDUCCION,
   TipoDeduccion,
+  calculoDesdeFactura,
   calculoVacio,
   claveDeduccion,
   detalleDeduccion,
@@ -39,6 +40,14 @@ import {
   validarCalculo,
 } from '../calculo.model';
 import { CalculoService } from '../calculo.service';
+import { NumeroInputDirective } from './numero-input.directive';
+import {
+  Factura,
+  calcularTotales,
+  formatearControl,
+  infoEstadoFactura,
+} from '../../billing/factura.model';
+import { FacturaService } from '../../billing/factura.service';
 
 /** Cifras derivadas que el editor deja escribir a mano. */
 type CifraAjustable = 'montoIva' | 'montoTotal' | 'ganancia';
@@ -57,7 +66,8 @@ type CifraFuente = 'montoSubtotal' | 'ivaPorcentaje' | 'gananciaPorcentaje';
  *      calculan solos;
  *   2. las **deducciones**, que el usuario agrega a su gusto: cada una en
  *      porcentaje sobre la base que elija, o en monto fijo;
- *   3. el **monto depositado** (por defecto, el total menos las deducciones);
+ *   3. el **monto depositado** (por defecto, el total menos las retenciones del
+ *      cliente);
  *   4. el **saldo disponible**, la ganancia objetivo y el **saldo libre**.
  *
  * Las cifras que salen de una fórmula se autocalculan. Si el documento real no
@@ -78,6 +88,7 @@ type CifraFuente = 'montoSubtotal' | 'ivaPorcentaje' | 'gananciaPorcentaje';
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
+    NumeroInputDirective,
   ],
   templateUrl: './calculator.component.html',
   styleUrls: ['./calculator.component.scss'],
@@ -90,6 +101,39 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   readonly guardando = signal(false);
   readonly cambiado = signal(false);
   readonly consultandoTasa = signal(false);
+
+  /** Selector de facturas de Facturación para rellenar el cálculo. */
+  readonly selectorFacturaAbierto = signal(false);
+  readonly cargandoFacturas = signal(false);
+  readonly facturasDisponibles = signal<Factura[]>([]);
+  readonly filtroFactura = signal('');
+
+  /** Facturas visibles en el selector, acotadas por el texto de búsqueda. */
+  readonly facturasFiltradas = computed<Factura[]>(() => {
+    const texto = this.filtroFactura().trim().toLowerCase();
+    const lista = this.facturasDisponibles();
+    if (!texto) return lista;
+
+    return lista.filter((f) => {
+      const heno = [
+        f.codigo,
+        f.numero,
+        formatearControl(f.controlPrefijo, f.numeroControl),
+        f.formato,
+        f.mes,
+        f.fechaTexto,
+        infoEstadoFactura(f.estado).etiqueta,
+        f.cliente?.nombre,
+        f.cliente?.identificacion,
+        f.cliente?.rif,
+        f.cliente?.codigo,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return heno.includes(texto);
+    });
+  });
 
   /** Cifras derivadas que el usuario desbloqueó (la fórmula no las toca). */
   readonly ajustes = signal<string[]>([]);
@@ -162,6 +206,8 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   readonly presets = PRESETS_DEDUCCION;
   readonly estados = ESTADOS_CALCULO;
   readonly infoEstado = infoEstadoCalculo;
+  readonly infoEstadoFactura = infoEstadoFactura;
+  readonly formatearControl = formatearControl;
   readonly formatoBs = formatoBs;
   readonly formatoPorcentaje = formatoPorcentaje;
   readonly nombreCalculo = nombreCalculo;
@@ -177,6 +223,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   constructor(
     private calculoService: CalculoService,
+    private facturaService: FacturaService,
     private api: ApiService,
     private notificar: NotificacionService,
   ) {}
@@ -233,11 +280,92 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   }
 
   // ═══════════════════════════════════════════
+  // Cargar factura de Facturación
+  // ═══════════════════════════════════════════
+
+  /** Abre el selector de facturas y refresca la lista desde el servidor. */
+  async abrirSelectorFactura(): Promise<void> {
+    if (this.soloLectura()) return;
+    this.selectorFacturaAbierto.set(true);
+    this.filtroFactura.set('');
+    await this.cargarFacturasDisponibles();
+  }
+
+  cerrarSelectorFactura(): void {
+    this.selectorFacturaAbierto.set(false);
+    this.filtroFactura.set('');
+  }
+
+  setFiltroFactura(texto: string): void {
+    this.filtroFactura.set(texto ?? '');
+  }
+
+  /**
+   * Facturas que se pueden cargar: borradores y emitidas. Las anuladas y las
+   * eliminadas no representan una operación válida.
+   */
+  async cargarFacturasDisponibles(): Promise<void> {
+    this.cargandoFacturas.set(true);
+    try {
+      const lista = await this.facturaService.listar();
+      const facturas = lista
+        .filter((f) => f.estado === 'borrador' || f.estado === 'emitida')
+        .sort(
+          (a, b) =>
+            new Date(b.fechaEmision ?? '').getTime() - new Date(a.fechaEmision ?? '').getTime(),
+        );
+      this.facturasDisponibles.set(facturas);
+    } catch (e) {
+      this.notificar.error(
+        'No se pudieron consultar las facturas',
+        NotificacionService.detalle(e),
+      );
+    } finally {
+      this.cargandoFacturas.set(false);
+    }
+  }
+
+  /**
+   * Vuelca los datos de la factura elegida en la calculadora: subtotal, IVA y
+   * total, y sus retenciones de IVA e ISLR como deducciones del cliente.
+   */
+  async elegirFactura(f: Factura): Promise<void> {
+    if (this.soloLectura() || !f?.codigo) return;
+
+    this.cargandoFacturas.set(true);
+    try {
+      // El listado trae una proyección liviana: se relee el documento completo.
+      const doc = (await this.facturaService.obtener(f.codigo)) ?? f;
+      const { calculo, ajustes } = calculoDesdeFactura(doc, this.calculo());
+
+      this.calculo.set(calculo);
+      this.ajustes.set(ajustes);
+      this.depositadoManual.set(false);
+      this.cambiado.set(true);
+      this.cerrarSelectorFactura();
+
+      this.notificar.exito(
+        'Factura cargada',
+        `Se rellenaron las cifras con la factura ${doc.numero} y sus retenciones.`,
+      );
+    } catch (e) {
+      this.notificar.error('No se pudo cargar la factura', NotificacionService.detalle(e));
+    } finally {
+      this.cargandoFacturas.set(false);
+    }
+  }
+
+  /** Total de la factura para mostrarlo en el selector. */
+  totalFactura(f: Factura): number {
+    return f.totales ? parsearNumero(f.totales.total) : calcularTotales(f).total;
+  }
+
+  // ═══════════════════════════════════════════
   // Cifras fuente
   // ═══════════════════════════════════════════
 
   /** Escribe una cifra de la que cuelga el resto del desglose. */
-  setFuente(campo: CifraFuente, texto: string): void {
+  setFuente(campo: CifraFuente, texto: string | number): void {
     if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, [campo]: parsearNumero(texto) }));
     this.recalcular();
@@ -245,7 +373,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   }
 
   /** Monto depositado: al escribirlo deja de seguir a la fórmula (total − deducciones). */
-  setDepositado(texto: string): void {
+  setDepositado(texto: string | number): void {
     if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, montoDepositado: parsearNumero(texto) }));
     this.depositadoManual.set(true);
@@ -353,7 +481,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   }
 
   /** Escribe una cifra derivada que estaba desbloqueada. */
-  setDerivado(campo: CifraAjustable, texto: string): void {
+  setDerivado(campo: CifraAjustable, texto: string | number): void {
     if (this.soloLectura()) return;
     this.calculo.update((c) => ({ ...c, [campo]: parsearNumero(texto) }));
     this.recalcular();
@@ -401,8 +529,9 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   /**
    * ¿El monto depositado guardado se escribió a mano o sigue la fórmula?
    *
-   * El depósito sigue por defecto al **total menos las deducciones**; si el
-   * guardado no coincide con eso, es porque alguien lo fijó a mano.
+   * El depósito sigue por defecto al **total menos las retenciones del
+   * cliente**; si el guardado no coincide con eso, es porque alguien lo fijó a
+   * mano.
    */
   private esDepositadoManual(doc: Calculo): boolean {
     const formula = recalcular(doc, new Set(this.ajustes()), false);
@@ -471,17 +600,21 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
 
   setDeduccionBase(d: Deduccion, base: BaseDeduccion): void {
     this.conDeduccion(d.id, (x) => ({ ...x, base }));
+    // La base manda la fórmula: si el monto estaba fijado a mano, se suelta
+    // para que la nueva base se refleje en la cifra.
+    this.soltarAjuste(claveDeduccion(d.id), false);
+    this.recalcular();
   }
 
   /** Escribe el porcentaje (o el monto) de la deducción: manda la fórmula. */
-  setDeduccionValor(d: Deduccion, texto: string): void {
+  setDeduccionValor(d: Deduccion, texto: string | number): void {
     this.conDeduccion(d.id, (x) => ({ ...x, valor: parsearNumero(texto) }));
     this.soltarAjuste(claveDeduccion(d.id), false);
     this.recalcular();
   }
 
   /** Escribe en bolívares una deducción en porcentaje (cifra ajustada a mano). */
-  setDeduccionMonto(d: Deduccion, texto: string): void {
+  setDeduccionMonto(d: Deduccion, texto: string | number): void {
     this.ajustar(claveDeduccion(d.id));
     this.conDeduccion(d.id, (x) => ({ ...x, monto: parsearNumero(texto) }));
   }
@@ -558,7 +691,7 @@ export class CalculatorComponent implements OnInit, PuedeSalir {
   }
 
   /** Escribe la tasa a mano (cuando el usuario consigue el valor por su cuenta). */
-  setTasaValor(texto: string): void {
+  setTasaValor(texto: string | number): void {
     const valor = parsearNumero(texto);
     this.calculo.update((c) => ({ ...c, tasa: { ...c.tasa, valor, actualizadaEn: new Date().toISOString() } }));
     this.cambiado.set(true);
