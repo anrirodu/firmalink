@@ -31,7 +31,7 @@
         @if (item.type === 'item' && item.url) {
           <a class="nav-item" [class.active]="isActive(item.url!)" (click)="navigateTo(item.url!)">
             <mat-icon>{{ item.icon }}</mat-icon>
-            <span>{{ item.title }}</span>
+            <span [matTooltip]="item.title" matTooltipPosition="right">{{ item.title }}</span>
           </a>
         }
 
@@ -39,7 +39,7 @@
           <div class="nav-collapsible">
             <a class="nav-item" (click)="toggleSubmenu(item)">
               <mat-icon>{{ item.icon }}</mat-icon>
-              <span>{{ item.title }}</span>
+              <span [matTooltip]="item.title" matTooltipPosition="right">{{ item.title }}</span>
               <mat-icon class="expand-icon" [class.expanded]="isExpanded(item)">
                 expand_more
               </mat-icon>
@@ -51,7 +51,7 @@
                   @if (child.url) {
                     <a class="submenu-item" [class.active]="isActive(child.url)" (click)="navigateTo(child.url)">
                       <mat-icon>{{ child.icon }}</mat-icon>
-                      <span>{{ child.title }}</span>
+                      <span [matTooltip]="child.title" matTooltipPosition="right">{{ child.title }}</span>
                     </a>
                   }
                 }

@@ -1,4 +1,4 @@
-import{A as z,d as O,f as P,k as y$1,m as U,n as B,u as N}from"./chunk-Cbe9BkEl.js";import{f as Ne}from"./chunk-CGku6mJa.js";var n={anchoCm:21.7,altoCm:28,margenSuperiorCm:4.5,margenInferiorCm:2.5,margenLateralCm:2};var d=`firmalink-factura-estilos`;var x=`
+import{f as Ne}from"./chunk-BlF77dRO.js";import{A as z,d as O,f as P,k as y$1,m as U,n as B,u as N}from"./chunk-Cbe9BkEl.js";var n={anchoCm:21.7,altoCm:28,margenSuperiorCm:4.5,margenInferiorCm:2.5,margenLateralCm:2};var d=`firmalink-factura-estilos`;var x=`
 /* \u2500\u2500 Lienzo de la vista previa \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .fx-lienzo {
   display: flex;
